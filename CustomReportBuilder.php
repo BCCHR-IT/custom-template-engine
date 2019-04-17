@@ -7,6 +7,7 @@ require_once "vendor/autoload.php";
 
 use REDCap;
 use Project;
+use Logging;
 use DOMDocument;
 use HtmlPage;
 use Dompdf\Dompdf;
@@ -40,6 +41,36 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             // Local
             @unlink(EDOC_PATH . $file);
         }
+    }
+
+    private function initializeEditor($id, $height)
+    {
+        print "
+        <script>
+            //CKEDITOR.plugins.addExternal( 'codemirror', pluginsFolder + 'codemirror/', 'plugin.js' );
+            CKEDITOR.replace( '$id', {
+                extraPlugins: 'uploadimage',
+                toolbar: [
+                    { name: 'clipboard', items: [ 'Undo', 'Redo' ] },
+                    { name: 'basicstyles', items: [ 'Bold', 'Italic', 'Underline', 'Strike', 'RemoveFormat'] },
+                    { name: 'paragraph', items: [ 'NumberedList', 'BulletedList', '-', 'Outdent', 'Indent', '-'] },
+                    { name: 'insert', items: [ 'Image', 'Table', 'HorizontalRule' ] },
+                    { name: 'styles', items: [ 'Format', 'Font', 'FontSize' ] },
+                    { name: 'colors', items: [ 'TextColor', 'BGColor', 'CopyFormatting' ] },
+                    { name: 'align', items: [ 'JustifyLeft', 'JustifyCenter', 'JustifyRight', 'JustifyBlock' ] },
+                    { name: 'source', items: ['Source', 'searchCode', 'Find', 'SelectAll'] },
+                ],
+                height: $height,
+                bodyClass: 'document-editor',
+                contentsCss: [ 'https://cdn.ckeditor.com/4.8.0/full-all/contents.css', '" . $this->getUrl("app.css") . "' ],
+                filebrowserBrowseUrl: '" . $this->getUrl("BrowseImages.php") . "&type=Images',
+                filebrowserUploadUrl: '" . $this->getUrl("UploadImages.php") . "&type=Images',
+                filebrowserUploadMethod: 'form',
+                fillEmptyBlocks: false,
+                extraAllowedContent: '*{*}',
+                font_names: 'Arial/Arial, Helvetica, sans-serif; Times New Roman/Times New Roman, Times, serif; Courier; DejaVu'
+            });
+        </script>";
     }
 
     private function checkPermissions()
@@ -545,6 +576,220 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         <?php
     }
 
+    public function uploadImages()
+    {
+        // Required: anonymous function reference number as explained above.
+        $func_num = $_GET["CKEditorFuncNum"] ;
+        // Optional: compare it with the value of `ckCsrfToken` sent in a cookie to protect your server side uploader against CSRF.
+        // Available since CKEditor 4.5.6.
+        $token = $_POST["ckCsrfToken"] ;
+        $cookie_token = $_COOKIE["ckCsrfToken"];
+
+        // url of the image to return
+        $url = "";
+        // error message, empty if none
+        $message = "";
+
+        if ($token === $cookie_token)
+        {
+            // Check the $_FILES array and save the file. Assign the correct path to a variable ($url).
+            if (isset($_FILES["upload"]) && !empty($_FILES["upload"]))
+            {
+                $upload = $_FILES["upload"];
+                if ($upload["error"] == UPLOAD_ERR_OK)
+                {
+                    $tmp_name = $upload["tmp_name"];
+                    $check = getimagesize($tmp_name);
+                    
+                    if ($check !== false)
+                    {
+                        $name = pathinfo(basename($upload["name"]));
+                        $filename = str_replace(" ", "_", $name["filename"]) . "_" . $_GET["pid"] . "." . $name["extension"];
+
+                        $upload_dir = $this->getSystemSetting("proj-img-folder") . $filename;
+
+                        if (!file_exists($upload_dir))
+                        {
+                            if (!mkdir($upload_dir))
+                            {
+                                $message = "ERROR: Failed to create images directory for project images. Please contact your REDCap administrator.";
+                                ?>
+                                <!DOCTYPE html>
+                                <html lang="en">
+                                <head>
+                                    <meta charset="UTF-8">
+                                    <title>Img Upload</title>
+                                </head>
+                                <body>
+                                <?php print "<script type='text/javascript'>window.parent.CKEDITOR.tools.callFunction($func_num, '$url', \"$message\");</script>"; ?>
+                                </body>
+                                </html> 
+                                <?php
+                                exit;
+                            }
+                        }
+
+                        if (move_uploaded_file($tmp_name, $upload_dir))
+                        {
+                            $url = "fileManager/$upload_dir";
+                            REDCap::logEvent("Photo uploaded", $filename);
+                        }
+                        else
+                        {
+                            $lastErr = error_get_last();
+                            if ($lastErr != NULL)
+                            {
+                                $message = "ERROR: " . $lastErr["message"];
+                            }
+                            else
+                            {
+                                $message = "ERROR: Unable to move uploaded file to directory.";
+                            }
+                        }
+                    }
+                    else
+                    {
+                        $message = "ERROR: File is not an image.";
+                    }
+                }
+                else
+                {
+                    $message = "ERROR: error uploading file.";
+                }
+            }
+            else
+            {
+                $message = "ERROR: error uploading file.";
+            }
+        }
+        else
+        {
+            $message = "ERROR: ckCsrfToken not valid";
+        }
+        ?>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Img Upload</title>
+        </head>
+        <body>
+        <?php print "<script type='text/javascript'>window.parent.CKEDITOR.tools.callFunction($func_num, '$url', \"$message\");</script>"; ?>
+        </body>
+        </html> 
+        <?php
+    }
+
+    public function browseImages()
+    {
+        $sys_imgs_dir = $this->getSystemSetting("sys-img-folder");
+        $proj_imgs_dir = $this->getSystemSetting("proj-img-folder");
+
+        $sys_imgs = array_diff(scandir($sys_imgs_dir), array(".", ".."));
+        $proj_imgs = array_filter(scandir($proj_imgs_dir), function ($img) {
+            return strpos($img, "_" . $this->pid) !== FALSE;
+        });
+        ?>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Browsing Files</title>
+            <link href="<?php print $this->getUrl("app.css"); ?>" rel="stylesheet" type="text/css">
+            <!-- Latest compiled and minified CSS -->
+            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+            <!-- Optional theme -->
+            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+            <!-- Latest compiled and minified JavaScript -->
+            <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+            <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+            <script>
+                // Helper function to get parameters from the query string.
+                function getUrlParam( paramName ) {
+                    var reParam = new RegExp( "(?:[\?&]|&)" + paramName + "=([^&]+)", "i" );
+                    var match = window.location.search.match( reParam );
+
+                    return ( match && match.length > 1 ) ? match[1] : null;
+                }
+                // Simulate user action of selecting a file to be returned to CKEditor.
+                function returnFileUrl(filename) {
+                    var funcNum = getUrlParam( "CKEditorFuncNum" );
+                    var fileUrl = "fileManager/" + filename;
+                    window.opener.CKEDITOR.tools.callFunction(funcNum, fileUrl);
+                    window.close();
+                }
+            </script>
+        </head>
+        <body>
+            <div class="row" style="margin:20px">
+                <h4>IMAGE GALLERY</h4>
+                <h6>Click on your image to import it into the editor</h6>
+            </div>
+            <hr/>
+            <div style="margin:20px">
+                <?php
+                    $all_imgs = array();
+
+                    foreach($sys_imgs as $img)
+                    {
+                        array_push(
+                            $all_imgs,
+                            array(
+                                "url" => $imgs_dir . "sys/" . $img,
+                                "name" => $img
+                            )
+                        );
+                    }
+
+                    foreach($proj_imgs as $img)
+                    {
+                        array_push(
+                            $all_imgs,
+                            array(
+                                "url" => $imgs_dir . "project/" . $img,
+                                "name" => $img
+                            )
+                        );
+                    }
+
+                    for($i = 0; $i < sizeof($all_imgs); $i++)
+                    {
+                        if ($i%6 == 0 && $i == 0)
+                        {
+                            print "<div class='row'>";
+                        }
+                        else if ($i%6 == 0 && $i != 0 && $i != sizeof($all_imgs))
+                        {
+                            print "</div><br/><div class='row'>";
+                        }
+
+                        $arr = $all_imgs[$i];
+                        print "
+                        <div class='col-sm-2'>
+                            <div class='img-file' img-url ='" . $arr["url"]. "'>
+                                <div style='background-image: url(\"". $arr["url"]. "\");'></div>
+                                <p style='background-color:#286090;color:white'>" . $arr["name"] . "</p>
+                            </div>
+                        </div>
+                        ";
+
+                        if ($i == sizeof($all_imgs) - 1)
+                        {
+                            print "</div>";
+                        }
+                    }
+                ?>
+            </div>
+            <script>
+                $(".img-file").click(function () {
+                    returnFileUrl($(this).attr("img-url"));
+                });
+            </script>
+        </body>
+        </html>
+        <?php
+    }
+
     public function saveTemplate()
     {
         $header = preg_replace("/&nbsp;/", " ", $_POST["header-editor"]);
@@ -739,22 +984,20 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             $dummy_file_name = str_replace("__","_",$dummy_file_name);
             
             $file_extension = "pdf";
-            $stored_name = date('YmdHis') . "_pid" . $project_id . "_" . generateRandomHash(6) . ".pdf";
+            $stored_name = date('YmdHis') . "_pid" . $this->pid . "_" . generateRandomHash(6) . ".pdf";
 
             $upload_success = file_put_contents(EDOC_PATH . $stored_name, $dompdf->output());
 
             if ($upload_success !== FALSE) 
             {
-                $userid = strtolower(USERID);
-
                 $dummy_file_size = $upload_success;
                 $dummy_file_type = "application/pdf";
                 
                 $file_repo_name = date("Y/m/d H:i:s");
 
                 $sql = "INSERT INTO redcap_docs (project_id,docs_date,docs_name,docs_size,docs_type,docs_comment,docs_rights)
-                        VALUES ($project_id,CURRENT_DATE,'$dummy_file_name.pdf','$dummy_file_size','$dummy_file_type',
-                        \"$file_repo_name - $filename ($userid)\",NULL)";
+                        VALUES ($this->pid,CURRENT_DATE,'$dummy_file_name.pdf','$dummy_file_size','$dummy_file_type',
+                        \"$file_repo_name - $filename ($this->userid)\",NULL)";
                                 
                 if ($this->query($sql)) 
                 {
@@ -762,7 +1005,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
                     $sql = "INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date)
                             VALUES('".$stored_name."','".$dummy_file_type."','".$dummy_file_name."','".$dummy_file_size."',
-                            '".$file_extension."','".$project_id."','".date('Y-m-d H:i:s')."');";
+                            '".$file_extension."','".$this->pid."','".date('Y-m-d H:i:s')."');";
                                 
                     if ($this->query($sql)) 
                     {
@@ -921,7 +1164,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                                 <td style="width:25%;"><strong style="color:red">* Required</strong></td>
                                 <td class="data">
                                     <div class="col-sm-5">
-                                        <input id="filename" name="filename" type="text" class="form-control" value="<?php print basename($template_filename, "_$project_id.html") . " - $record";?>" required>
+                                        <input id="filename" name="filename" type="text" class="form-control" value="<?php print basename($template_filename, "_$this->pid.html") . " - $record";?>" required>
                                     </div>
                                 </td>
                             </tr>
@@ -960,13 +1203,10 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         print "
         <script src='" . $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js") . "'></script>
         <script src='" . $this->getUrl("scripts.js") . "'></script>
-        <script>
-            CKEDITOR.dtd.\$removeEmpty['p'] = true;
-            initializeEditor('header-editor', 200, '$plugins_folder', '$this->pid')
-            initializeEditor('footer-editor', 200,  '$plugins_folder', '$this->pid')
-            initializeEditor('editor', 1000, '$plugins_folder', '$this->pid');
-        </script>
-        ";        
+        ";
+        $this->initializeEditor("header-editor", 200);
+        $this->initializeEditor("footer-editor", 200);
+        $this->initializeEditor("editor", 1000);
     }
 
     public function generateEditTemplatePage($info = NULL)
@@ -1117,12 +1357,10 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         print "
         <script src='" . $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js") . "'></script>
         <script src='" . $this->getUrl("scripts.js") . "'></script>
-        <script>
-            initializeEditor('header-editor', 200, '$plugins_folder', '$this->pid')
-            initializeEditor('footer-editor', 200,  '$plugins_folder', '$this->pid')
-            initializeEditor('editor', 1000, '$plugins_folder', '$this->pid')
-        </script>
         ";
+        $this->initializeEditor("header-editor", 200);
+        $this->initializeEditor("footer-editor", 200);
+        $this->initializeEditor("editor", 1000);
     }
 
     public function generateCreateTemplatePage()
@@ -1186,12 +1424,10 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         print "
         <script src='" . $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js") . "'></script>
         <script src='" . $this->getUrl("scripts.js") . "'></script>
-        <script>
-            initializeEditor('header-editor', 200, '$plugins_folder', '$this->pid')
-            initializeEditor('footer-editor', 200,  '$plugins_folder', '$this->pid')
-            initializeEditor('editor', 1000, '$plugins_folder', '$this->pid')
-        </script>
         ";
+        $this->initializeEditor("header-editor", 200);
+        $this->initializeEditor("footer-editor", 200);
+        $this->initializeEditor("editor", 1000);
     }
 
     public function generateIndexPage()
