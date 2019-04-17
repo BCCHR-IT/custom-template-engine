@@ -4,8 +4,19 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "82982ba3f0041b62bce3d600046595ad",
+    "content-hash": "b90738cbdde26ce72c3a4a64fddf791c",
     "packages": [
+        {
+            "name": "ckeditor-plugin/codemirror",
+            "version": "1.17.10",
+            "dist": {
+                "type": "zip",
+                "url": "https://github.com/w8tcha/CKEditor-CodeMirror-Plugin/releases/download/v1.17.10/CKEditor-CodeMirror-Plugin.zip",
+                "reference": null,
+                "shasum": null
+            },
+            "type": "library"
+        },
         {
             "name": "ckeditor/ckeditor",
             "version": "dev-full/4.11.x",

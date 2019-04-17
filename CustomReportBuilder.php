@@ -47,9 +47,9 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
     {
         print "
         <script>
-            //CKEDITOR.plugins.addExternal( 'codemirror', pluginsFolder + 'codemirror/', 'plugin.js' );
+            CKEDITOR.plugins.addExternal( 'codemirror', '" . $this->getUrl("vendor/ckeditor-plugin/codemirror/codemirror/plugin.js") . "');
             CKEDITOR.replace( '$id', {
-                extraPlugins: 'uploadimage',
+                extraPlugins: 'uploadimage, codemirror',
                 toolbar: [
                     { name: 'clipboard', items: [ 'Undo', 'Redo' ] },
                     { name: 'basicstyles', items: [ 'Bold', 'Italic', 'Underline', 'Strike', 'RemoveFormat'] },
@@ -606,13 +606,12 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         $name = pathinfo(basename($upload["name"]));
                         $filename = str_replace(" ", "_", $name["filename"]) . "_" . $_GET["pid"] . "." . $name["extension"];
 
-                        $upload_dir = $this->getSystemSetting("proj-img-folder") . $filename;
+                        $upload_dir = $this->getSystemSetting("proj-img-folder");
 
                         if (!file_exists($upload_dir))
                         {
                             if (!mkdir($upload_dir))
                             {
-                                $message = "ERROR: Failed to create images directory for project images. Please contact your REDCap administrator.";
                                 ?>
                                 <!DOCTYPE html>
                                 <html lang="en">
@@ -621,7 +620,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                                     <title>Img Upload</title>
                                 </head>
                                 <body>
-                                <?php print "<script type='text/javascript'>window.parent.CKEDITOR.tools.callFunction($func_num, '$url', \"$message\");</script>"; ?>
+                                <?php print "<script type='text/javascript'>window.parent.CKEDITOR.tools.callFunction($func_num, '$url', \"ERROR: Failed to create images directory for project images. Please contact your REDCap administrator.\");</script>"; ?>
                                 </body>
                                 </html> 
                                 <?php
@@ -629,10 +628,9 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                             }
                         }
 
-                        if (move_uploaded_file($tmp_name, $upload_dir))
+                        if (move_uploaded_file($tmp_name, $upload_dir . $filename))
                         {
-                            $url = "fileManager/$upload_dir";
-                            REDCap::logEvent("Photo uploaded", $filename);
+                            REDCap::logEvent("Photo uploaded", $upload_dir . $filename);
                         }
                         else
                         {
@@ -714,8 +712,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 // Simulate user action of selecting a file to be returned to CKEditor.
                 function returnFileUrl(filename) {
                     var funcNum = getUrlParam( "CKEditorFuncNum" );
-                    var fileUrl = "fileManager/" + filename;
-                    window.opener.CKEDITOR.tools.callFunction(funcNum, fileUrl);
+                    window.opener.CKEDITOR.tools.callFunction(funcNum, filename);
                     window.close();
                 }
             </script>
@@ -729,29 +726,26 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             <div style="margin:20px">
                 <?php
                     $all_imgs = array();
-
                     foreach($sys_imgs as $img)
                     {
                         array_push(
                             $all_imgs,
                             array(
-                                "url" => $imgs_dir . "sys/" . $img,
+                                "url" => $this->getSystemSetting("sys-img-url") . $img,
                                 "name" => $img
                             )
                         );
                     }
-
                     foreach($proj_imgs as $img)
                     {
                         array_push(
                             $all_imgs,
                             array(
-                                "url" => $imgs_dir . "project/" . $img,
+                                "url" => $this->getSystemSetting("proj-img-url") . $img,
                                 "name" => $img
                             )
                         );
                     }
-
                     for($i = 0; $i < sizeof($all_imgs); $i++)
                     {
                         if ($i%6 == 0 && $i == 0)
