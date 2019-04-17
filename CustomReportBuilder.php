@@ -731,7 +731,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         array_push(
                             $all_imgs,
                             array(
-                                "url" => $this->getSystemSetting("sys-img-url") . $img,
+                                "url" => $this->getUrl($sys_imgs_dir . $img),
                                 "name" => $img
                             )
                         );
@@ -741,7 +741,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         array_push(
                             $all_imgs,
                             array(
-                                "url" => $this->getSystemSetting("proj-img-url") . $img,
+                                "url" => $this->getUrl($proj_imgs_dir . $img),
                                 "name" => $img
                             )
                         );
@@ -966,103 +966,111 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             // Render the HTML as PDF
             $dompdf->render();
 
-            // Stolen code from redcap version/FileRepository/index.php with several modifications
-            // Upload the compiled report to the File Repository
-            $database_success = FALSE;
-            $upload_success = FALSE;
-            $errors = array();
-
-            $dummy_file_name = $filename;
-            $dummy_file_name = preg_replace("/[^a-zA-Z-._0-9]/","_",$dummy_file_name);
-            $dummy_file_name = str_replace("__","_",$dummy_file_name);
-            $dummy_file_name = str_replace("__","_",$dummy_file_name);
-            
-            $file_extension = "pdf";
-            $stored_name = date('YmdHis') . "_pid" . $this->pid . "_" . generateRandomHash(6) . ".pdf";
-
-            $upload_success = file_put_contents(EDOC_PATH . $stored_name, $dompdf->output());
-
-            if ($upload_success !== FALSE) 
+            if ($this->getProjectSetting("save-report-to-repo"))
             {
-                $dummy_file_size = $upload_success;
-                $dummy_file_type = "application/pdf";
+                // Stolen code from redcap version/FileRepository/index.php with several modifications
+                // Upload the compiled report to the File Repository
+                $database_success = FALSE;
+                $upload_success = FALSE;
+                $errors = array();
+
+                $dummy_file_name = $filename;
+                $dummy_file_name = preg_replace("/[^a-zA-Z-._0-9]/","_",$dummy_file_name);
+                $dummy_file_name = str_replace("__","_",$dummy_file_name);
+                $dummy_file_name = str_replace("__","_",$dummy_file_name);
                 
-                $file_repo_name = date("Y/m/d H:i:s");
+                $file_extension = "pdf";
+                $stored_name = date('YmdHis') . "_pid" . $this->pid . "_" . generateRandomHash(6) . ".pdf";
 
-                $sql = "INSERT INTO redcap_docs (project_id,docs_date,docs_name,docs_size,docs_type,docs_comment,docs_rights)
-                        VALUES ($this->pid,CURRENT_DATE,'$dummy_file_name.pdf','$dummy_file_size','$dummy_file_type',
-                        \"$file_repo_name - $filename ($this->userid)\",NULL)";
-                                
-                if ($this->query($sql)) 
+                $upload_success = file_put_contents(EDOC_PATH . $stored_name, $dompdf->output());
+
+                if ($upload_success !== FALSE) 
                 {
-                    $docs_id = db_insert_id();
+                    $dummy_file_size = $upload_success;
+                    $dummy_file_type = "application/pdf";
+                    
+                    $file_repo_name = date("Y/m/d H:i:s");
 
-                    $sql = "INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date)
-                            VALUES('".$stored_name."','".$dummy_file_type."','".$dummy_file_name."','".$dummy_file_size."',
-                            '".$file_extension."','".$this->pid."','".date('Y-m-d H:i:s')."');";
-                                
+                    $sql = "INSERT INTO redcap_docs (project_id,docs_date,docs_name,docs_size,docs_type,docs_comment,docs_rights)
+                            VALUES ($this->pid,CURRENT_DATE,'$dummy_file_name.pdf','$dummy_file_size','$dummy_file_type',
+                            \"$file_repo_name - $filename ($this->userid)\",NULL)";
+                                    
                     if ($this->query($sql)) 
                     {
-                        $doc_id = db_insert_id();
-                        $sql = "INSERT INTO redcap_docs_to_edocs (docs_id,doc_id) VALUES ('".$docs_id."','".$doc_id."');";
+                        $docs_id = db_insert_id();
+
+                        $sql = "INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date)
+                                VALUES('".$stored_name."','".$dummy_file_type."','".$dummy_file_name."','".$dummy_file_size."',
+                                '".$file_extension."','".$this->pid."','".date('Y-m-d H:i:s')."');";
                                     
                         if ($this->query($sql)) 
                         {
-                            if ($project_language == 'English') 
+                            $doc_id = db_insert_id();
+                            $sql = "INSERT INTO redcap_docs_to_edocs (docs_id,doc_id) VALUES ('".$docs_id."','".$doc_id."');";
+                                        
+                            if ($this->query($sql)) 
                             {
-                                // ENGLISH
-                                $context_msg_insert = "{$lang['docs_22']} {$lang['docs_08']}";
+                                if ($project_language == 'English') 
+                                {
+                                    // ENGLISH
+                                    $context_msg_insert = "{$lang['docs_22']} {$lang['docs_08']}";
+                                } 
+                                else 
+                                {
+                                    // NON-ENGLISH
+                                    $context_msg_insert = ucfirst($lang['docs_22'])." {$lang['docs_08']}";
+                                }
+
+                                // Logging
+                                Logging::logEvent("","redcap_docs","MANAGE",$docs_id,"docs_id = $docs_id","Upload document to file repository");
+                                $context_msg = str_replace('{fetched}', '', $context_msg_insert);
+                                $database_success = TRUE;
                             } 
                             else 
                             {
-                                // NON-ENGLISH
-                                $context_msg_insert = ucfirst($lang['docs_22'])." {$lang['docs_08']}";
+                                /* if this failed, we need to roll back redcap_edocs_metadata and redcap_docs */
+                                $this->query("DELETE FROM redcap_edocs_metadata WHERE doc_id='".$doc_id."';");
+                                $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
+                                $this->delete_repository_file($stored_name);
                             }
-
-                            // Logging
-                            Logging::logEvent("","redcap_docs","MANAGE",$docs_id,"docs_id = $docs_id","Upload document to file repository");
-                            $context_msg = str_replace('{fetched}', '', $context_msg_insert);
-                            $database_success = TRUE;
                         } 
-                        else 
+                        else
                         {
-                            /* if this failed, we need to roll back redcap_edocs_metadata and redcap_docs */
-                            $this->query("DELETE FROM redcap_edocs_metadata WHERE doc_id='".$doc_id."';");
+                            /* if we failed here, we need to roll back redcap_docs */
                             $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
                             $this->delete_repository_file($stored_name);
                         }
                     } 
-                    else
+                    else 
                     {
-                        /* if we failed here, we need to roll back redcap_docs */
-                        $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
+                        /* if we failed here, we need to delete the file */
                         $this->delete_repository_file($stored_name);
-                    }
-                } 
-                else 
-                {
-                    /* if we failed here, we need to delete the file */
-                    $this->delete_repository_file($stored_name);
-                }            
-            }
-
-            if ($database_success === FALSE) 
-            {
-                $context_msg = "<b>{$lang['global_01']}{$lang['colon']} {$lang['docs_47']}</b><br>" . $lang['docs_65'] . ' ' . maxUploadSizeFileRespository().'MB'.$lang['period'];
-                                
-                if ($super_user) 
-                {
-                    $context_msg .= '<br><br>' . $lang['system_config_69'];
+                    }            
                 }
 
-                $HtmlPage = new HtmlPage();
-                $HtmlPage->PrintHeaderExt();
-                print "<div class='red'>" . $context_msg . "</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>";
-                $HtmlPage->PrintFooterExt();
+                if ($database_success === FALSE) 
+                {
+                    $context_msg = "<b>{$lang['global_01']}{$lang['colon']} {$lang['docs_47']}</b><br>" . $lang['docs_65'] . ' ' . maxUploadSizeFileRespository().'MB'.$lang['period'];
+                                    
+                    if ($super_user) 
+                    {
+                        $context_msg .= '<br><br>' . $lang['system_config_69'];
+                    }
+
+                    $HtmlPage = new HtmlPage();
+                    $HtmlPage->PrintHeaderExt();
+                    print "<div class='red'>" . $context_msg . "</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>";
+                    $HtmlPage->PrintFooterExt();
+                }
+                else
+                {
+                    // Output the generated PDF to Browser
+                    $dompdf->stream($filename);
+                    REDCap::logEvent("Downloaded Report ", $filename , "" ,$_GET["record"]);
+                }
             }
             else
             {
-                // Output the generated PDF to Browser
                 $dompdf->stream($filename);
                 REDCap::logEvent("Downloaded Report ", $filename , "" ,$_GET["record"]);
             }

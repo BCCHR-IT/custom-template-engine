@@ -65,6 +65,15 @@
             "type": "text",
             "repeatable": false,
             "super-users-only": true
-        }               
+        }             
+    ],
+    "project-settings": [
+        {
+            "key": "save-report-to-repo",
+            "name": "Save Filled Reports to File Repository?",
+            "type": "checkbox",
+            "repeatable": false,
+            "super-users-only": true
+        } 
     ]
 }
