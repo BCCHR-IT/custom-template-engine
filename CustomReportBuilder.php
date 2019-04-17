@@ -2,10 +2,14 @@
 
 namespace BCCHR\CustomReportBuilder;
 
+require_once "Template.php";
+require_once "vendor/autoload.php";
+
 use REDCap;
 use Project;
 use DOMDocument;
 use HtmlPage;
+use Dompdf\Dompdf;
 
 class CustomReportBuilder extends \ExternalModules\AbstractExternalModule 
 {
@@ -19,6 +23,23 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         $this->templates_dir = $this->getSystemSetting("templates-folder");
         $this->pid = $this->getProjectId();
         $this->userid = strtolower(USERID);
+    }
+
+    private function delete_repository_file($file)
+    {
+        global $edoc_storage_option,$wdc,$webdav_path;
+        if ($edoc_storage_option == '1') {
+            // Webdav
+            $wdc->delete($webdav_path . $file);
+        } elseif ($edoc_storage_option == '2') {
+            // S3
+            global $amazon_s3_key, $amazon_s3_secret, $amazon_s3_bucket;
+            $s3 = new S3($amazon_s3_key, $amazon_s3_secret, SSL); if (isset($GLOBALS['amazon_s3_endpoint']) && $GLOBALS['amazon_s3_endpoint'] != '') $s3->setEndpoint($GLOBALS['amazon_s3_endpoint']);
+            $s3->deleteObject($amazon_s3_bucket, $file);
+        } else {
+            // Local
+            @unlink(EDOC_PATH . $file);
+        }
     }
 
     private function checkPermissions()
@@ -538,7 +559,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         {
             $HtmlPage = new HtmlPage();
             $HtmlPage->PrintHeaderExt();
-            exit("<div class='warning'>Nothing was in the editor, therefore, no file was saved</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
+            exit("<div class='yellow'>Nothing was in the editor, therefore, no file was saved</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
             $HtmlPage->PrintFooterExt();
         }
         else
@@ -550,7 +571,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 {
                     $HtmlPage = new HtmlPage();
                     $HtmlPage->PrintHeaderExt();
-                    exit("<b>ERROR</b> Unable to create directory $this->templates_dir to store template. Please contact your REDCap administrator");
+                    exit("<b>ERROR</b> Unable to create directory $this->templates_dir to store template. Please contact your REDCap administrator to ensure module has proper permissions.");
                     $HtmlPage->PrintFooterExt();
                 }
             }
@@ -583,6 +604,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                     else
                     {
                         $other_errors[] = "<b>ERROR</b> Template already exists! Please choose another name";
+                        $filename = $name;
                     }        
                 }
                 else
@@ -618,6 +640,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                     else
                     {
                         $other_errors[] = "<b>ERROR</b> Template doesn't exist! Please contact your REDCap administrator about this";
+                        $filename = $name;
                     }
                 }
             }
@@ -661,7 +684,159 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     public function downloadTemplate()
     {
+        $header = $_POST["header-editor"];
+        $footer = $_POST["footer-editor"];
+        $main = $_POST["editor"];
+        $filename = $_POST["filename"];
+        $pid = $this->getProjectId();
 
+        if (isset($main) && !empty($main))
+        {
+            $doc = new DOMDocument();
+            $doc->loadHtml("<html><body><header>$header</header><footer>$footer</footer><main>$main</main></body></html>");
+
+            // DOMPdf renders what's passed in, and if default font-size is used then
+            // the editor will use what's in app.css. Set the general CSS to be 12px.
+            // Any styling done by the user should appear as inline styling, which should
+            // override this.
+            if (!empty($header) && !empty($footer))
+            {
+                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 25px; } header { position: fixed; left: 0px; top: -100px; } footer { position: fixed; left: 0px; bottom:0px; } @page { margin: 130px 50px; }");
+            }
+            else if (!empty($header))
+            {
+                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 15px; } header { position: fixed; left: 0px; top: -100px; } @page { margin: 130px 50px 50px 50px; }");
+            }
+            else if (!empty($footer))
+            {
+                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 15px; } footer { position: fixed; left: 0px; bottom: 0px; } @page { margin: 50px 50px 130px 50px; }");
+            }
+            else
+            {
+                $style = $doc->createElement("style", "body, body > table { font-size: 12px;} @page { margin: 50px 50px; }");
+            }   
+            
+            $doc->appendChild($style);
+
+            $dompdf = new Dompdf();
+            $dompdf->loadHtml($doc->saveHtml());
+
+            // (Optional) Setup the paper size and orientation
+            $dompdf->setPaper("letter", "portrait");
+
+            // Render the HTML as PDF
+            $dompdf->render();
+
+            // Stolen code from redcap version/FileRepository/index.php with several modifications
+            // Upload the compiled report to the File Repository
+            $database_success = FALSE;
+            $upload_success = FALSE;
+            $errors = array();
+
+            $dummy_file_name = $filename;
+            $dummy_file_name = preg_replace("/[^a-zA-Z-._0-9]/","_",$dummy_file_name);
+            $dummy_file_name = str_replace("__","_",$dummy_file_name);
+            $dummy_file_name = str_replace("__","_",$dummy_file_name);
+            
+            $file_extension = "pdf";
+            $stored_name = date('YmdHis') . "_pid" . $project_id . "_" . generateRandomHash(6) . ".pdf";
+
+            $upload_success = file_put_contents(EDOC_PATH . $stored_name, $dompdf->output());
+
+            if ($upload_success !== FALSE) 
+            {
+                $userid = strtolower(USERID);
+
+                $dummy_file_size = $upload_success;
+                $dummy_file_type = "application/pdf";
+                
+                $file_repo_name = date("Y/m/d H:i:s");
+
+                $sql = "INSERT INTO redcap_docs (project_id,docs_date,docs_name,docs_size,docs_type,docs_comment,docs_rights)
+                        VALUES ($project_id,CURRENT_DATE,'$dummy_file_name.pdf','$dummy_file_size','$dummy_file_type',
+                        \"$file_repo_name - $filename ($userid)\",NULL)";
+                                
+                if ($this->query($sql)) 
+                {
+                    $docs_id = db_insert_id();
+
+                    $sql = "INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date)
+                            VALUES('".$stored_name."','".$dummy_file_type."','".$dummy_file_name."','".$dummy_file_size."',
+                            '".$file_extension."','".$project_id."','".date('Y-m-d H:i:s')."');";
+                                
+                    if ($this->query($sql)) 
+                    {
+                        $doc_id = db_insert_id();
+                        $sql = "INSERT INTO redcap_docs_to_edocs (docs_id,doc_id) VALUES ('".$docs_id."','".$doc_id."');";
+                                    
+                        if ($this->query($sql)) 
+                        {
+                            if ($project_language == 'English') 
+                            {
+                                // ENGLISH
+                                $context_msg_insert = "{$lang['docs_22']} {$lang['docs_08']}";
+                            } 
+                            else 
+                            {
+                                // NON-ENGLISH
+                                $context_msg_insert = ucfirst($lang['docs_22'])." {$lang['docs_08']}";
+                            }
+
+                            // Logging
+                            Logging::logEvent("","redcap_docs","MANAGE",$docs_id,"docs_id = $docs_id","Upload document to file repository");
+                            $context_msg = str_replace('{fetched}', '', $context_msg_insert);
+                            $database_success = TRUE;
+                        } 
+                        else 
+                        {
+                            /* if this failed, we need to roll back redcap_edocs_metadata and redcap_docs */
+                            $this->query("DELETE FROM redcap_edocs_metadata WHERE doc_id='".$doc_id."';");
+                            $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
+                            $this->delete_repository_file($stored_name);
+                        }
+                    } 
+                    else
+                    {
+                        /* if we failed here, we need to roll back redcap_docs */
+                        $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
+                        $this->delete_repository_file($stored_name);
+                    }
+                } 
+                else 
+                {
+                    /* if we failed here, we need to delete the file */
+                    $this->delete_repository_file($stored_name);
+                }            
+            }
+
+            if ($database_success === FALSE) 
+            {
+                $context_msg = "<b>{$lang['global_01']}{$lang['colon']} {$lang['docs_47']}</b><br>" . $lang['docs_65'] . ' ' . maxUploadSizeFileRespository().'MB'.$lang['period'];
+                                
+                if ($super_user) 
+                {
+                    $context_msg .= '<br><br>' . $lang['system_config_69'];
+                }
+
+                $HtmlPage = new HtmlPage();
+                $HtmlPage->PrintHeaderExt();
+                print "<div class='red'>" . $context_msg . "</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>";
+                $HtmlPage->PrintFooterExt();
+            }
+            else
+            {
+                // Output the generated PDF to Browser
+                $dompdf->stream($filename);
+                REDCap::logEvent("Downloaded Report ", $filename , "" ,$_GET["record"]);
+            }
+        }
+        else
+        {
+            $HtmlPage = new HtmlPage();
+            $HtmlPage->PrintHeaderExt();
+            print "<div class='yellow'>Nothing was in the editor, therefore, no file was downloaded</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>";
+            $HtmlPage->PrintFooterExt();
+        }
     }
 
     public function generateFillTemplatePage()
@@ -669,7 +844,6 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         $this->checkPermissions();
         
         $record = $_POST["participantID"];
-        
         if (empty($record))
         {
             // OPTIONAL: Display the project header
@@ -678,22 +852,19 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         
         $template_filename = $_POST['template'];
         $template = new Template($this->templates_dir);
-        
-        $errors = array();
+
         try
         {
             $filled_template = $template->fillTemplate($template_filename, $record);
         
             $doc = new DOMDocument();
-        
             $doc->loadHTML($filled_template);
         
             $header = $doc->getElementsByTagName("header")->item(0);
             $footer = $doc->getElementsByTagName("footer")->item(0);
+            $main = $doc->getElementsByTagName("main")->item(0);
         
-            $body = $doc->getElementsByTagName("main")->item(0);
-        
-            $filled_body = $doc->saveHTML($body);
+            $filled_main = $doc->saveHTML($main);
             $filled_header = empty($header) ? "" : $doc->saveHTML($header);
             $filled_footer = empty($footer)? "" : $doc->saveHTML($footer);
         }
@@ -702,7 +873,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             $errors[] = "<b>ERROR</b> [" . $e->getCode() . "] LINE [" . $e->getLine() . "] FILE [" . $e->getFile() . "] " . str_replace("Undefined index", "Field name does not exist", $e->getMessage());
         }
         ?>
-        <link rel="stylesheet" href="app.css" type="text/css">
+        <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
         <div class="container"> 
             <div class="jumbotron">
                 <div class="row">
@@ -710,7 +881,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         <h3>Download Template</h3>
                     </div>
                     <div class="col-md-2">
-                        <a class="btn btn-primary" style="color:white" href="index.php?pid=<?php print $this->pid;?>">Back to Front</a>
+                        <a class="btn btn-primary" style="color:white" href="<?php print $this->getUrl("index.php");?>">Back to Front</a>
                     </div>
                 </div>
                 <hr/>
@@ -743,7 +914,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                     </ul>
                 </div>
                 <br/>
-                <form action="downloadFilledTemplate.php?pid=<?php print $this->pid; ?>&record=<?php print $record;?>" method="post">
+                <form action="<?php print $this->getUrl("DownloadFilledTemplate.php"); ?>" method="post">
                     <table class="table" style="width:100%;">
                         <tbody>
                             <tr>
@@ -779,7 +950,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                     </div>
                     <div style="margin-top:20px">
                         <textarea cols="80" id="editor" name="editor" rows="10">
-                            <?php print $filled_body; ?>
+                            <?php print $filled_main; ?>
                         </textarea>
                     </div>
                 </form>
@@ -807,6 +978,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             $header_data = $info["header"];
             $footer_data = $info["footer"];
             $main_data = $info["main"];
+            $template_name = $info["templateName"];
         }
         else
         {
@@ -831,7 +1003,11 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             <div class="jumbotron">
                 <div class="row">
                     <div class="col-md-10">
-                        <h3>Edit Template</h3>
+                        <?php if (!empty($errors) && file_exists("$this->templates_dir{$template_name}_$this->pid.html")):?>
+                            <h3>Create Template</h3>
+                        <?php else: ?>
+                            <h3>Edit Template</h3>
+                        <?php endif;?>
                     </div>
                     <div class="col-md-2">
                         <a class="btn btn-primary" style="color:white" href="<?php print $this->getUrl("index.php")?>">Back to Front</a>
@@ -901,8 +1077,8 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                                 <td style="width:25%;">Template Name <strong style="color:red">*Required</strong></td>
                                 <td class="data">
                                     <div class="col-sm-5">
-                                        <input name="templateName" type="text" class="form-control" value="<?php print $template_name; ?>" disabled>
-                                        <input type="hidden" name="action" value="edit">
+                                        <input name="templateName" type="text" class="form-control" value="<?php print $template_name; ?>" <?php !empty($errors) && file_exists("$this->templates_dir{$template_name}_$this->pid.html") ? : print "readonly"?>>
+                                        <input type="hidden" name="action" value="<?php !empty($errors) && file_exists("$this->templates_dir{$template_name}_$this->pid.html") ? print "create" : print "edit"?>">
                                     </div>
                                 </td>
                             </tr>

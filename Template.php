@@ -2,9 +2,11 @@
 
 namespace BCCHR\CustomReportBuilder;
 
-use REDCap;
-
 require_once "vendor/smarty/smarty/libs/Smarty.class.php";
+
+use REDCap;
+use Smarty;
+use DOMDocument;
 
 class Template
 {
