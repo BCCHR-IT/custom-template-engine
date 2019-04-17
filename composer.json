@@ -1,0 +1,7 @@
+{
+    "require": {
+        "ckeditor/ckeditor": "dev-full/4.11.x",
+        "dompdf/dompdf": "dev-master",
+        "smarty/smarty": "~3.1"
+    }
+}

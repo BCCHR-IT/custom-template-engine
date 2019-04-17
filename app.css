@@ -1,0 +1,154 @@
+#readmore > p, .collapsible-container p, .syntax-rule p {
+    font-size: 13px;
+    max-width: 100%;
+}
+
+.jumbotron .container {
+    max-width: 100%;
+}
+
+.syntax-rule {
+	background-color: #fff;
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-top: -1px;
+}
+
+.syntax-example {
+    background-color: #e9e9e9;
+    border: 1px solid #ddd;
+    padding: 5px;
+}
+
+.syntax-example div {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    margin: 5px 20px;
+    padding: 5px;
+}
+
+.data {
+    padding: 7px;
+    max-width: 400px;
+    font-family: "Open Sans",Helvetica,Arial,Helvetica,sans-serif;
+    font-size: 13px;
+    background: #F8F8F8;
+    border: 1px solid #CCCCCC;
+}
+
+.collapsible-container {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #fff;
+}
+
+.collapsible {
+    background-color: #fff;
+    color: black;
+    cursor: pointer;
+    padding: 10px;
+    text-align: left;
+    outline: none;
+    font-size: 14px;
+    border: none;
+    width: 100%;
+    border-radius: 5px;
+}
+
+.collapsible-content {
+    padding: 0 18px;
+    display: none;
+    overflow: hidden;
+    background-color: white;
+    margin-bottom: 20px;
+    margin-top:20px;
+}
+
+.collapsible-content .collapsible {
+    background-color: #f1f1f1;
+}
+
+.collapsible-content table {
+    display: inline-table;
+    border: 1px solid black;
+    border-collapse: collapse
+}
+
+.collapsible-content td {
+    border: 1px solid black;
+}
+
+.img-file {
+    max-width:250px;
+    border: 1px solid #204d74;
+    border-radius: 5px;
+}
+
+.img-file div {
+    height:100px; 
+    background-repeat: no-repeat; 
+    background-size: cover; 
+    background-position: center;
+}
+
+.img-file p {
+    margin-bottom: 0px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    text-align: center;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+
+.img-file:hover {
+    border: 5px solid lightblue;
+}
+
+/*
+* Editor CSS
+*/
+body.document-editor {
+    font-size: 12px;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+body.document-editor h1 {
+    margin-bottom: 1cm;
+}
+
+body.document-editor td, body.document-editor th {
+    font-size: 12px;
+}
+
+body.document-editor table {
+    margin-top: 0.5cm;
+    margin-bottom: 0.5cm;
+}
+
+body.document-editor table td {
+    border-right: 1px solid #d0d0d0;
+    border-bottom: 1px solid #d0d0d0;
+}
+
+body.document-editor table td:first-of-type {
+    border-left: 1px solid #d0d0d0;
+}
+
+body.document-editor table tr:first-of-type td {
+    border-top: 1px solid #d0d0d0;
+}
+
+body.document-editor table thead th {
+    border-top: 1px solid #d0d0d0;
+    border-right: 1px solid #d0d0d0;
+}
+
+body.document-editor table thead th:first-of-type {
+    border-left: 1px solid #d0d0d0;
+}
+
+.red > div > div {
+    background-color: white;
+    padding: 5px;
+}

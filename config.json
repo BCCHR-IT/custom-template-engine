@@ -1,0 +1,54 @@
+{
+    "name": "Custom Report Builder",
+    "namespace": "BCCHR\\CustomReportBuilder",
+    "description": "This module allows you to create HTML templates and fill them with record data from your project. You can download the filled templates as a PDF, which are saved to the File Repository.",
+    "authors": [
+        {
+            "name": "Ashley Lee",
+            "email": "alee2@bcchr.ca",
+            "institution": "BC Children's Hospital Research Institute"
+        }
+    ],
+    "links": {
+        "project": [
+            {
+                "name": "Custom Report Builder",
+                "url": "index.php",
+                "icon": "link",
+                "show-header-and-footer": true
+            }
+        ]
+    },
+    "compatibility": {
+        "php-version-min": "",
+        "php-version-max": "",
+        "redcap-version-min": "8.5.14",
+        "redcap-version-max": ""
+    },
+    "system-settings": [
+        {
+            "key": "templates-folder",
+            "name": "Saved Templates Folder",
+            "required": true,
+            "type": "text",
+            "repeatable": false,
+            "super-users-only": true
+        },
+        {
+            "key": "sys-img-folder",
+            "name": "System Images Folder",
+            "required": true,
+            "type": "text",
+            "repeatable": false,
+            "super-users-only": true
+        },
+        {
+            "key": "proj-img-folder",
+            "name": "Project Images Folder",
+            "required": true,
+            "type": "text",
+            "repeatable": false,
+            "super-users-only": true
+        }        
+    ]
+}
