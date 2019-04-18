@@ -49,23 +49,7 @@
             "type": "text",
             "repeatable": false,
             "super-users-only": true
-        },
-        {
-            "key": "sys-img-url",
-            "name": "System Images Url **Must be publically accessible**",
-            "required": true,
-            "type": "text",
-            "repeatable": false,
-            "super-users-only": true
-        },
-        {
-            "key": "proj-img-url",
-            "name": "Project Images Url **Must be publically accessible**",
-            "required": true,
-            "type": "text",
-            "repeatable": false,
-            "super-users-only": true
-        }             
+        }           
     ],
     "project-settings": [
         {

@@ -607,7 +607,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         $filename = str_replace(" ", "_", $name["filename"]) . "_" . $_GET["pid"] . "." . $name["extension"];
 
                         $upload_dir = $this->getSystemSetting("proj-img-folder");
-
+                        
                         if (!file_exists($upload_dir))
                         {
                             if (!mkdir($upload_dir))
@@ -711,7 +711,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 }
                 // Simulate user action of selecting a file to be returned to CKEditor.
                 function returnFileUrl(filename) {
-                    var funcNum = getUrlParam( "CKEditorFuncNum" );
+                    var funcNum = getUrlParam("CKEditorFuncNum");
                     window.opener.CKEDITOR.tools.callFunction(funcNum, filename);
                     window.close();
                 }
@@ -731,7 +731,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         array_push(
                             $all_imgs,
                             array(
-                                "url" => $this->getUrl($sys_imgs_dir . $img),
+                                "url" => $sys_imgs_dir . $img,
                                 "name" => $img
                             )
                         );
@@ -741,7 +741,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         array_push(
                             $all_imgs,
                             array(
-                                "url" => $this->getUrl($proj_imgs_dir . $img),
+                                "url" => $proj_imgs_dir . $img,
                                 "name" => $img
                             )
                         );
