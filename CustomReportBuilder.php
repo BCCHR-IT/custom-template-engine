@@ -7,7 +7,6 @@ require_once "vendor/autoload.php";
 
 use REDCap;
 use Project;
-use Logging;
 use DOMDocument;
 use HtmlPage;
 use Dompdf\Dompdf;
@@ -1010,7 +1009,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                                 }
 
                                 // Logging
-                                Logging::logEvent("","redcap_docs","MANAGE",$docs_id,"docs_id = $docs_id","Upload document to file repository");
+                                REDCap::logEvent("Custom Report Builder - Uploaded document to file repository", "Successfully uploaded $filename");
                                 $context_msg = str_replace('{fetched}', '', $context_msg_insert);
                                 $database_success = TRUE;
                             } 
