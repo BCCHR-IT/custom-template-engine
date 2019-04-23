@@ -35,16 +35,8 @@
             "super-users-only": true
         },
         {
-            "key": "sys-img-folder",
-            "name": "System Images Folder **Must be publically accessible**",
-            "required": true,
-            "type": "text",
-            "repeatable": false,
-            "super-users-only": true
-        },
-        {
-            "key": "proj-img-folder",
-            "name": "Project Images Folder **Must be publically accessible**",
+            "key": "img-folder",
+            "name": "Images Folder **Must be publically accessible, and given as a path relative to external module folder**",
             "required": true,
             "type": "text",
             "repeatable": false,

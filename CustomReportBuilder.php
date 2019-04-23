@@ -606,7 +606,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         $name = pathinfo(basename($upload["name"]));
                         $filename = str_replace(" ", "_", $name["filename"]) . "_" . $_GET["pid"] . "." . $name["extension"];
 
-                        $upload_dir = $this->getSystemSetting("proj-img-folder");
+                        $upload_dir = $this->getSystemSetting("img-folder");
                         
                         if (!file_exists($upload_dir))
                         {
@@ -630,6 +630,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
                         if (move_uploaded_file($tmp_name, $upload_dir . $filename))
                         {
+                            $url = $upload_dir . $filename;
                             REDCap::logEvent("Photo uploaded", $upload_dir . $filename);
                         }
                         else
@@ -680,10 +681,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     public function browseImages()
     {
-        $sys_imgs_dir = $this->getSystemSetting("sys-img-folder");
-        $proj_imgs_dir = $this->getSystemSetting("proj-img-folder");
-
-        $sys_imgs = array_diff(scandir($sys_imgs_dir), array(".", ".."));
+        $proj_imgs_dir = $this->getSystemSetting("img-folder");
         $proj_imgs = array_filter(scandir($proj_imgs_dir), function ($img) {
             return strpos($img, "_" . $this->pid) !== FALSE;
         });
@@ -726,16 +724,6 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             <div style="margin:20px">
                 <?php
                     $all_imgs = array();
-                    foreach($sys_imgs as $img)
-                    {
-                        array_push(
-                            $all_imgs,
-                            array(
-                                "url" => $sys_imgs_dir . $img,
-                                "name" => $img
-                            )
-                        );
-                    }
                     foreach($proj_imgs as $img)
                     {
                         array_push(
