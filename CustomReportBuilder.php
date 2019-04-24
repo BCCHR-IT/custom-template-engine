@@ -920,7 +920,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             // Save template
             
             // Validate Template
-            $template = new Template($this->templates_dir, $this->getSystemSetting("compiled-templates-folder"));
+            $template = new Template($this->templates_dir, $this->compiled_dir);
 
             $template_errors = $template->validateTemplate($data);
             $header_errors = $template->validateTemplate($header);
