@@ -35,8 +35,16 @@
             "super-users-only": true
         },
         {
+            "key": "compiled-templates-folder",
+            "name": "Compiled Templates Folder **Used by Smarty to store compiled templates**",
+            "required": true,
+            "type": "text",
+            "repeatable": false,
+            "super-users-only": true
+        },
+        {
             "key": "img-folder",
-            "name": "Images Folder **Must be publically accessible, and given as a path relative to external module folder**",
+            "name": "Images Folder **Must be publically accessible**",
             "required": true,
             "type": "text",
             "repeatable": false,

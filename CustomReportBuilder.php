@@ -7,6 +7,7 @@ require_once "vendor/autoload.php";
 
 use REDCap;
 use Project;
+use Records;
 use DOMDocument;
 use HtmlPage;
 use Dompdf\Dompdf;
@@ -33,7 +34,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
     {
         if (!file_exists($this->templates_dir))
         {
-            if (!mkdir($this->templates_dir))
+            if (!mkdir($this->templates_dir, 0777, true))
             {
                 exit("<div class='red'><b>ERROR</b> Unable to create directory $this->templates_dir to store templates. Please contact your systems administrator to make sure the location is writable.</div>");
             }
@@ -41,7 +42,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
         if (!file_exists($this->compiled_dir))
         {
-            if (!mkdir($this->compiled_dir))
+            if (!mkdir($this->compiled_dir, 0777, true))
             {
                 exit("<div class='red'><b>ERROR</b> Unable to create directory $this->compiled_dir to store compiled templates. Please contact your systems administrator to  make sure the location is writable.</div>");
             }
@@ -49,130 +50,11 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
         if (!file_exists($this->img_dir))
         {
-            if (!mkdir($this->img_dir))
+            if (!mkdir($this->img_dir, 0777, true))
             {
                 exit("<div class='red'><b>ERROR</b> Unable to create directory $this->img_dir to store template. Please contact your systems administrator to  make sure the location is writable.</div>");
             }
         }
-    }
-
-    private function getParticipantIdsAndLabels()
-    {   
-        $participant_options = array();
-
-        $query = "select secondary_pk, secondary_pk_display_value, secondary_pk_display_label, custom_record_label from redcap_projects where project_id = $this->pid";
-        $result = $this->query($query);
-        while ($row = db_fetch_assoc($result)) {
-            // Do something with this row from redcap_data
-            $secondary_pk = $row["secondary_pk"];
-            $display_value = $row["secondary_pk_display_value"];
-            $display_label = $row["secondary_pk_display_label"];
-            $custom_record_label = $row["custom_record_label"];
-        }
-
-        $id_field = REDCap::getRecordIdField();
-
-        if (!empty($secondary_pk) && $display_value == "1")
-        {
-            if ($display_label == "1")
-            {
-                $dictionary = REDCap::getDataDictionary("array", FALSE, $secondary_pk);
-                $secondary_pk_label = $dictionary[$secondary_pk]["field_label"];
-            }
-        }
-
-        if (!empty($custom_record_label))
-        {
-            if (REDCap::isLongitudinal())
-            {
-                preg_match_all("/\[[0-9a-zA-Z_-]*\]\[[0-9a-zA-Z_-]*\]/", $custom_record_label, $fields);
-
-                foreach($fields[0] as $index => $field)
-                {
-                    $start = strpos($field, "[") + 1;
-                    $mid = strpos($field, "][") + 2;
-                    $end = strpos($field, "]", $mid);
-
-                    $fields_to_replace[] = array(
-                        "event" => substr($field, $start, $mid - $start - 2),
-                        "field" => substr($field, $mid, $end - $mid)
-                    );
-
-                    $labels_to_replace[] = $field;
-                }
-            }
-            {
-                preg_match_all("/\[[0-9a-zA-Z_]*\]/", $custom_record_label, $fields);
-                foreach($fields[0] as $index => $field)
-                {
-                    $fields_to_replace[] = substr($field, 1, strlen($field) - 2);
-                    $labels_to_replace[] = $field;
-                }
-            }
-        }
-
-        $participant_ids = REDCap::getData("json", null, null, null, $rights[$user]["group_id"]);
-
-        // Grab the record id, the first field, of each record in the project and the secondary id field
-        if (REDCap::isLongitudinal())
-        {   
-            $options = array();
-
-            foreach(json_decode($participant_ids) as $json)
-            {
-                $id = $json->$id_field;
-
-                if (empty($options[$id]))
-                {
-                    $options[$id] = array();
-                }
-
-                if ($display_value == "1" && !empty($json->$secondary_pk) && empty($options[$id]["secondary_pk"]))
-                {
-                    $options[$id]["secondary_pk"] = $json->$secondary_pk;
-                }
-
-                foreach($fields_to_replace as $field)
-                {   
-                    if ($json->redcap_event_name == $field["event"])
-                    {
-                        $f = $field["field"];
-                        $options[$id]["label_replacements"][] = $json->$f;
-                    }
-                }
-            }
-
-            foreach($options as $id => $option)
-            {
-                $custom_label = empty($custom_record_label) || empty($option["label_replacements"]) ? "" : str_replace($labels_to_replace, $option["label_replacements"], $custom_record_label);
-
-                $id2 = ($display_value == "1" && !empty($option["secondary_pk"])) ? "( $secondary_pk_label " . $option["secondary_pk"] . " )" : "";
-
-                $label  = "$id $id2 $custom_label";
-                    
-                $participant_options[$id] = $label;
-            }
-        }
-        else
-        {
-            foreach(json_decode($participant_ids) as $json)
-            {
-                $id = $json->$id_field;
-                    
-                $id2 = ($display_value == "1" && !empty($json->$secondary_pk)) ? "( $secondary_pk_label " . $json->$secondary_pk . " )" : "";
-
-                $replacements = array();
-                foreach($fields_to_replace as $index => $field)
-                {
-                    $replacements[] = empty($json->$field) ? "" : $json->$field;
-                }
-                $custom_label = empty($custom_record_label) ? "" : str_replace($labels_to_replace, $replacements, $custom_record_label);
-
-                $participant_options[$id] = "$id $id2 $custom_label";
-            }
-        }
-
-        return $participant_options;
     }
 
     private function initializeEditor($id, $height)
@@ -1347,7 +1229,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             <div class="jumbotron">
                 <div class="row">
                     <div class="col-md-10">
-                        <?php if (!empty($errors) && file_exists("$this->templates_dir{$template_name}_$this->pid.html")):?>
+                        <?php if (!empty($errors) && (file_exists("$this->templates_dir{$template_name}_$this->pid.html") || file_exists("$this->templates_dir{$template_name}_$this->pid - INVALID.html"))):?>
                             <h3>Create Template</h3>
                         <?php else: ?>
                             <h3>Edit Template</h3>
@@ -1421,8 +1303,14 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                                 <td style="width:25%;">Template Name <strong style="color:red">*Required</strong></td>
                                 <td class="data">
                                     <div class="col-sm-5">
-                                        <input name="templateName" type="text" class="form-control" value="<?php print $template_name; ?>" <?php !empty($errors) && file_exists("$this->templates_dir{$template_name}_$this->pid.html") ? : print "readonly"?>>
-                                        <input type="hidden" name="action" value="<?php !empty($errors) && file_exists("$this->templates_dir{$template_name}_$this->pid.html") ? print "create" : print "edit"?>">
+                                        <input name="templateName" type="text" class="form-control" value="<?php print $template_name; ?>" 
+                                            <?php !empty($errors) && (file_exists("$this->templates_dir{$template_name}_$this->pid.html") || file_exists("$this->templates_dir{$template_name}_$this->pid - INVALID.html")) ? 
+                                            : print "readonly"?>
+                                        >
+                                        <input type="hidden" name="action" 
+                                            value="<?php !empty($errors) && (file_exists("$this->templates_dir{$template_name}_$this->pid.html") || file_exists("$this->templates_dir{$template_name}_$this->pid - INVALID.html")) ?
+                                                     print "create" : print "edit"?>"
+                                        >
                                     </div>
                                 </td>
                             </tr>
@@ -1535,16 +1423,34 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     public function generateIndexPage()
     {
-        $rights = REDCap::getUserRights($this->userid);
-        if ($rights["data_export_tool"] === "0")
-        {
-            // OPTIONAL: Display the project header
-            exit("<div class='red'>You don't have premission to access this module. Please contact your project administrator.</div>");
-        }
-
         $this->createModuleFolders();
 
-        $participant_options = $this->getParticipantIdsAndLabels();
+        $rights = REDCap::getUserRights($this->userid);
+
+        $participant_options = array();
+
+        $id_field = REDCap::getRecordIdField();
+        $data = json_decode(REDCap::getData("json", null, array($id_field, "redcap_event_name"), null, $rights[$user]["group_id"]), true);
+
+        foreach($data as $record)
+        {
+            $to_add = $record[$id_field];
+            if (!in_array($to_add, array_keys($participant_options)))
+            {
+                $arm = REDCap::isLongitudinal() ? array_pop(explode("arm_", $record["redcap_event_name"])) : "1";
+                $label = Records::getCustomRecordLabelsSecondaryFieldAllRecords($to_add, true, $arm, false, '');
+
+                if (!empty($label))
+                {
+                    $participant_options[$to_add] = "$to_add $label";
+                }
+                else
+                {
+                    $participant_options[$to_add] = $to_add;
+                }
+            }
+        }
+
         $total = count($participant_options);
 
         $all_templates = array_diff(scandir($this->templates_dir), array("..", "."));
@@ -1676,10 +1582,11 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         </div>
         <?php 
             print "<script> var options = [";
-            foreach($participant_options as $id => $option)
-            {
-                print "{label: \"$option\", value: \"$id\"},";
-            }
+                foreach($participant_options as $id => $option)
+                {
+                    print "{label: '$option', value: '$id'},";
+                }
+
             print "]; </script>";
         ?>
         <script>
@@ -1693,5 +1600,18 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             });
         </script>
         <?php
+    }
+
+    public function redcap_module_link_check_display($project_id, $link)
+    {
+        $rights = REDCap::getUserRights($this->userid);
+        if ($rights[$this->userid]["data_export_tool"] === "0")
+        {
+            return NULL;
+        }
+        else
+        {
+            return $link;
+        }
     }
 }

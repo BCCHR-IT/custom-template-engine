@@ -20,10 +20,11 @@ class Template
                                 "datetime_seconds_mdy", "datetime_seconds_ymd");
     private $logical_operators = array("eq", "ne", "neq", "gt", "lt", "gte", "gte", "lte", "le", "not", "or", "and");
 
-    function __construct($templates_dir) 
+    function __construct($templates_dir, $compiled_dir) 
     {
         $this->smarty = new Smarty();
         $this->smarty->setTemplateDir($templates_dir);
+        $this->smarty->setCompileDir($compiled_dir);
         $this->smarty->assign("showLabelAndRow", $this->show_label_and_row);
     }
 
