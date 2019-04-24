@@ -14,6 +14,8 @@ use Dompdf\Dompdf;
 class CustomReportBuilder extends \ExternalModules\AbstractExternalModule 
 {
     private $templates_dir;
+    private $compiled_dir;
+    private $img_dir;
     private $pid;
     private $userid;
 
@@ -21,25 +23,156 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
     {
         parent::__construct();
         $this->templates_dir = $this->getSystemSetting("templates-folder");
+        $this->compiled_dir = $this->getSystemSetting("compiled-templates-folder");
+        $this->img_dir = $this->getSystemSetting("img-folder");
         $this->pid = $this->getProjectId();
         $this->userid = strtolower(USERID);
     }
 
-    private function delete_repository_file($file)
+    private function createModuleFolders()
     {
-        global $edoc_storage_option,$wdc,$webdav_path;
-        if ($edoc_storage_option == '1') {
-            // Webdav
-            $wdc->delete($webdav_path . $file);
-        } elseif ($edoc_storage_option == '2') {
-            // S3
-            global $amazon_s3_key, $amazon_s3_secret, $amazon_s3_bucket;
-            $s3 = new S3($amazon_s3_key, $amazon_s3_secret, SSL); if (isset($GLOBALS['amazon_s3_endpoint']) && $GLOBALS['amazon_s3_endpoint'] != '') $s3->setEndpoint($GLOBALS['amazon_s3_endpoint']);
-            $s3->deleteObject($amazon_s3_bucket, $file);
-        } else {
-            // Local
-            @unlink(EDOC_PATH . $file);
+        if (!file_exists($this->templates_dir))
+        {
+            if (!mkdir($this->templates_dir))
+            {
+                exit("<div class='red'><b>ERROR</b> Unable to create directory $this->templates_dir to store templates. Please contact your systems administrator to make sure the location is writable.</div>");
+            }
         }
+
+        if (!file_exists($this->compiled_dir))
+        {
+            if (!mkdir($this->compiled_dir))
+            {
+                exit("<div class='red'><b>ERROR</b> Unable to create directory $this->compiled_dir to store compiled templates. Please contact your systems administrator to  make sure the location is writable.</div>");
+            }
+        }
+
+        if (!file_exists($this->img_dir))
+        {
+            if (!mkdir($this->img_dir))
+            {
+                exit("<div class='red'><b>ERROR</b> Unable to create directory $this->img_dir to store template. Please contact your systems administrator to  make sure the location is writable.</div>");
+            }
+        }
+    }
+
+    private function getParticipantIdsAndLabels()
+    {   
+        $participant_options = array();
+
+        $query = "select secondary_pk, secondary_pk_display_value, secondary_pk_display_label, custom_record_label from redcap_projects where project_id = $this->pid";
+        $result = $this->query($query);
+        while ($row = db_fetch_assoc($result)) {
+            // Do something with this row from redcap_data
+            $secondary_pk = $row["secondary_pk"];
+            $display_value = $row["secondary_pk_display_value"];
+            $display_label = $row["secondary_pk_display_label"];
+            $custom_record_label = $row["custom_record_label"];
+        }
+
+        $id_field = REDCap::getRecordIdField();
+
+        if (!empty($secondary_pk) && $display_value == "1")
+        {
+            if ($display_label == "1")
+            {
+                $dictionary = REDCap::getDataDictionary("array", FALSE, $secondary_pk);
+                $secondary_pk_label = $dictionary[$secondary_pk]["field_label"];
+            }
+        }
+
+        if (!empty($custom_record_label))
+        {
+            if (REDCap::isLongitudinal())
+            {
+                preg_match_all("/\[[0-9a-zA-Z_-]*\]\[[0-9a-zA-Z_-]*\]/", $custom_record_label, $fields);
+
+                foreach($fields[0] as $index => $field)
+                {
+                    $start = strpos($field, "[") + 1;
+                    $mid = strpos($field, "][") + 2;
+                    $end = strpos($field, "]", $mid);
+
+                    $fields_to_replace[] = array(
+                        "event" => substr($field, $start, $mid - $start - 2),
+                        "field" => substr($field, $mid, $end - $mid)
+                    );
+
+                    $labels_to_replace[] = $field;
+                }
+            }
+            {
+                preg_match_all("/\[[0-9a-zA-Z_]*\]/", $custom_record_label, $fields);
+                foreach($fields[0] as $index => $field)
+                {
+                    $fields_to_replace[] = substr($field, 1, strlen($field) - 2);
+                    $labels_to_replace[] = $field;
+                }
+            }
+        }
+
+        $participant_ids = REDCap::getData("json", null, null, null, $rights[$user]["group_id"]);
+
+        // Grab the record id, the first field, of each record in the project and the secondary id field
+        if (REDCap::isLongitudinal())
+        {   
+            $options = array();
+
+            foreach(json_decode($participant_ids) as $json)
+            {
+                $id = $json->$id_field;
+
+                if (empty($options[$id]))
+                {
+                    $options[$id] = array();
+                }
+
+                if ($display_value == "1" && !empty($json->$secondary_pk) && empty($options[$id]["secondary_pk"]))
+                {
+                    $options[$id]["secondary_pk"] = $json->$secondary_pk;
+                }
+
+                foreach($fields_to_replace as $field)
+                {   
+                    if ($json->redcap_event_name == $field["event"])
+                    {
+                        $f = $field["field"];
+                        $options[$id]["label_replacements"][] = $json->$f;
+                    }
+                }
+            }
+
+            foreach($options as $id => $option)
+            {
+                $custom_label = empty($custom_record_label) || empty($option["label_replacements"]) ? "" : str_replace($labels_to_replace, $option["label_replacements"], $custom_record_label);
+
+                $id2 = ($display_value == "1" && !empty($option["secondary_pk"])) ? "( $secondary_pk_label " . $option["secondary_pk"] . " )" : "";
+
+                $label  = "$id $id2 $custom_label";
+                    
+                $participant_options[$id] = $label;
+            }
+        }
+        else
+        {
+            foreach(json_decode($participant_ids) as $json)
+            {
+                $id = $json->$id_field;
+                    
+                $id2 = ($display_value == "1" && !empty($json->$secondary_pk)) ? "( $secondary_pk_label " . $json->$secondary_pk . " )" : "";
+
+                $replacements = array();
+                foreach($fields_to_replace as $index => $field)
+                {
+                    $replacements[] = empty($json->$field) ? "" : $json->$field;
+                }
+                $custom_label = empty($custom_record_label) ? "" : str_replace($labels_to_replace, $replacements, $custom_record_label);
+
+                $participant_options[$id] = "$id $id2 $custom_label";
+            }
+        }
+
+        return $participant_options;
     }
 
     private function initializeEditor($id, $height)
@@ -575,6 +708,23 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         <?php
     }
 
+    private function deleteRepositoryFile($file)
+    {
+        global $edoc_storage_option,$wdc,$webdav_path;
+        if ($edoc_storage_option == '1') {
+            // Webdav
+            $wdc->delete($webdav_path . $file);
+        } elseif ($edoc_storage_option == '2') {
+            // S3
+            global $amazon_s3_key, $amazon_s3_secret, $amazon_s3_bucket;
+            $s3 = new S3($amazon_s3_key, $amazon_s3_secret, SSL); if (isset($GLOBALS['amazon_s3_endpoint']) && $GLOBALS['amazon_s3_endpoint'] != '') $s3->setEndpoint($GLOBALS['amazon_s3_endpoint']);
+            $s3->deleteObject($amazon_s3_bucket, $file);
+        } else {
+            // Local
+            @unlink(EDOC_PATH . $file);
+        }
+    }
+
     public function uploadImages()
     {
         // Required: anonymous function reference number as explained above.
@@ -605,32 +755,10 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         $name = pathinfo(basename($upload["name"]));
                         $filename = str_replace(" ", "_", $name["filename"]) . "_" . $_GET["pid"] . "." . $name["extension"];
 
-                        $upload_dir = $this->getSystemSetting("img-folder");
-                        
-                        if (!file_exists($upload_dir))
+                        if (move_uploaded_file($tmp_name, $this->img_dir . $filename))
                         {
-                            if (!mkdir($upload_dir))
-                            {
-                                ?>
-                                <!DOCTYPE html>
-                                <html lang="en">
-                                <head>
-                                    <meta charset="UTF-8">
-                                    <title>Img Upload</title>
-                                </head>
-                                <body>
-                                <?php print "<script type='text/javascript'>window.parent.CKEDITOR.tools.callFunction($func_num, '$url', \"ERROR: Failed to create images directory for project images. Please contact your REDCap administrator.\");</script>"; ?>
-                                </body>
-                                </html> 
-                                <?php
-                                exit;
-                            }
-                        }
-
-                        if (move_uploaded_file($tmp_name, $upload_dir . $filename))
-                        {
-                            $url = $upload_dir . $filename;
-                            REDCap::logEvent("Photo uploaded", $upload_dir . $filename);
+                            $url = $this->img_dir . $filename;
+                            REDCap::logEvent("Photo uploaded", $this->img_dir . $filename);
                         }
                         else
                         {
@@ -680,8 +808,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     public function browseImages()
     {
-        $proj_imgs_dir = $this->getSystemSetting("img-folder");
-        $proj_imgs = array_filter(scandir($proj_imgs_dir), function ($img) {
+        $proj_imgs = array_filter(scandir($this->img_dir), function ($img) {
             return strpos($img, "_" . $this->pid) !== FALSE;
         });
         ?>
@@ -728,7 +855,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         array_push(
                             $all_imgs,
                             array(
-                                "url" => $proj_imgs_dir . $img,
+                                "url" => $this->img_dir . $img,
                                 "name" => $img
                             )
                         );
@@ -791,83 +918,71 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         else
         {
             // Save template
-            if (!file_exists($this->templates_dir))
-            {
-                if (!mkdir($this->templates_dir))
+            
+            // Validate Template
+            $template = new Template($this->templates_dir, $this->getSystemSetting("compiled-templates-folder"));
+
+            $template_errors = $template->validateTemplate($data);
+            $header_errors = $template->validateTemplate($header);
+            $footer_errors = $template->validateTemplate($footer);
+
+            $doc = new DOMDocument();
+            $doc->loadHTML("<html><body><header>$header</header><footer>$footer</footer><main>$data</main></body></html>");
+
+            if ($action === "create")
+            {  
+                if (!file_exists("$this->templates_dir{$name}_$this->pid.html") && !file_exists("$this->templates_dir{$name}_{$this->pid} - INVALID.html"))
                 {
-                    $HtmlPage = new HtmlPage();
-                    $HtmlPage->PrintHeaderExt();
-                    exit("<b>ERROR</b> Unable to create directory $this->templates_dir to store template. Please contact your REDCap administrator to ensure module has proper permissions.");
-                    $HtmlPage->PrintFooterExt();
-                }
-            }
-            else
-            {
-                // Validate Template
-                $template = new Template($this->templates_dir);
-
-                $template_errors = $template->validateTemplate($data);
-                $header_errors = $template->validateTemplate($header);
-                $footer_errors = $template->validateTemplate($footer);
-
-                $doc = new DOMDocument();
-                $doc->loadHTML("<html><body><header>$header</header><footer>$footer</footer><main>$data</main></body></html>");
-
-                if ($action === "create")
-                {  
-                    if (!file_exists("$this->templates_dir{$name}_$this->pid.html") && !file_exists("$this->templates_dir{$name}_{$this->pid} - INVALID.html"))
+                    $filename = !empty($template_errors) || !empty($header_errors) || !empty($footer_errors) ? "{$name}_{$this->pid} - INVALID.html" : "{$name}_$this->pid.html";
+                    if ($doc->saveHTMLFile($this->templates_dir . $filename) === FALSE)
                     {
-                        $filename = !empty($template_errors) || !empty($header_errors) || !empty($footer_errors) ? "{$name}_{$this->pid} - INVALID.html" : "{$name}_$this->pid.html";
-                        if ($doc->saveHTMLFile($this->templates_dir . $filename) === FALSE)
-                        {
-                            $other_errors[] = "<b>ERROR</b> Unable to save template. Please contact your REDCap administrator";
-                        }
-                        else
-                        {
-                            REDCap::logEvent("Template created", $filename);
-                        }
+                        $other_errors[] = "<b>ERROR</b> Unable to save template. Please contact your REDCap administrator";
                     }
                     else
                     {
-                        $other_errors[] = "<b>ERROR</b> Template already exists! Please choose another name";
-                        $filename = $name;
-                    }        
+                        REDCap::logEvent("Template created", $filename);
+                    }
                 }
                 else
                 {
-                    $path_info = pathinfo($name);
-                    
-                    if (file_exists($this->templates_dir . $name))
+                    $other_errors[] = "<b>ERROR</b> Template already exists! Please choose another name";
+                    $filename = $name;
+                }        
+            }
+            else
+            {
+                $path_info = pathinfo($name);
+                
+                if (file_exists($this->templates_dir . $name))
+                {
+                    if ($doc->saveHTMLFile($this->templates_dir . $name) === FALSE)
                     {
-                        if ($doc->saveHTMLFile($this->templates_dir . $name) === FALSE)
-                        {
-                            $other_errors[] = "<b>ERROR</b> Unable to save template. Please contact your REDCap administrator";
-                        }
-                        else
-                        {
-                            REDCap::logEvent("Template edited", $name);
-                            if (!empty($template_errors) || !empty($header_errors) || !empty($footer_errors))
-                            {
-                                $filename = strpos($path_info["filename"], " - INVALID") !== FALSE ? $name : $path_info["filename"] . " - INVALID.html";
-                                if ($name !== $filename)
-                                {
-                                    rename($this->templates_dir. $name, $this->templates_dir . $filename);
-                                }
-                            }
-                            else
-                            {
-                                if (strpos($name, " - INVALID") !== FALSE)
-                                {
-                                    rename($this->templates_dir. $name, $this->templates_dir. str_replace(" - INVALID", "", $name));
-                                }
-                            }
-                        }
+                        $other_errors[] = "<b>ERROR</b> Unable to save template. Please contact your REDCap administrator";
                     }
                     else
                     {
-                        $other_errors[] = "<b>ERROR</b> Template doesn't exist! Please contact your REDCap administrator about this";
-                        $filename = $name;
+                        REDCap::logEvent("Template edited", $name);
+                        if (!empty($template_errors) || !empty($header_errors) || !empty($footer_errors))
+                        {
+                            $filename = strpos($path_info["filename"], " - INVALID") !== FALSE ? $name : $path_info["filename"] . " - INVALID.html";
+                            if ($name !== $filename)
+                            {
+                                rename($this->templates_dir. $name, $this->templates_dir . $filename);
+                            }
+                        }
+                        else
+                        {
+                            if (strpos($name, " - INVALID") !== FALSE)
+                            {
+                                rename($this->templates_dir. $name, $this->templates_dir. str_replace(" - INVALID", "", $name));
+                            }
+                        }
                     }
+                }
+                else
+                {
+                    $other_errors[] = "<b>ERROR</b> Template doesn't exist! Please contact your REDCap administrator about this";
+                    $filename = $name;
                 }
             }
         }
@@ -945,6 +1060,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             $doc->appendChild($style);
 
             $dompdf = new Dompdf();
+            $dompdf->set_option('isHtml5ParserEnabled', true);
             $dompdf->loadHtml($doc->saveHtml());
 
             // (Optional) Setup the paper size and orientation
@@ -1018,20 +1134,20 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                                 /* if this failed, we need to roll back redcap_edocs_metadata and redcap_docs */
                                 $this->query("DELETE FROM redcap_edocs_metadata WHERE doc_id='".$doc_id."';");
                                 $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
-                                $this->delete_repository_file($stored_name);
+                                $this->deleteRepositoryFile($stored_name);
                             }
                         } 
                         else
                         {
                             /* if we failed here, we need to roll back redcap_docs */
                             $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
-                            $this->delete_repository_file($stored_name);
+                            $this->deleteRepositoryFile($stored_name);
                         }
                     } 
                     else 
                     {
                         /* if we failed here, we need to delete the file */
-                        $this->delete_repository_file($stored_name);
+                        $this->deleteRepositoryFile($stored_name);
                     }            
                 }
 
@@ -1083,7 +1199,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         }
         
         $template_filename = $_POST['template'];
-        $template = new Template($this->templates_dir);
+        $template = new Template($this->templates_dir, $this->compiled_dir);
 
         try
         {
@@ -1227,7 +1343,6 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         }
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
-        <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.1/css/all.css" integrity="sha384-gfdkjb5BdAXd+lj+gudLWI+BXq4IuLW5IT+brZEZsLFm++aCMlF1V92rMkPaX4PP" crossorigin="anonymous">
         <div class="container"> 
             <div class="jumbotron">
                 <div class="row">
@@ -1357,7 +1472,6 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         $this->checkPermissions();
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
-        <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.1/css/all.css" integrity="sha384-gfdkjb5BdAXd+lj+gudLWI+BXq4IuLW5IT+brZEZsLFm++aCMlF1V92rMkPaX4PP" crossorigin="anonymous">
         <div class="container"> 
             <div class="jumbotron">
                 <div class="row">
@@ -1428,120 +1542,9 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             exit("<div class='red'>You don't have premission to access this module. Please contact your project administrator.</div>");
         }
 
-        $query = "select secondary_pk, secondary_pk_display_value, secondary_pk_display_label, custom_record_label from redcap_projects where project_id = $this->pid";
-        $result = $this->query($query);
-        while ($row = db_fetch_assoc($result)) {
-            // Do something with this row from redcap_data
-            $secondary_pk = $row["secondary_pk"];
-            $display_value = $row["secondary_pk_display_value"];
-            $display_label = $row["secondary_pk_display_label"];
-            $custom_record_label = $row["custom_record_label"];
-        }
+        $this->createModuleFolders();
 
-        $id_field = REDCap::getRecordIdField();
-
-        if (!empty($secondary_pk) && $display_value == "1")
-        {
-            if ($display_label == "1")
-            {
-                $dictionary = REDCap::getDataDictionary("array", FALSE, $secondary_pk);
-                $secondary_pk_label = $dictionary[$secondary_pk]["field_label"];
-            }
-        }
-
-        if (!empty($custom_record_label))
-        {
-            if (REDCap::isLongitudinal())
-            {
-                preg_match_all("/\[[0-9a-zA-Z_-]*\]\[[0-9a-zA-Z_-]*\]/", $custom_record_label, $fields);
-
-                foreach($fields[0] as $index => $field)
-                {
-                    $start = strpos($field, "[") + 1;
-                    $mid = strpos($field, "][") + 2;
-                    $end = strpos($field, "]", $mid);
-
-                    $fields_to_replace[] = array(
-                        "event" => substr($field, $start, $mid - $start - 2),
-                        "field" => substr($field, $mid, $end - $mid)
-                    );
-
-                    $labels_to_replace[] = $field;
-                }
-            }
-            {
-                preg_match_all("/\[[0-9a-zA-Z_]*\]/", $custom_record_label, $fields);
-                foreach($fields[0] as $index => $field)
-                {
-                    $fields_to_replace[] = substr($field, 1, strlen($field) - 2);
-                    $labels_to_replace[] = $field;
-                }
-            }
-        }
-
-        $participant_options = array();
-
-        $participant_ids = REDCap::getData("json", null, null, null, $rights[$user]["group_id"]);
-
-        // Grab the record id, the first field, of each record in the project and the secondary id field
-        if (REDCap::isLongitudinal())
-        {   
-            $options = array();
-
-            foreach(json_decode($participant_ids) as $json)
-            {
-                $id = $json->$id_field;
-
-                if (empty($options[$id]))
-                {
-                    $options[$id] = array();
-                }
-
-                if ($display_value == "1" && !empty($json->$secondary_pk) && empty($options[$id]["secondary_pk"]))
-                {
-                    $options[$id]["secondary_pk"] = $json->$secondary_pk;
-                }
-
-                foreach($fields_to_replace as $field)
-                {   
-                    if ($json->redcap_event_name == $field["event"])
-                    {
-                        $f = $field["field"];
-                        $options[$id]["label_replacements"][] = $json->$f;
-                    }
-                }
-            }
-
-            foreach($options as $id => $option)
-            {
-                $custom_label = empty($custom_record_label) || empty($option["label_replacements"]) ? "" : str_replace($labels_to_replace, $option["label_replacements"], $custom_record_label);
-
-                $id2 = ($display_value == "1" && !empty($option["secondary_pk"])) ? "( $secondary_pk_label " . $option["secondary_pk"] . " )" : "";
-
-                $label  = "$id $id2 $custom_label";
-                    
-                $participant_options[$id] = $label;
-            }
-        }
-        else
-        {
-            foreach(json_decode($participant_ids) as $json)
-            {
-                $id = $json->$id_field;
-                    
-                $id2 = ($display_value == "1" && !empty($json->$secondary_pk)) ? "( $secondary_pk_label " . $json->$secondary_pk . " )" : "";
-
-                $replacements = array();
-                foreach($fields_to_replace as $index => $field)
-                {
-                    $replacements[] = empty($json->$field) ? "" : $json->$field;
-                }
-                $custom_label = empty($custom_record_label) ? "" : str_replace($labels_to_replace, $replacements, $custom_record_label);
-
-                $participant_options[$id] = "$id $id2 $custom_label";
-            }
-        }
-        
+        $participant_options = $this->getParticipantIdsAndLabels();
         $total = count($participant_options);
 
         $all_templates = array_diff(scandir($this->templates_dir), array("..", "."));
