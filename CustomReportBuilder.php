@@ -7,7 +7,6 @@ require_once "vendor/autoload.php";
 
 use REDCap;
 use Project;
-use Records;
 use DOMDocument;
 use HtmlPage;
 use Dompdf\Dompdf;
@@ -63,7 +62,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         <script>
             CKEDITOR.plugins.addExternal( 'codemirror', '" . $this->getUrl("vendor/ckeditor-plugin/codemirror/codemirror/plugin.js") . "');
             CKEDITOR.replace( '$id', {
-                extraPlugins: 'uploadimage, codemirror',
+                extraPlugins: 'codemirror',
                 toolbar: [
                     { name: 'clipboard', items: [ 'Undo', 'Redo' ] },
                     { name: 'basicstyles', items: [ 'Bold', 'Italic', 'Underline', 'Strike', 'RemoveFormat'] },
@@ -782,11 +781,11 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     public function saveTemplate()
     {
-        $header = preg_replace("/&nbsp;/", " ", $_POST["header-editor"]);
-        $footer = preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]);
-        $data = preg_replace("/&nbsp;/", " ", $_POST["editor"]);
+        $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor"]));
+        $footer = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]));
+        $data = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["editor"]));
 
-        $name = trim($_POST["templateName"]);
+        $name = REDCap::escapeHtml(trim($_POST["templateName"]));
         $action = $_POST["action"];
 
         // Check if template has content and a name
@@ -863,7 +862,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 }
                 else
                 {
-                    $other_errors[] = "<b>ERROR</b> Template doesn't exist! Please contact your REDCap administrator about this";
+                    $other_errors[] = "<b>ERROR</b> You're editing a template that doesn't exist! Please contact your REDCap administrator about this";
                     $filename = $name;
                 }
             }
@@ -907,11 +906,10 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     public function downloadTemplate()
     {
-        $header = $_POST["header-editor"];
-        $footer = $_POST["footer-editor"];
-        $main = $_POST["editor"];
-        $filename = $_POST["filename"];
-        $pid = $this->getProjectId();
+        $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor"]));
+        $footer = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]));
+        $main = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["editor"]));
+        $filename = REDCap::escapeHtml($_POST["filename"]);
 
         if (isset($main) && !empty($main))
         {
@@ -1430,24 +1428,14 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         $participant_options = array();
 
         $id_field = REDCap::getRecordIdField();
-        $data = json_decode(REDCap::getData("json", null, array($id_field, "redcap_event_name"), null, $rights[$user]["group_id"]), true);
+        $data = json_decode(REDCap::getData("json", null, array($id_field), null, $rights[$user]["group_id"]), true);
 
         foreach($data as $record)
         {
             $to_add = $record[$id_field];
             if (!in_array($to_add, array_keys($participant_options)))
             {
-                $arm = REDCap::isLongitudinal() ? array_pop(explode("arm_", $record["redcap_event_name"])) : "1";
-                $label = Records::getCustomRecordLabelsSecondaryFieldAllRecords($to_add, true, $arm, false, '');
-
-                if (!empty($label))
-                {
-                    $participant_options[$to_add] = "$to_add $label";
-                }
-                else
-                {
-                    $participant_options[$to_add] = $to_add;
-                }
+                $participant_options[$to_add] = $to_add;
             }
         }
 
@@ -1582,11 +1570,10 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         </div>
         <?php 
             print "<script> var options = [";
-                foreach($participant_options as $id => $option)
-                {
-                    print "{label: '$option', value: '$id'},";
-                }
-
+            foreach($participant_options as $id => $option)
+            {
+                print "{label: '$option', value: '$id'},";
+            }
             print "]; </script>";
         ?>
         <script>
