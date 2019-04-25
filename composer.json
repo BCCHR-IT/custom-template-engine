@@ -1,13 +1,20 @@
 {
     "repositories": [
         {
-            "type": "vcs",
-            "url": "https://github.com/w8tcha/CKEditor-CodeMirror-Plugin"
+            "type": "package",
+            "package": {
+                "name": "ckeditor-plugin/codemirror",
+                "version": "1.17.10",
+                "dist": {
+                    "url": "https://github.com/w8tcha/CKEditor-CodeMirror-Plugin/releases/download/v1.17.10/CKEditor-CodeMirror-Plugin.zip",
+                    "type": "zip"
+                }
+            }
         }
     ],
     "require": {
         "ckeditor/ckeditor": "dev-full/4.11.x",
-        "ckeditor-plugin/codemirror": "@dev",
+        "ckeditor-plugin/codemirror": "1.17.10",
         "dompdf/dompdf": "dev-master",
         "smarty/smarty": "~3.1"
     }

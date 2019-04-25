@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "70bb27f87ef8cab96520e4b72c0a11e7",
+    "content-hash": "b90738cbdde26ce72c3a4a64fddf791c",
     "packages": [
         {
             "name": "ckeditor-plugin/codemirror",
@@ -304,7 +304,6 @@
     "minimum-stability": "stable",
     "stability-flags": {
         "ckeditor/ckeditor": 20,
-        "ckeditor-plugin/codemirror": 20,
         "dompdf/dompdf": 20
     },
     "prefer-stable": false,
