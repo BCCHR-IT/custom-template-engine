@@ -31,27 +31,48 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     private function createModuleFolders()
     {
-        if (!file_exists($this->templates_dir))
+        if (empty($this->templates_dir))
         {
-            if (!mkdir($this->templates_dir, 0777, true))
+            exit("<div class='red'><b>ERROR</b> Templates directory has not been set. Please contact your REDCap administrator.</div>");
+        }
+        else
+        {
+            if (!file_exists($this->templates_dir))
             {
-                exit("<div class='red'><b>ERROR</b> Unable to create directory $this->templates_dir to store templates. Please contact your systems administrator to make sure the location is writable.</div>");
+                if (!mkdir($this->templates_dir, 0777, true))
+                {
+                    exit("<div class='red'><b>ERROR</b> Unable to create directory $this->templates_dir to store templates. Please contact your systems administrator to make sure the location is writable.</div>");
+                }
             }
         }
 
-        if (!file_exists($this->compiled_dir))
+        if (empty($this->compiled_dir))
         {
-            if (!mkdir($this->compiled_dir, 0777, true))
+            exit("<div class='red'><b>ERROR</b> Compiled templates directory has not been set. Please contact your REDCap administrator.</div>");
+        }
+        else
+        {
+            if (!file_exists($this->compiled_dir))
             {
-                exit("<div class='red'><b>ERROR</b> Unable to create directory $this->compiled_dir to store compiled templates. Please contact your systems administrator to  make sure the location is writable.</div>");
+                if (!mkdir($this->compiled_dir, 0777, true))
+                {
+                    exit("<div class='red'><b>ERROR</b> Unable to create directory $this->compiled_dir to store compiled templates. Please contact your systems administrator to  make sure the location is writable.</div>");
+                }
             }
         }
 
-        if (!file_exists($this->img_dir))
+        if (empty($this->img_dir))
         {
-            if (!mkdir($this->img_dir, 0777, true))
+            exit("<div class='red'><b>ERROR</b> Images directory has not been set. Please contact your REDCap administrator.</div>");
+        }
+        else
+        {
+            if (!file_exists($this->img_dir))
             {
-                exit("<div class='red'><b>ERROR</b> Unable to create directory $this->img_dir to store template. Please contact your systems administrator to  make sure the location is writable.</div>");
+                if (!mkdir($this->img_dir, 0777, true))
+                {
+                    exit("<div class='red'><b>ERROR</b> Unable to create directory $this->img_dir to store template. Please contact your systems administrator to  make sure the location is writable.</div>");
+                }
             }
         }
     }
@@ -88,6 +109,21 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     private function checkPermissions()
     {
+        if (empty($this->templates_dir))
+        {
+            exit("<div class='red'><b>ERROR</b> Templates directory has not been set. Please contact your REDCap administrator.</div>");
+        }
+
+        if (empty($this->compiled_dir))
+        {
+            exit("<div class='red'><b>ERROR</b> Compiled templates directory has not been set. Please contact your REDCap administrator.</div>");
+        }
+
+        if (empty($this->img_dir))
+        {
+            exit("<div class='red'><b>ERROR</b> Images directory has not been set. Please contact your REDCap administrator.</div>");
+        }
+
         $rights = REDCap::getUserRights($this->userid);
         if ($rights[$this->userid]["data_export_tool"] === "0" || !$rights[$this->userid]["reports"]) 
         {
