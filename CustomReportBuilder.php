@@ -109,19 +109,19 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     private function checkPermissions()
     {
-        if (empty($this->templates_dir))
+        if (empty($this->templates_dir) || !file_exists($this->templates_dir))
         {
-            exit("<div class='red'><b>ERROR</b> Templates directory has not been set. Please contact your REDCap administrator.</div>");
+            exit("<div class='red'><b>ERROR</b> Templates directory has not been set, or doesn't exist. Please contact your REDCap administrator.</div>");
         }
 
-        if (empty($this->compiled_dir))
+        if (empty($this->compiled_dir) || !file_exists($this->compiled_dir))
         {
-            exit("<div class='red'><b>ERROR</b> Compiled templates directory has not been set. Please contact your REDCap administrator.</div>");
+            exit("<div class='red'><b>ERROR</b> Compiled templates directory has not been set, or doesn't exist. Please contact your REDCap administrator.</div>");
         }
 
-        if (empty($this->img_dir))
+        if (empty($this->img_dir) || !file_exists($this->img_dir))
         {
-            exit("<div class='red'><b>ERROR</b> Images directory has not been set. Please contact your REDCap administrator.</div>");
+            exit("<div class='red'><b>ERROR</b> Images directory has not been set, or doesn't exist. Please contact your REDCap administrator.</div>");
         }
 
         $rights = REDCap::getUserRights($this->userid);
