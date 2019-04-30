@@ -22,7 +22,7 @@
     "compatibility": {
         "php-version-min": "",
         "php-version-max": "",
-        "redcap-version-min": "8.5.14",
+        "redcap-version-min": "8.10.12",
         "redcap-version-max": ""
     },
     "system-settings": [

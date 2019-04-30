@@ -7,6 +7,7 @@ require_once "vendor/autoload.php";
 
 use REDCap;
 use Project;
+use Records;
 use DOMDocument;
 use HtmlPage;
 use Dompdf\Dompdf;
@@ -79,10 +80,10 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     private function initializeEditor($id, $height)
     {
-        print "
+        ?>
         <script>
-            CKEDITOR.plugins.addExternal( 'codemirror', '" . $this->getUrl("vendor/ckeditor-plugin/codemirror/codemirror/plugin.js") . "');
-            CKEDITOR.replace( '$id', {
+            CKEDITOR.plugins.addExternal('codemirror', '<?php print $this->getUrl("vendor/ckeditor-plugin/codemirror/codemirror/plugin.js"); ?>');
+            CKEDITOR.replace('<?php print $id;?>', {
                 extraPlugins: 'codemirror',
                 toolbar: [
                     { name: 'clipboard', items: [ 'Undo', 'Redo' ] },
@@ -94,17 +95,18 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                     { name: 'align', items: [ 'JustifyLeft', 'JustifyCenter', 'JustifyRight', 'JustifyBlock' ] },
                     { name: 'source', items: ['Source', 'searchCode', 'Find', 'SelectAll'] },
                 ],
-                height: $height,
+                height: <?php print $height; ?>,
                 bodyClass: 'document-editor',
-                contentsCss: [ 'https://cdn.ckeditor.com/4.8.0/full-all/contents.css', '" . $this->getUrl("app.css") . "' ],
-                filebrowserBrowseUrl: '" . $this->getUrl("BrowseImages.php") . "&type=Images',
-                filebrowserUploadUrl: '" . $this->getUrl("UploadImages.php") . "&type=Images',
+                contentsCss: [ 'https://cdn.ckeditor.com/4.8.0/full-all/contents.css', '<?php print $this->getUrl("app.css"); ?>' ],
+                filebrowserBrowseUrl: '<?php print $this->getUrl("BrowseImages.php"); ?>&type=Images',
+                filebrowserUploadUrl: '<?php print $this->getUrl("UploadImages.php"); ?>&type=Images',
                 filebrowserUploadMethod: 'form',
                 fillEmptyBlocks: false,
                 extraAllowedContent: '*{*}',
                 font_names: 'Arial/Arial, Helvetica, sans-serif; Times New Roman/Times New Roman, Times, serif; Courier; DejaVu'
             });
-        </script>";
+        </script>
+        <?php
     }
 
     private function checkPermissions()
@@ -716,8 +718,8 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             <meta charset="UTF-8">
             <title>Img Upload</title>
         </head>
+        <script type="text/javascript"><?php print "window.parent.CKEDITOR.tools.callFunction($func_num, '$url', \"$message\");"; ?></script>
         <body>
-        <?php print "<script type='text/javascript'>window.parent.CKEDITOR.tools.callFunction($func_num, '$url', \"$message\");</script>"; ?>
         </body>
         </html> 
         <?php
@@ -1220,11 +1222,9 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 </form>
             </div>
         </div>
-        <?php 
-        print "
-        <script src='" . $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js") . "'></script>
-        <script src='" . $this->getUrl("scripts.js") . "'></script>
-        ";
+        <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
+        <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
+        <?php
         $this->initializeEditor("header-editor", 200);
         $this->initializeEditor("footer-editor", 200);
         $this->initializeEditor("editor", 1000);
@@ -1379,11 +1379,9 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 </form>
             </div>
         </div>
+        <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
+        <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
         <?php
-        print "
-        <script src='" . $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js") . "'></script>
-        <script src='" . $this->getUrl("scripts.js") . "'></script>
-        ";
         $this->initializeEditor("header-editor", 200);
         $this->initializeEditor("footer-editor", 200);
         $this->initializeEditor("editor", 1000);
@@ -1445,11 +1443,9 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 </form>
             </div>
         </div>
+        <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
+        <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
         <?php
-        print "
-        <script src='" . $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js") . "'></script>
-        <script src='" . $this->getUrl("scripts.js") . "'></script>
-        ";
         $this->initializeEditor("header-editor", 200);
         $this->initializeEditor("footer-editor", 200);
         $this->initializeEditor("editor", 1000);
@@ -1471,7 +1467,17 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             $to_add = $record[$id_field];
             if (!in_array($to_add, array_keys($participant_options)))
             {
-                $participant_options[$to_add] = $to_add;
+                $arm = REDCap::isLongitudinal() ? array_pop(explode("arm_", $record["redcap_event_name"])) : "1";
+                $label = Records::getCustomRecordLabelsSecondaryFieldAllRecords($to_add, true, $arm, false, '');
+
+                if (!empty($label))
+                {
+                    $participant_options[$to_add] = "$to_add $label";
+                }
+                else
+                {
+                    $participant_options[$to_add] = $to_add;
+                }
             }
         }
 
@@ -1604,15 +1610,16 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 </div>
             </div>
         </div>
-        <?php 
-            print "<script> var options = [";
-            foreach($participant_options as $id => $option)
-            {
-                print "{label: '$option', value: '$id'},";
-            }
-            print "]; </script>";
-        ?>
         <script>
+            var options = [
+                <?php 
+                    foreach($participant_options as $id => $option)
+                    {
+                        print "{label: '$option', value: '$id'},";
+                    }
+                ?>
+            ]
+
             $(function() {
                 $("#participantIDs" ).autocomplete({
                     minLength: 0,
