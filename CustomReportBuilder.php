@@ -1107,7 +1107,11 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     public function generateFillTemplatePage()
     {
-        $this->checkPermissions();
+        $rights = REDCap::getUserRights($this->userid);
+        if ($rights[$this->userid]["data_export_tool"] === "0") 
+        {
+            exit("<div class='red'>You don't have premission to view this page</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
+        }
         
         $record = $_POST["participantID"];
         if (empty($record))
