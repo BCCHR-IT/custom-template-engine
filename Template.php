@@ -181,7 +181,7 @@ class Template
                         {
                             $event_fields_and_vals[$field_name] = array();
                         }
-                        $event_fields_and_vals[$field_name]["allValues"] = $value;
+                        $event_fields_and_vals[$field_name]["allValues"] = implode(", ", explode(",", $value));
                     }
                 }
                 else

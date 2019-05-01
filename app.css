@@ -152,3 +152,7 @@ body.document-editor table thead th:first-of-type {
     background-color: white;
     padding: 5px;
 }
+
+.red > div > div > p {
+    font-size: 13px;
+}

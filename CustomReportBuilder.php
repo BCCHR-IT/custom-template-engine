@@ -823,7 +823,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         $footer = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]));
         $data = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["editor"]));
 
-        $name = REDCap::escapeHtml(trim($_POST["templateName"]));
+        $name = trim($_POST["templateName"]);
         $action = $_POST["action"];
 
         // Check if template has content and a name
@@ -1224,6 +1224,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         </div>
         <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
         <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
+        <script>CKEDITOR.dtd.\$removeEmpty['p'] = true;</script>
         <?php
         $this->initializeEditor("header-editor", 200);
         $this->initializeEditor("footer-editor", 200);
