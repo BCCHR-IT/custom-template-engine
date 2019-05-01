@@ -14,15 +14,14 @@
             {
                 "name": "Custom Report Builder",
                 "url": "index.php",
-                "icon": "link",
-                "show-header-and-footer": true
+                "icon": "link"
             }
         ]
     },
     "compatibility": {
         "php-version-min": "",
         "php-version-max": "",
-        "redcap-version-min": "8.10.12",
+        "redcap-version-min": "8.5.14",
         "redcap-version-max": ""
     },
     "system-settings": [
