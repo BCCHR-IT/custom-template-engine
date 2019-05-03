@@ -880,39 +880,59 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 {
                     $other_errors[] = "<b>ERROR</b> Template already exists! Please choose another name";
                     $filename = $name;
-                }        
+                }
             }
             else
             {
                 $currTemplateName = $_POST["currTemplateName"];
                 if (file_exists($this->templates_dir . $currTemplateName))
                 {
-                    if ($doc->saveHTMLFile($this->templates_dir . $currTemplateName) === FALSE)
+                    if ($currTemplateName == "{$name}_{$this->pid}.html" || $currTemplateName == "{$name}_{$this->pid} - INVALID.html")
                     {
-                        $other_errors[] = "<b>ERROR</b> Unable to save template. Please contact your REDCap administrator";
+                        if ($doc->saveHTMLFile($this->templates_dir . $currTemplateName) === FALSE)
+                        {
+                            $other_errors[] = "<b>ERROR</b> Unable to save template. Please contact your REDCap administrator";
+                        }
+                        else
+                        {
+                            REDCap::logEvent("Template edited", $currTemplateName);
+                            if ((!empty($template_errors) || !empty($header_errors) || !empty($footer_errors)) && strpos($currTemplateName, " - INVALID") === FALSE)
+                            {
+                                $filename = strpos($currTemplateName, " - INVALID") !== FALSE ? $currTemplateName : str_replace(".html", " - INVALID.html", $currTemplateName);
+                                rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
+                            }
+                            else if (strpos($currTemplateName, " - INVALID") !== FALSE)
+                            {
+                                $filename = str_replace(" - INVALID", "", $currTemplateName);
+                                rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
+                            }
+                        }
                     }
-                    else
+                    else if (!file_exists("$this->templates_dir{$name}_$this->pid.html") && !file_exists("$this->templates_dir{$name}_{$this->pid} - INVALID.html") )
                     {
-                        REDCap::logEvent("Template edited", $name);
-
-                        if ($currTemplateName == "{$name}_{$this->pid}.html" || $currTemplateName == "{$name}_{$this->pid} - INVALID.html")
+                        if ($doc->saveHTMLFile($this->templates_dir . $currTemplateName) === FALSE)
                         {
-                            $filename = $currTemplateName;
+                            $other_errors[] = "<b>ERROR</b> Unable to save template. Please contact your REDCap administrator";
                         }
                         else
                         {
-                            $filename = "{$name}_{$this->pid}.html";
+                            if (!empty($template_errors) || !empty($header_errors) || !empty($footer_errors))
+                            {
+                                $filename = "{$name}_$this->pid - INVALID.html";
+                                rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
+                            }
+                            else
+                            {
+                                $filename = "{$name}_$this->pid.html";
+                                rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
+                            }
+                            REDCap::logEvent("Template edited", "Renamed template from '$currTemplateName' to '$filename'");
                         }
-                        
-                        if (!empty($template_errors) || !empty($header_errors) || !empty($footer_errors))
-                        {
-                            $to_rename = strpos($filename, " - INVALID") !== FALSE ? $filename : $filename . " - INVALID.html";
-                            rename($this->templates_dir. $currTemplateName, $this->templates_dir . $to_rename);
-                        }
-                        else
-                        {
-                            rename($this->templates_dir. $currTemplateName, $this->templates_dir. str_replace(" - INVALID", "", $filename));
-                        }
+                    }
+                    else 
+                    {
+                        $other_errors[] = "<b>ERROR</b> Template already exists! Please choose another name";
+                        $filename = $name;
                     }
                 }
                 else
@@ -1394,7 +1414,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                                 <td style="width:25%;">Template Name <strong style="color:red">*Required</strong></td>
                                 <td class="data">
                                     <div class="col-sm-5">
-                                        <input name="templateName" type="text" class="form-control" value="<?php print str_replace(array("_$this->pid.html", " - INVALID.html"), "", $template_name); ?>">
+                                        <input name="templateName" type="text" class="form-control" value="<?php print str_replace(array("_$this->pid", " - INVALID", ".html"), "", $template_name); ?>">
                                         <input type="hidden" name="action" 
                                             value="<?php !empty($errors) && (file_exists("$this->templates_dir{$template_name}_$this->pid.html") || file_exists("$this->templates_dir{$template_name}_$this->pid - INVALID.html")) ?
                                                      print "create" : print "edit"?>"
