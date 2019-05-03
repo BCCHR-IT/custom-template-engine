@@ -817,6 +817,20 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         <?php
     }
 
+    public function deleteTemplate()
+    {
+        $templateToDelete = $_POST["templateToDelete"];
+        if (unlink($this->templates_dir . $templateToDelete))
+        {
+            REDCap::logEvent("Deleted template", $templateToDelete);
+            return TRUE;
+        }
+        else
+        {
+            return FALSE;
+        }
+    }
+
     public function saveTemplate()
     {
         $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor"]));
@@ -870,31 +884,34 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             }
             else
             {
-                $path_info = pathinfo($name);
-                
-                if (file_exists($this->templates_dir . $name))
+                $currTemplateName = $_POST["currTemplateName"];
+                if (file_exists($this->templates_dir . $currTemplateName))
                 {
-                    if ($doc->saveHTMLFile($this->templates_dir . $name) === FALSE)
+                    if ($doc->saveHTMLFile($this->templates_dir . $currTemplateName) === FALSE)
                     {
                         $other_errors[] = "<b>ERROR</b> Unable to save template. Please contact your REDCap administrator";
                     }
                     else
                     {
                         REDCap::logEvent("Template edited", $name);
-                        if (!empty($template_errors) || !empty($header_errors) || !empty($footer_errors))
+
+                        if ($currTemplateName == "{$name}_{$this->pid}.html" || $currTemplateName == "{$name}_{$this->pid} - INVALID.html")
                         {
-                            $filename = strpos($path_info["filename"], " - INVALID") !== FALSE ? $name : $path_info["filename"] . " - INVALID.html";
-                            if ($name !== $filename)
-                            {
-                                rename($this->templates_dir. $name, $this->templates_dir . $filename);
-                            }
+                            $filename = $currTemplateName;
                         }
                         else
                         {
-                            if (strpos($name, " - INVALID") !== FALSE)
-                            {
-                                rename($this->templates_dir. $name, $this->templates_dir. str_replace(" - INVALID", "", $name));
-                            }
+                            $filename = "{$name}_{$this->pid}.html";
+                        }
+                        
+                        if (!empty($template_errors) || !empty($header_errors) || !empty($footer_errors))
+                        {
+                            $to_rename = strpos($filename, " - INVALID") !== FALSE ? $filename : $filename . " - INVALID.html";
+                            rename($this->templates_dir. $currTemplateName, $this->templates_dir . $to_rename);
+                        }
+                        else
+                        {
+                            rename($this->templates_dir. $currTemplateName, $this->templates_dir. str_replace(" - INVALID", "", $filename));
                         }
                     }
                 }
@@ -952,7 +969,28 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         if (isset($main) && !empty($main))
         {
             $doc = new DOMDocument();
-            $doc->loadHtml("<html><body><header>$header</header><footer>$footer</footer><main>$main</main></body></html>");
+            $doc->loadHtml("
+                <html>
+                    <body>
+                        <header>$header</header>
+                        <footer>$footer</footer>
+                        <main>$main</main>
+                        <script type='text/php'>
+                            // Add page number to every page
+                            if (isset(\$pdf)) { 
+                                \$pdf->page_script('
+                                    \$font = \$fontMetrics->get_font(\"Arial, Helvetica, sans-serif\", \"normal\");
+                                    \$size = 12;
+                                    \$pageText = \"Page \" . \$PAGE_NUM . \" of \" . \$PAGE_COUNT;
+                                    \$y = 750;
+                                    \$x = 520;
+                                    \$pdf->text(\$x, \$y, \$pageText, \$font, \$size);
+                                ');
+                            }
+                        </script>
+                    </body>
+                </html>
+            ");
 
             // DOMPdf renders what's passed in, and if default font-size is used then
             // the editor will use what's in app.css. Set the general CSS to be 12px.
@@ -977,11 +1015,16 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             
             $doc->appendChild($style);
 
+            // Add page numbers to the footer of every page
+
+            //print htmlspecialchars($doc->saveHtml());
+
             $dompdf = new Dompdf();
-            $dompdf->set_option('isHtml5ParserEnabled', true);
+            $dompdf->set_option("isHtml5ParserEnabled", true);
+            $dompdf->set_option("isPhpEnabled", true);
             $dompdf->loadHtml($doc->saveHtml());
 
-            // (Optional) Setup the paper size and orientation
+            // Setup the paper size and orientation
             $dompdf->setPaper("letter", "portrait");
 
             // Render the HTML as PDF
@@ -1061,7 +1104,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                             $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
                             $this->deleteRepositoryFile($stored_name);
                         }
-                    } 
+                    }
                     else 
                     {
                         /* if we failed here, we need to delete the file */
@@ -1182,13 +1225,22 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                             <li> Data has been de-identified according to user access rights</li>
                         <?php endif;?>
                     </ul>
+                    <?php if ($this->getProjectSetting("save-report-to-repo")) :?>
+                        <div class="green" style="max-width: initial;">
+                            <p>This module can save reports to the File Repository, upon download. This is currently <strong>enabled</strong> if you'd like to disable this contact your REDCap administrator.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="red" style="max-width: initial;">
+                            <p> This module can save reports to the File Repository,  upon download. This is currently <strong>disabled</strong>, but if you'd like to enable this contact your REDCap administrator.</p>
+                        </div>
+                    <?php endif;?>
                 </div>
                 <br/>
                 <form action="<?php print $this->getUrl("DownloadFilledTemplate.php"); ?>" method="post">
                     <table class="table" style="width:100%;">
                         <tbody>
                             <tr>
-                                <td style="width:25%;"><strong style="color:red">* Required</strong></td>
+                                <td style="width:25%;">Template Name <strong style="color:red">* Required</strong></td>
                                 <td class="data">
                                     <div class="col-sm-5">
                                         <input id="filename" name="filename" type="text" class="form-control" value="<?php print basename($template_filename, "_$this->pid.html") . " - $record";?>" required>
@@ -1342,14 +1394,12 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                                 <td style="width:25%;">Template Name <strong style="color:red">*Required</strong></td>
                                 <td class="data">
                                     <div class="col-sm-5">
-                                        <input name="templateName" type="text" class="form-control" value="<?php print $template_name; ?>" 
-                                            <?php !empty($errors) && (file_exists("$this->templates_dir{$template_name}_$this->pid.html") || file_exists("$this->templates_dir{$template_name}_$this->pid - INVALID.html")) ? 
-                                            : print "readonly"?>
-                                        >
+                                        <input name="templateName" type="text" class="form-control" value="<?php print str_replace(array("_$this->pid.html", " - INVALID.html"), "", $template_name); ?>">
                                         <input type="hidden" name="action" 
                                             value="<?php !empty($errors) && (file_exists("$this->templates_dir{$template_name}_$this->pid.html") || file_exists("$this->templates_dir{$template_name}_$this->pid - INVALID.html")) ?
                                                      print "create" : print "edit"?>"
                                         >
+                                        <input name="currTemplateName" type="hidden" class="form-control" value="<?php print $template_name; ?>">
                                     </div>
                                 </td>
                             </tr>
@@ -1515,6 +1565,16 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                     {
                         print "<div class='green container'>Your template was successfully saved</div><br/>";
                     }
+
+                    $deleted = $_GET["deleted"];
+                    if ($deleted === "1")
+                    {
+                        print "<div class='green container'>Your template was successfully deleted</div><br/>";
+                    }
+                    else if ($deleted === "0")
+                    {
+                        print "<div class='red container'>Something went wrong! Your template was not deleted. Please contact your REDCap administrator.</div><br/>";
+                    }
                 ?>
                 <h3>REDCap Report Builder</h3>
                 <hr>
@@ -1524,9 +1584,14 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                     <div class="container syntax-rule">
                         <a class="btn btn-link" href=<?php print $this->getUrl("CreateTemplate.php");?>>Create New Template</a> |
                         <?php if (sizeof($edit_templates) > 0):?>
-                            <button type="button" class="btn btn-link" data-toggle="modal" data-target="#exampleModalCenter">Edit Existing Template</button>
+                            <button type="button" class="btn btn-link" data-toggle="modal" data-target="#exampleModalCenter">Edit Template</button> | 
                         <?php else:?>
-                            <button type="button" class="btn btn-link" data-toggle="modal" data-target="#exampleModalCenter" disabled>Edit Existing Template</button>
+                            <button type="button" class="btn btn-link" data-toggle="modal" data-target="#exampleModalCenter" disabled>Edit Template</button> | 
+                        <?php endif;?>
+                        <?php if (sizeof($edit_templates) > 0):?>
+                            <button type="button" class="btn btn-link" data-toggle="modal" data-target="#deleteTemplateModal">Delete Template</button>
+                        <?php else:?>
+                            <button type="button" class="btn btn-link" data-toggle="modal" data-target="#deleteTemplateModal" disabled>Delete Template</button>
                         <?php endif;?>
                     </div>
                 <?php else:?>
@@ -1615,6 +1680,55 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 </div>
             </div>
         </div>
+        <!-- Delete Template Modals -->
+        <div class="modal fade" id="deleteTemplateModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5>Choose a Template: </h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <select id="deleteTemplateDropdown" name="template" style="display:block; margin: 0 auto;" class="form-control">
+                            <?php
+                                foreach($edit_templates as $template)
+                                {
+                                    print "<option value=\"" . $template . "\">" . $template . "</option>";
+                                }
+                            ?>        
+                        </select>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#checkDeletionModal">Delete Template</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade" id="checkDeletionModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5>Delete Template: </h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <form action=<?php print $this->getUrl("DeleteTemplate.php");?> method="post">
+                        <div class="modal-body">
+                            <div class="red"><p>Are you sure you want to delete <strong id="toDelete"></strong>?</p></div>
+                            <input type="hidden" id="templateToDelete" name="templateToDelete">
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-primary">Delete Template</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
         <script>
             var options = [
                 <?php 
@@ -1631,7 +1745,13 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                     source: options
                     }).focus(function () {
                         $(this).autocomplete("search", "");
-                    });
+                });
+                $("#toDelete").text($("#deleteTemplateDropdown").val());
+                $("#templateToDelete").val($("#deleteTemplateDropdown").val());
+                $("#deleteTemplateDropdown").change(function() {
+                    $("#toDelete").text($(this).val());
+                    $("#templateToDelete").val($(this).val());
+                });
             });
         </script>
         <?php
