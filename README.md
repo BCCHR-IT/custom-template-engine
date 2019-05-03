@@ -19,13 +19,17 @@ Users must have data export access in order to use the module, and perhaps addit
 
 ## Creating/Editing a Template
 
-Users must have access to data exports and reports in order to edit or create a template. The content will be created in the WYSIWYG CKEditor, and saved as an HTML file in the previously configured saved templates folder. In order to pass template validation, the syntax instruction must be followed. Invalid templates will be saved under "template_name_project_id - INVALID.html" and can be edited but not filled, and errors will be returned to the user. Valid templates will be saved, and the user will be redirected to the module index.
+Users must have access to data exports and reports in order to edit or create a template. The content will be created in the WYSIWYG CKEditor, and saved as an HTML file in the previously configured saved templates folder. In order to pass template validation, the syntax instruction must be followed. Invalid templates will be saved under "{template name}_{project id} - INVALID.html" and can be edited but not filled, and errors will be returned to the user. Valid templates will be saved, and the user will be redirected to the module index.
 
 Users may add optional footers and headers that follow the same syntax rules as the body.
 
 Users may upload and browse images. However, no security is placed on what images are uploaded, and all images uploaded to the project are viewable by every user. Consider this before uploading.
 
 The user may copy-paste pre-formatted fields and events into their template. Descriptive text fields are exempt from the list. 
+
+## Deleting a template
+
+Users must have access to data exports and reports in order to delete a template. 
 
 ## Filling and Downloading Template
 
