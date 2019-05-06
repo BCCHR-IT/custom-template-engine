@@ -614,26 +614,30 @@ class Template
 
         if (!empty($text))
         {
-            if ($text != strip_tags($text))
-            {
-                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Report logic cannot have any HTML between {}";
-            }
-            else if (preg_match("/{/", $text) !== 0 || preg_match("/}/", $text) !== 0)
-            {
-                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] There is either a '{'  or '}' within {}. They are special characters and can only denote the beginning and end of syntax.";
-            }
             if ((sizeof(explode("'", $text)) - 1) % 2 > 0)
             {
                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Odd number of single quotes exist. You've either added an extra quote, forgotten to close one, or forgotten to escape one.";
             }
-            else if (empty($errors))
-            {  
-                // Validate syntax arrangement
-                $errors = array_merge($errors, $this->validateSyntax($text, $line_num));
-                    
-                // Fields and events must exist in project
-                // Check that checkboxes are queried properly
-                $errors = array_merge($errors, $this->validateFieldsAndEvents($text, $line_num));
+            else
+            {
+                $strings_stripped = $this->replaceStrings($text, "''");
+                if ($strings_stripped != strip_tags($strings_stripped))
+                {
+                    $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Report logic cannot have any HTML between {}";
+                }
+                else if (preg_match("/{/", $text) !== 0 || preg_match("/}/", $text) !== 0)
+                {
+                    $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] There is either a '{'  or '}' within {}. They are special characters and can only denote the beginning and end of syntax.";
+                }
+                else if (empty($errors))
+                {  
+                    // Validate syntax arrangement
+                    $errors = array_merge($errors, $this->validateSyntax($text, $line_num));
+                        
+                    // Fields and events must exist in project
+                    // Check that checkboxes are queried properly
+                    $errors = array_merge($errors, $this->validateFieldsAndEvents($text, $line_num));
+                }
             }
         }
         return $errors;

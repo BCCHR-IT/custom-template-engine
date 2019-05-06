@@ -1003,7 +1003,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                                     \$size = 12;
                                     \$pageText = \"Page \" . \$PAGE_NUM . \" of \" . \$PAGE_COUNT;
                                     \$y = 750;
-                                    \$x = 520;
+                                    \$x = 270;
                                     \$pdf->text(\$x, \$y, \$pageText, \$font, \$size);
                                 ');
                             }
