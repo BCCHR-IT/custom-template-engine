@@ -625,7 +625,7 @@ class Template
             {
                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Odd number of single quotes exist. You've either added an extra quote, forgotten to close one, or forgotten to escape one.";
             }
-            else if ($strings_stripped != strip_tags($strings_stripped))
+            else if ($text != strip_tags($text))
             {
                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Report logic cannot have any HTML between {}";
             }
