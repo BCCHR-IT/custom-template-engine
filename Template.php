@@ -150,11 +150,12 @@ class Template
         $event_fields_and_vals = array();
         foreach($event_data as $field_name => $value)
         {
+            $value = trim(strip_tags($value));
             if (in_array($field_name, $instruments_complete))
             {
                 $event_fields_and_vals[$field_name] = $value;
             }
-            else if ($field_name !== "redcap_event_name" && array_key_exists($field_name, $dictionary))
+            else if ($field_name !== "redcap_event_name")
             {
                 if ($dictionary[$field_name]["field_type"] === "checkbox")
                 {
@@ -173,13 +174,19 @@ class Template
                     }
                     else
                     {
-                        if (!empty($value))
+                        $all_choices = explode("|", $dictionary[$field_name]["select_choices_or_calculations"]);
+                        $all_choices = array_map(function ($v) {
+                            $v = strip_tags($v);
+                            $first_comma = strpos($v, ",");
+                            return trim(substr($v, $first_comma + 1));
+                        }, $all_choices);
+
+                        foreach($all_choices as $choice)
                         {
-                            $event_fields_and_vals[$field_name] = explode(",", $value);
-                        }
-                        else
-                        {
-                            $event_fields_and_vals[$field_name] = array();
+                            if (strpos($value, $choice) != FALSE)
+                            {
+                                $event_fields_and_vals[$field_name][] = $choice;
+                            }
                         }
                         $event_fields_and_vals[$field_name]["allValues"] = implode(", ", explode(",", $value));
                     }
@@ -618,26 +625,22 @@ class Template
             {
                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Odd number of single quotes exist. You've either added an extra quote, forgotten to close one, or forgotten to escape one.";
             }
-            else
+            else if ($strings_stripped != strip_tags($strings_stripped))
             {
-                $strings_stripped = $this->replaceStrings($text, "''");
-                if ($strings_stripped != strip_tags($strings_stripped))
-                {
-                    $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Report logic cannot have any HTML between {}";
-                }
-                else if (preg_match("/{/", $text) !== 0 || preg_match("/}/", $text) !== 0)
-                {
-                    $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] There is either a '{'  or '}' within {}. They are special characters and can only denote the beginning and end of syntax.";
-                }
-                else if (empty($errors))
-                {  
-                    // Validate syntax arrangement
-                    $errors = array_merge($errors, $this->validateSyntax($text, $line_num));
-                        
-                    // Fields and events must exist in project
-                    // Check that checkboxes are queried properly
-                    $errors = array_merge($errors, $this->validateFieldsAndEvents($text, $line_num));
-                }
+                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Report logic cannot have any HTML between {}";
+            }
+            else if (preg_match("/{/", $text) !== 0 || preg_match("/}/", $text) !== 0)
+            {
+                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] There is either a '{'  or '}' within {}. They are special characters and can only denote the beginning and end of syntax.";
+            }
+            else if (empty($errors))
+            {  
+                // Validate syntax arrangement
+                $errors = array_merge($errors, $this->validateSyntax($text, $line_num));
+                    
+                // Fields and events must exist in project
+                // Check that checkboxes are queried properly
+                $errors = array_merge($errors, $this->validateFieldsAndEvents($text, $line_num));
             }
         }
         return $errors;
@@ -966,7 +969,6 @@ class Template
                 }
                 $empty_elems = $this->getEmptyNodes($body);
             }
-
             $filled_template = $doc->saveHTML();
         }
         catch (Exception $e)
