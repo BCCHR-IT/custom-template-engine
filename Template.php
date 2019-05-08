@@ -18,7 +18,7 @@ class Template
     private $de_identified_replacement = "[DE-IDENTIFIED]";
     private $date_formats = array("date_dmy", "date_mdy", "date_my", "date_ymd", "date_ym", "datetime_dmy", "datetime_mdy", "datetime_ymd", "datetime_seconds_dmy",
                                 "datetime_seconds_mdy", "datetime_seconds_ymd");
-    private $logical_operators = array("eq", "ne", "neq", "gt", "lt", "gte", "gte", "lte", "le", "not", "or", "and");
+    private $logical_operators = array("eq", "ne", "neq", "gt", "lt", "ge", "gte", "lte", "le", "not", "or", "and");
 
     function __construct($templates_dir, $compiled_dir) 
     {
