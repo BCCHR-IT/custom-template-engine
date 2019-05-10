@@ -984,7 +984,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor"]));
         $footer = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]));
         $main = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["editor"]));
-        $filename = REDCap::escapeHtml($_POST["filename"]);
+        $filename = $_POST["filename"];
 
         if (isset($main) && !empty($main))
         {
