@@ -7,6 +7,8 @@ require_once "vendor/smarty/smarty/libs/Smarty.class.php";
 use REDCap;
 use Smarty;
 use DOMDocument;
+use DOMElement;
+use DOMText;
 
 class Template
 {
@@ -31,7 +33,7 @@ class Template
     private function getEmptyNodes($elem)
     {
         $empty_elems = array();
-    
+
         if ($elem->hasChildNodes())
         {
             foreach($elem->childNodes as $child)
@@ -40,11 +42,12 @@ class Template
                 $empty_elems = array_merge($empty_elems, $empty_child_elems);
             }
         }
-        else if (trim($elem->nodeValue) == "" && $elem->tagName != "img" && $elem->tagName != "body" && $elem->tagName != "hr" && $elem->tagName != "br")
+        else if ((ctype_space($elem->nodeValue) || str_replace(array(" ", "\xC2\xA0"), "", $elem->nodeValue) == "") && 
+                $elem->tagName != "img" && $elem->tagName != "body" && $elem->tagName != "hr" && $elem->tagName != "br")
         {
             if ($elem->tagName == "td")
             {
-                if (empty($elem->previousSibling))
+                if (empty($elem->previousSibling) || $elem->previousSibling->tagName != "td")
                 {
                     $empty_elems[] = $elem;
                 }
@@ -54,7 +57,7 @@ class Template
                 $empty_elems[] = $elem;
             }
         }
-    
+        
         return $empty_elems;
     }
 

@@ -4,31 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b90738cbdde26ce72c3a4a64fddf791c",
+    "content-hash": "8ca53e8036c835cf6f5f27c0e3935483",
     "packages": [
-        {
-            "name": "ckeditor-plugin/codemirror",
-            "version": "1.17.10",
-            "dist": {
-                "type": "zip",
-                "url": "https://github.com/w8tcha/CKEditor-CodeMirror-Plugin/releases/download/v1.17.10/CKEditor-CodeMirror-Plugin.zip",
-                "reference": null,
-                "shasum": null
-            },
-            "type": "library"
-        },
         {
             "name": "ckeditor/ckeditor",
             "version": "dev-full/4.11.x",
             "source": {
                 "type": "git",
                 "url": "https://github.com/ckeditor/ckeditor-releases.git",
-                "reference": "67c47903d3cd146074ed508ef774ebad2cea34a8"
+                "reference": "6f1346dc4ac94a6e22ebde53d92b3267159c4c05"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/ckeditor/ckeditor-releases/zipball/67c47903d3cd146074ed508ef774ebad2cea34a8",
-                "reference": "67c47903d3cd146074ed508ef774ebad2cea34a8",
+                "url": "https://api.github.com/repos/ckeditor/ckeditor-releases/zipball/6f1346dc4ac94a6e22ebde53d92b3267159c4c05",
+                "reference": "6f1346dc4ac94a6e22ebde53d92b3267159c4c05",
                 "shasum": ""
             },
             "type": "library",
@@ -56,7 +45,7 @@
                 "text",
                 "wysiwyg"
             ],
-            "time": "2019-02-26T12:58:57+00:00"
+            "time": "2019-04-09T13:35:04+00:00"
         },
         {
             "name": "dompdf/dompdf",
@@ -64,12 +53,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/dompdf/dompdf.git",
-                "reference": "75f13c700009be21a1965dc2c5b68a8708c22ba2"
+                "reference": "d30679a47a067a69540c988405cb675404898acc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/dompdf/dompdf/zipball/75f13c700009be21a1965dc2c5b68a8708c22ba2",
-                "reference": "75f13c700009be21a1965dc2c5b68a8708c22ba2",
+                "url": "https://api.github.com/repos/dompdf/dompdf/zipball/d30679a47a067a69540c988405cb675404898acc",
+                "reference": "d30679a47a067a69540c988405cb675404898acc",
                 "shasum": ""
             },
             "require": {
@@ -122,7 +111,44 @@
             ],
             "description": "DOMPDF is a CSS 2.1 compliant HTML to PDF converter",
             "homepage": "https://github.com/dompdf/dompdf",
-            "time": "2018-12-14T02:40:31+00:00"
+            "time": "2019-05-10T01:14:18+00:00"
+        },
+        {
+            "name": "egorlaw/ckeditor_codemirror",
+            "version": "1.0.5",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/egorlaw/ckeditor.codemirror.git",
+                "reference": "8f219b9b64f7ae431733f2107dc13b79e946b634"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://github.com/egorlaw/ckeditor_codemirror/archive/1.0.5.zip",
+                "reference": "8f219b9b64f7ae431733f2107dc13b79e946b634",
+                "shasum": null
+            },
+            "type": "drupal-library",
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Egor Guriyanov",
+                    "email": "egorlaw@gmail.com",
+                    "homepage": "https://github.com/egorlaw",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Composer wrapper for CKEditor Codemirror plugin",
+            "homepage": "https://github.com/egorlaw/ckeditor.codemirror",
+            "keywords": [
+                "CKEditor",
+                "javascript",
+                "plugin",
+                "text-highlight"
+            ],
+            "time": "2017-11-16T07:32:37+00:00"
         },
         {
             "name": "phenx/php-font-lib",

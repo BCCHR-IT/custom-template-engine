@@ -82,7 +82,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
     {
         ?>
         <script>
-            CKEDITOR.plugins.addExternal('codemirror', '<?php print $this->getUrl("vendor/ckeditor-plugin/codemirror/codemirror/plugin.js"); ?>');
+            CKEDITOR.plugins.addExternal('codemirror', '<?php print $this->getUrl("vendor/egorlaw/ckeditor_codemirror/plugin.js"); ?>');
             CKEDITOR.replace('<?php print $id;?>', {
                 extraPlugins: 'codemirror',
                 toolbar: [
@@ -833,9 +833,9 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     public function saveTemplate()
     {
-        $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor"]));
-        $footer = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]));
-        $data = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["editor"]));
+        $header = REDCap::filterHtml($_POST["header-editor"]);
+        $footer = REDCap::filterHtml($_POST["footer-editor"]);
+        $data = REDCap::filterHtml($_POST["editor"]);
 
         $name = trim($_POST["templateName"]);
         $action = $_POST["action"];
