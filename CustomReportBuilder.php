@@ -591,7 +591,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                                 
                             if (!empty($field["select_choices_or_calculations"]) && $field["field_type"] !== "calc")
                             {
-                                $valuesAndLabels = explode(" | ", $field["select_choices_or_calculations"]);
+                                $valuesAndLabels = explode("|", $field["select_choices_or_calculations"]);
                                 if ($field["field_type"] === "slider")
                                 {
                                     $labels = $valuesAndLabels;

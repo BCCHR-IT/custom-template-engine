@@ -7,6 +7,8 @@ require_once "vendor/smarty/smarty/libs/Smarty.class.php";
 use REDCap;
 use Smarty;
 use DOMDocument;
+use DOMElement;
+use DOMText;
 
 class Template
 {
@@ -184,11 +186,12 @@ class Template
 
                         foreach($all_choices as $choice)
                         {
-                            if (strpos($value, $choice) != FALSE)
+                            if (strpos($value, $choice) !== FALSE)
                             {
                                 $event_fields_and_vals[$field_name][] = $choice;
                             }
                         }
+
                         $event_fields_and_vals[$field_name]["allValues"] = implode(", ", explode(",", $value));
                     }
                 }
@@ -920,7 +923,7 @@ class Template
         $user = strtolower(USERID);
         $rights = REDCap::getUserRights($user);
 
-        $template = REDCap::getData("json", array($record),null, null, null, TRUE, FALSE, FALSE, null, TRUE);
+        $template = REDCap::getData("json", $record, null, null, null, TRUE, FALSE, null, null, TRUE);
         $json = json_decode($template, true);
 
         if (REDCap::isLongitudinal())
