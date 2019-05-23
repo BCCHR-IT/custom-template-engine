@@ -1636,7 +1636,8 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                                     </td>
                                     <td class="data">
                                         <?php if (sizeof($participant_options) > 0):?>
-                                            <input  name="participantID" id="participantIDs" class="form-control" style="width:initial;" required>
+                                            <input id="participantIDs" class="form-control" style="width:initial;" required>
+                                            <input name="participantID" id="participantID-value" type="hidden">
                                         <?php else:?>
                                             <span>No Existing Records</span>        
                                         <?php endif;?>
@@ -1754,7 +1755,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 <?php 
                     foreach($participant_options as $id => $option)
                     {
-                        print "{label: '$option', value: '$id'},";
+                        print "{label: '$option', id: '$id'},";
                     }
                 ?>
             ]
@@ -1762,10 +1763,13 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             $(function() {
                 $("#participantIDs" ).autocomplete({
                     minLength: 0,
-                    source: options
-                    }).focus(function () {
-                        $(this).autocomplete("search", "");
-                });
+                    source: options,
+                    select: function (event, ui) {
+                        $("#participantID-value").val(ui.item.id);
+                    }
+                }).focus(function () {
+                    $(this).autocomplete("search", "");
+                })
                 $("#toDelete").text($("#deleteTemplateDropdown").val());
                 $("#templateToDelete").val($("#deleteTemplateDropdown").val());
                 $("#deleteTemplateDropdown").change(function() {
