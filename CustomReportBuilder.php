@@ -1037,8 +1037,6 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
             // Add page numbers to the footer of every page
 
-            //print htmlspecialchars($doc->saveHtml());
-
             $dompdf = new Dompdf();
             $dompdf->set_option("isHtml5ParserEnabled", true);
             $dompdf->set_option("isPhpEnabled", true);
