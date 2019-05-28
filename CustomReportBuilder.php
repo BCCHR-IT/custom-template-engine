@@ -833,9 +833,9 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     public function saveTemplate()
     {
-        $header = REDCap::filterHtml($_POST["header-editor"]);
-        $footer = REDCap::filterHtml($_POST["footer-editor"]);
-        $data = REDCap::filterHtml($_POST["editor"]);
+        $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor"]));
+        $footer = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]));
+        $data = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["editor"]));
 
         $name = trim($_POST["templateName"]);
         $action = $_POST["action"];
