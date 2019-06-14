@@ -135,6 +135,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     private function generateInstructions()
     {
+        $Proj = new Project();
         ?>
         <div class="container syntax-rule">
             <h4><u>Instructions</u></h4>
@@ -569,10 +570,17 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
             <button class="collapsible">Click to view fields <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
             <div class="collapsible-content">
             <p>
-                <?php if (REDCap::isLongitudinal()): ?>
+                <?php if (REDCap::isLongitudinal() && $Proj->project['surveys_enabled']): ?>
+                    <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
+                    To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).</p>
+                    <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
+                <?php elseif (REDCap::isLongitudinal()): ?>
                     <u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
                     To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).
-                <?php else:?>
+                <?php elseif ($Proj->project['surveys_enabled']): ?> 
+                    <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use.</p>
+                    <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
+                <?php else: ?>
                     <u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use.
                 <?php endif;?>
             </p>
@@ -622,6 +630,22 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                     print "</div></div>";
                 }
                 ?>
+                <?php if ($Proj->project['surveys_enabled']): ?>
+                <div class='collapsible-container'>
+                    <button class='collapsible'>Survey Completion Timestamps <span class='fas fa-caret-down'></span><span class='fas fa-caret-up'></span></button>
+                    <div class='collapsible-content'>
+                        <?php
+                            foreach ($instruments as $unique_name => $label)
+                            {
+                                if (!empty($Proj->forms[$unique_name]['survey_id']))
+                                {
+                                    print "<p><strong>$label</strong> -> {\$redcap['{$unique_name}_timestamp']}</p>";
+                                }
+                            }
+                        ?>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
         <?php

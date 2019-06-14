@@ -141,18 +141,20 @@ class Template
 
         $dictionary = REDCap::getDataDictionary('array', false);
 
-        $instruments_complete = array();
+        $external_fields = array();
+
         $instruments = REDCap::getInstrumentNames();
         foreach ($instruments as $unique_name => $label)
         {   
-            $instruments_complete[] = "{$unique_name}_complete";
+            $external_fields[] = "{$unique_name}_complete";
+            $external_fields[] = "{$unique_name}_timestamp";
         }
 
         $event_fields_and_vals = array();
         foreach($event_data as $field_name => $value)
         {
             $value = trim(strip_tags($value));
-            if (in_array($field_name, $instruments_complete))
+            if (in_array($field_name, $external_fields))
             {
                 $event_fields_and_vals[$field_name] = $value;
             }
@@ -232,11 +234,12 @@ class Template
 
         $events = REDCap::getEventNames(true, true); // If there are no events (the project is classical), the method will return false
 
-        $instruments_complete = array();
+        $external_fields = array();
         $instruments = REDCap::getInstrumentNames();
         foreach ($instruments as $unique_name => $label)
         {   
-            $instruments_complete[] = "{$unique_name}_complete";
+            $external_fields[] = "{$unique_name}_complete";
+            $external_fields[] = "{$unique_name}_timestamp";
         }
 
         // Get all occurences of an opening square bracket "["
@@ -260,7 +263,7 @@ class Template
 
                     $var = trim($var, "'\"");
 
-                    if ($var !== "allValues" && !in_array($var, $instruments_complete))
+                    if ($var !== "allValues" && !in_array($var, $external_fields))
                     {
                         $dictionary = REDCap::getDataDictionary('array', FALSE, array($var));
                         if ($events === FALSE && empty($dictionary))
@@ -921,7 +924,8 @@ class Template
         $user = strtolower(USERID);
         $rights = REDCap::getUserRights($user);
 
-        $template = REDCap::getData("json", $record, null, null, null, TRUE, FALSE, null, null, TRUE);
+        $template = REDCap::getData("json", $record, null, null, null, TRUE, FALSE, TRUE, null, TRUE);
+
         $json = json_decode($template, true);
 
         if (REDCap::isLongitudinal())
