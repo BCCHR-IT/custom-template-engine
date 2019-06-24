@@ -857,9 +857,9 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
 
     public function saveTemplate()
     {
-        $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor"]));
-        $footer = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]));
-        $data = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["editor"]));
+        $header = REDCap::filterHtml(preg_replace(array("/&lsquo;/", "/&rsquo;/", "/&nbsp;/"), array("'", "'", " "), $_POST["header-editor"]));
+        $footer = REDCap::filterHtml(preg_replace(array("/&lsquo;/", "/&rsquo;/", "/&nbsp;/"), array("'", "'", " "), $_POST["footer-editor"]));
+        $data = REDCap::filterHtml(preg_replace(array("/&lsquo;/", "/&rsquo;/", "/&nbsp;/"), array("'", "'", " "), $_POST["editor"]));
 
         $name = trim($_POST["templateName"]);
         $action = $_POST["action"];
@@ -1199,6 +1199,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         }
         
         $record = $_POST["participantID"];
+        
         if (empty($record))
         {
             // OPTIONAL: Display the project header
@@ -1777,7 +1778,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 <?php 
                     foreach($participant_options as $id => $option)
                     {
-                        print "{label: '$option', id: '$id'},";
+                        print "{label: \"" . addslashes($option) ."\", id: '$id'},";
                     }
                 ?>
             ]
@@ -1786,8 +1787,15 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                 $("#participantIDs" ).autocomplete({
                     minLength: 0,
                     source: options,
-                    select: function (event, ui) {
-                        $("#participantID-value").val(ui.item.id);
+                    change: function(event, ui) {
+                        if (ui.item)
+                        {
+                            $("#participantID-value").val(ui.item.id);
+                        }
+                        else
+                        {
+                            $("#participantID-value").val($('#participantIDs').val());
+                        }
                     }
                 }).focus(function () {
                     $(this).autocomplete("search", "");
