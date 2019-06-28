@@ -45,7 +45,7 @@ class Template
         {
             if ($elem->tagName == "td")
             {
-                if (empty($elem->previousSibling) || $elem->previousSibling->tagName != "td")
+                if (empty($elem->previousSibling) && $elem->previousSibling->tagName != "td")
                 {
                     $empty_elems[] = $elem;
                 }
