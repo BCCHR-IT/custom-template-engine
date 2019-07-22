@@ -1,5 +1,17 @@
 <?php
-require_once APP_PATH_DOCROOT . "ProjectGeneral/header.php"; 
+/**
+ * Include REDCap header.
+ */
+require_once APP_PATH_DOCROOT . "ProjectGeneral/header.php";
+
+/**
+ * Inititalize Custom Report Builder object and display Edit Template
+ * page.
+ */
 $customReportBuilder = new \BCCHR\CustomReportBuilder\CustomReportBuilder();
 $customReportBuilder->generateEditTemplatePage();
+
+/**
+ * Include REDCap footer.
+ */
 require_once APP_PATH_DOCROOT . "ProjectGeneral/footer.php";
