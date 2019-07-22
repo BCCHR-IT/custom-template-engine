@@ -2,6 +2,9 @@
 
 namespace BCCHR\CustomReportBuilder;
 
+/**
+ * Require Smarty class.
+ */
 require_once "vendor/smarty/smarty/libs/Smarty.class.php";
 
 use REDCap;
@@ -10,16 +13,31 @@ use DOMDocument;
 
 class Template
 {
+    /**
+     * Class properties.
+     * 
+     * @var Smarty $smarty      Instance of Smarty object.
+     * @var Array $dictionary   REDCap data dictionary for current project.
+     * @var Array $redcap       Stores variables that will be used by Smarty template engine to fill data.
+     * 
+     * @var Boolean $show_label_and_row         Whether to show a label or row or not in template.
+     * @var String $de_identified_replacement   What to replace de-identified data with.
+     * @var Array $logical_operators            Allowed logical operators.
+     */
     private $smarty;
     private $dictionary;
     private $redcap;
 
     private $show_label_and_row = true;
     private $de_identified_replacement = "[DE-IDENTIFIED]";
-    private $date_formats = array("date_dmy", "date_mdy", "date_my", "date_ymd", "date_ym", "datetime_dmy", "datetime_mdy", "datetime_ymd", "datetime_seconds_dmy",
-                                "datetime_seconds_mdy", "datetime_seconds_ymd");
     private $logical_operators = array("eq", "ne", "neq", "gt", "lt", "ge", "gte", "lte", "le", "not", "or", "and");
 
+    /**
+     * Class constructor.
+     * 
+     * @param String $templates_dir     Directory where templates are stored.
+     * @param String $compiled_dir      Directory where templates compiled by Smarty are stored.
+     */
     function __construct($templates_dir, $compiled_dir) 
     {
         $this->smarty = new Smarty();
@@ -28,6 +46,13 @@ class Template
         $this->smarty->assign("showLabelAndRow", $this->show_label_and_row);
     }
 
+    /**
+     * Retrieves empty child nodes within given element.
+     * 
+     * @access private
+     * @param DOMNode $elem     Root element.
+     * @return Array An array of all empty nodes.
+     */
     private function getEmptyNodes($elem)
     {
         $empty_elems = array();
@@ -59,6 +84,14 @@ class Template
         return $empty_elems;
     }
 
+    /**
+     * Replaces given text with replacement.
+     * 
+     * @access private
+     * @param String $text          The text to replace.
+     * @param String $replacement   The replacement text.
+     * @return String A string with the replaced text.
+     */
     private function replaceStrings($text, $replacement)
     {
         preg_match_all("/'/", $text, $quotes, PREG_OFFSET_CAPTURE);
@@ -78,6 +111,13 @@ class Template
         return $text;
     }
 
+    /**
+     * Parses a conditional string into blocks.
+     * 
+     * @access private
+     * @param String $condition     The condition to parse.
+     * @return Array An array of blocks that make up the condition passed.
+     */
     private function getSyntaxParts($condition)
     {
         //Replace strings with ''
@@ -134,6 +174,18 @@ class Template
         return $parts;
     }
 
+    /**
+     * Parses event data into an assosiative array that will be used by Smarty to fill templates 
+     * with data.
+     * 
+     * Builds the array used in filling template data. Values are parsed according to the user's 
+     * data rights. i.e. Identifiers removed, no unvalidated text fields, etc... Values are associated with
+     * field names, and field names are associated with event names (if project is longitudinal).
+     * 
+     * @access private
+     * @param Array $event_data     Event data for a REDcap record.
+     * @return Array An associative array of fields mapped to values, or events mapped to an array of fields mapped to values (if longitudinal). 
+     */
     private function parseEventData($event_data)
     {
         $user = strtolower(USERID);
@@ -228,6 +280,14 @@ class Template
         return $event_fields_and_vals;
     }
 
+    /**
+     * Checks whether fields and events exist within project, and whether they are being queried correctly.
+     * 
+     * @access private
+     * @param String $text      The line of text to validate.
+     * @param Integer $lin_num  The current line number in the template.
+     * @return Array An array of errors, with the line number appended to indicate where it occured.
+     */
     private function validateFieldsAndEvents($text, $line_num)
     {
         $errors = array();
@@ -309,6 +369,15 @@ class Template
         return $errors;
     }
 
+    /**
+     * Validate general syntax.
+     * 
+     * @access private
+     * @see Template::getSyntaxParts() For retreiving blocks of syntax from the given condition string.
+     * @param String $condition     The condition to validate.
+     * @param Integer $lin_num      The current line number in the template.
+     * @return Array An array of errors, with the line number appended to indicate where it occured.
+     */
     private function validateSyntax($condition, $line_num)
     {
         $errors = array();
@@ -619,6 +688,16 @@ class Template
         return $errors;
     }
 
+    /**
+     * Validate line of text.
+     * 
+     * @access private
+     * @see Template::validateSyntax() For checking whether general syntax is correct.
+     * @see Template::validatefieldsAndEvents() For checking existing fields and events, and that they're queried correctly.
+     * @param String $text      The line of text to validate.
+     * @param Integer $lin_num  The current line number in the template.
+     * @return Array An array of errors, with the line number appended to indicate where it occured.
+     */
     private function validateText($text, $line_num)
     {
         $explode = explode(" ", $text);
@@ -651,6 +730,19 @@ class Template
         return $errors;
     }
 
+    /**
+     * Valdiates if statements.
+     * 
+     * Checks that...
+     *      
+     * - If statements have matching opening and closing statements.
+     * - Elseifs are associated with an if statement.
+     * - Every if statement has at most one else clause.
+     * 
+     * @access private
+     * @param Array $lines      An array of lines within template.
+     * @return Array An array of errors, with their line numbers appended to indicate where it occured.
+     */
     private function validateIfStatements($lines)
     {
         $errors = array();
@@ -855,17 +947,16 @@ class Template
         return $errors;
     }
 
-    /*
-     * Template Validation:
+    /**
+     * Performs template validation.
      * 
-     * Not super extensive, checks the following...
-     *      If statements have matching opening and closing statements, 
-     *      Elseifs are associated with an if statement,
-     *      Every if statement has at most one else clause,
-     *      Smarty variables are correct,
-     *      Fields and Events exist,
-     *      Check that checkboxes are queried correctly,
-     *      Basic syntax validation (opening, closing quotes, and brackets...)
+     * Checks that there are no unclosed curly brackets within the template, as they're special characters that denote
+     * Smarty syntax. If validation passes, then retrieve all text enclosed within curly brackets, and validate them.
+     * 
+     * @see Template::validateText() For validating all syntax, escept if statements.
+     * @see Template::validateIfStatements() For validating if statements.
+     * @param String $template_data      Template contents.
+     * @return Array An array of errors, with their line numbers appended to indicate where it occured.
      */
     public function validateTemplate($template_data)
     {
@@ -917,6 +1008,19 @@ class Template
         return $errors;
     }
 
+    /**
+     * Fill a given template with REDCap record data.
+     * 
+     * Retrieves REDCap data, and parses it into an array used by Smarty to fill the
+     * template with data. After using Smarty to fill the template, empty nodes are 
+     * found and deleted.
+     * 
+     * @see Template::parseEventData() For parsing event data into Array used in Smarty.
+     * @see Template::getEmptyNodes()  For retrieving empty nodes in HTML.
+     * @param String $template_name     The Template name.
+     * @param Integer $record           A REDCap record ID.
+     * @return String The template filled with REDCap record data.
+     */
     public function fillTemplate($template_name, $record)
     {
         $filled_template = "";

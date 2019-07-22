@@ -2,34 +2,62 @@
 
 namespace BCCHR\CustomReportBuilder;
 
+/**
+ * Require Report Builder Template class, 
+ * and autoload.php from Composer.
+ */
 require_once "Template.php";
 require_once "vendor/autoload.php";
 
 use REDCap;
 use Project;
 use Records;
+use Dompdf\Dompdf;
 use DOMDocument;
 use HtmlPage;
-use Dompdf\Dompdf;
 
 class CustomReportBuilder extends \ExternalModules\AbstractExternalModule 
 {
+    /**
+     * Class variables.
+     * 
+     * @var String $templates_dir       Directory to store templates.
+     * @var String $compiled_dir        Directory to store templates compiled by Smarty template engine.
+     * @var String $img_dir             Directory to store images.
+     * @var String $pid                 Project id of current REDCap project.
+     * @var String $userid              ID of current user.
+     */
     private $templates_dir;
     private $compiled_dir;
     private $img_dir;
     private $pid;
     private $userid;
 
+    /**
+     * Initialize class variables.
+     */
     function __construct()
     {
         parent::__construct();
+        $this->userid = strtolower(USERID);
+        /**
+         * External Module functions to get module settings. 
+         */
         $this->templates_dir = $this->getSystemSetting("templates-folder");
         $this->compiled_dir = $this->getSystemSetting("compiled-templates-folder");
         $this->img_dir = $this->getSystemSetting("img-folder");
         $this->pid = $this->getProjectId();
-        $this->userid = strtolower(USERID);
     }
 
+    /**
+     * Creates the templates, compiled templates, and images folders for the module, if they don't exist.
+     * 
+     * Creates the templates, compiled templates, and images folders for the module, if they don't exist. Exits on an error if any of the 
+     * module folders haven't been configured, or if any of the locations aren't writable.
+     * 
+     * @since 1.0
+     * @access private
+     */
     private function createModuleFolders()
     {
         if (empty($this->templates_dir))
@@ -78,6 +106,17 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         }
     }
 
+    /**
+     * Initializes a CKeditor with all the appropriate plugins.
+     * 
+     * Injects Javascript to initialize the CKEditor in the given textarea element, alongside all its plugins,
+     * adjusting its height according to the argument passed.
+     * 
+     * @since 1.0
+     * @access private
+     * @param String $id    The id of the textarea element to replace with the editor.
+     * @param Integer $height   The height of the editor in pixels.
+     */
     private function initializeEditor($id, $height)
     {
         ?>
@@ -109,6 +148,15 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         <?php
     }
 
+    /**
+     * Checks the module permissions.
+     * 
+     * Checks if the necessary directorys have been created, and whether the user has data export and report rights,
+     * which are needed to access the module's functionality.
+     * 
+     * @since 1.0
+     * @access private
+     */
     private function checkPermissions()
     {
         if (empty($this->templates_dir) || !file_exists($this->templates_dir))
@@ -133,6 +181,12 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         }
     }
 
+    /**
+     * Include HTML to display instructions on Create Record, and Edit Record page.
+     * 
+     * @since 2.6
+     * @access private
+     */
     private function generateInstructions()
     {
         $Proj = new Project();
@@ -651,6 +705,14 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         <?php
     }
 
+    /**
+     * Helper function that deletes a file from the File Repository, if REDCap data about is fails
+     * to be inserted to the database.
+     * 
+     * @see Stolen code from redcap version/FileRepository/index.php.
+     * @since 1.0
+     * @access private
+     */
     private function deleteRepositoryFile($file)
     {
         global $edoc_storage_option,$wdc,$webdav_path;
@@ -668,6 +730,15 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         }
     }
 
+    /**
+     * Uploads images from file browser object to server.
+     * 
+     * Uploades images from file browser object to server, after performing 
+     * validations. Error returned to user if upload failed. Upon success
+     * log event in REDCap.
+     * 
+     * @since 1.0
+     */
     public function uploadImages()
     {
         // Required: anonymous function reference number as explained above.
@@ -749,6 +820,14 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         <?php
     }
 
+    /**
+     * Generates HTMl to display all images uploaded to the server, that are specific to the project.
+     * 
+     * Retrieve images for the current REDCap project and generate HTML to display, and Javascript
+     * that will return the image url on click.
+     * 
+     * @since 1.0
+     */
     public function browseImages()
     {
         $proj_imgs = array_filter(scandir($this->img_dir), function ($img) {
@@ -841,6 +920,15 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         <?php
     }
 
+    /**
+     * Deletes a template from the server.
+     * 
+     * Template to delete is passed via HTTP POST. Method deletes
+     * file from server, and logs event.
+     * 
+     * @since 2.0
+     * @return Boolean If template was deleted return TRUE, else return FALSE.
+     */
     public function deleteTemplate()
     {
         $templateToDelete = $_POST["templateToDelete"];
@@ -855,6 +943,17 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         }
     }
 
+    /**
+     * Saves a template.
+     * 
+     * Retrieves body, header, and footer contents of template passed via HTTP POST.
+     * Performs validation on the template contents, and saves regardless. If there's
+     * any validation errors then the template is saved on server as '<template name>_<pid> - INVALID.html'.
+     * 
+     * @since 2.8
+     * @return Array An array containing any validation errors, and the template's body, header, and footer contents.
+     * @return Boolean If the template passed validation, then return TRUE.
+     */
     public function saveTemplate()
     {
         $header = REDCap::filterHtml(preg_replace(array("/&lsquo;/", "/&rsquo;/", "/&nbsp;/"), array("'", "'", " "), $_POST["header-editor"]));
@@ -1003,6 +1102,17 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         }
     }
 
+    /**
+     * Outputs a PDF of a report to browser.
+     * 
+     * Retrieves body, header, and footer contents of template passed via HTTP POST.
+     * Formats the contents within the PDF, and uses DOMPDF to output PDF to browser.
+     * If saving to the File Repository is allowed, then a copy of the PDF is saved there.
+     * Upon successful download, log in REDCap Returns Warning if main content editor is empty.
+     * 
+     * @see CustomReportBuilder::deleteRepositoryFile() For deleting a file from the repository, if metadata failed to create.
+     * @since 2.2
+     */
     public function downloadTemplate()
     {
         $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor"]));
@@ -1190,6 +1300,18 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         }
     }
 
+    /**
+     * Fills a template with REDCap record data, and displays in 
+     * editors for customization, before download.
+     * 
+     * Record id and template name passed via HTTP POST. Template variables are
+     * replaced with record data, and returned in the editors rendered. User
+     * can customize contents before downloading.
+     * 
+     * @see Template::fillTemplate() For filling template with REDCap record data.
+     * @see CustomReporBuilder::initializeEditor() For initializing editors on page.
+     * @since 2.0
+     */
     public function generateFillTemplatePage()
     {
         $rights = REDCap::getUserRights($this->userid);
@@ -1330,6 +1452,19 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         $this->initializeEditor("editor", 1000);
     }
 
+    /**
+     * Generates a page to edit existing templates, or to fix validation errors.
+     * 
+     * If the page is being generated as a result of validation errors, 
+     * then retrieve validation errors, and template contents from the Array given, and display errors at the top of the page. 
+     * Else retrieve template name passed via HTTP Posed, and return template contents are to user in 
+     * editors. Template validation is performed upon saving.
+     * 
+     * @see CustomReportBuilder::checkPermissions() For checking if the user has permissions to view the page.
+     * @see CustomReportBuilder::generateInstructions() For generating instructions on page.
+     * @param Array $info   Array containing validation errors, and the template's contents.
+     * @since 2.0
+     */
     public function generateEditTemplatePage($info = NULL)
     {
         $this->checkPermissions();
@@ -1485,6 +1620,14 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         $this->initializeEditor("editor", 1000);
     }
 
+    /**
+     * Generates a page to create a new template.
+     * 
+     * @see CustomReportBuilder::checkPermissions() For checking if the user has permissions to view the page.
+     * @see CustomReportBuilder::generateInstructions() For generating instructions on page.
+     * @see CustomReportBuilder::initializeEditor() For initializing editors on page.
+     * @since 1.0 
+     */
     public function generateCreateTemplatePage()
     {
         $this->checkPermissions();
@@ -1549,6 +1692,17 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         $this->initializeEditor("editor", 1000);
     }
 
+    /**
+     * Generate landing page of module, and initialize modules folders.
+     * 
+     * Retrieves records in project, and existing project templates from server. REDCap records will
+     * display with any secondary and custom labels. From the landing page, a user can fill, create,
+     * edit, or delete a template. Only valid templates are available to fill, but all templates can be 
+     * edited or deleted.
+     * 
+     * @see CustomReportBuilder::createModuleFolders() For initializing module folders.
+     * @since 2.7
+     */
     public function generateIndexPage()
     {
         $this->createModuleFolders();
@@ -1811,6 +1965,15 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         <?php
     }
 
+    /**
+     * Function called by external module that checks whether the user has permissions to use the module.
+     * 
+     * @param String $project_id    Project ID of current REDCap project.
+     * @param String $link          Link that redirects to external module.
+     * @return NULL Return null if the user doesn't have permissions to use the module. 
+     * @return String Return link to module if the user has permissions to use it. 
+     * @since 1.0
+     */
     public function redcap_module_link_check_display($project_id, $link)
     {
         $rights = REDCap::getUserRights($this->userid);
