@@ -65,12 +65,26 @@ class Template
                 $empty_elems = array_merge($empty_elems, $empty_child_elems);
             }
         }
+        /**
+         * Checks for special whitespace characters, and tags that don't contain children.
+         */
         else if ((ctype_space($elem->nodeValue) || str_replace(array(" ", "\xC2\xA0"), "", $elem->nodeValue) == "") && 
                 $elem->tagName != "img" && $elem->tagName != "body" && $elem->tagName != "hr" && $elem->tagName != "br")
         {
+            /**
+             * Empty table data elements and headers may pad out other data in table. 
+             * Make sure the entire row is empty, before removing.
+             */
             if ($elem->tagName == "td")
             {
                 if (empty($elem->previousSibling) && $elem->previousSibling->tagName != "td")
+                {
+                    $empty_elems[] = $elem;
+                }
+            }
+            else if ($elem->tagName == "th")
+            {
+                if (empty($elem->previousSibling) && $elem->previousSibling->tagName != "th")
                 {
                     $empty_elems[] = $elem;
                 }
