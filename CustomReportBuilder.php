@@ -706,10 +706,9 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
     }
 
     /**
-     * Helper function that deletes a file from the File Repository, if REDCap data about is fails
-     * to be inserted to the database.
+     * Helper function that deletes a file from the File Repository, if REDCap data about it fails
+     * to be inserted to the database.Stolen code from redcap version/FileRepository/index.php.
      * 
-     * @see Stolen code from redcap version/FileRepository/index.php.
      * @since 1.0
      * @access private
      */
@@ -1110,6 +1109,8 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
      * If saving to the File Repository is allowed, then a copy of the PDF is saved there.
      * Upon successful download, log in REDCap Returns Warning if main content editor is empty.
      * 
+     * Code to save file to the File Repository was taken from redcap version/FileRepository/index.php.
+     * 
      * @see CustomReportBuilder::deleteRepositoryFile() For deleting a file from the repository, if metadata failed to create.
      * @since 2.2
      */
@@ -1386,6 +1387,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         <li>Tables and images may be cut off in PDF, because of size. If so, there is no current fix and you must edit your content until it fits. Some suggestions are to break up content into
                         multiple tables, shrink font, etc...</li>
                         <li>Any image uploaded to the plugin will be saved for future use by <strong>ALL</strong> users. <strong>Do not upload any identifying images.</strong></li>
+                        <li>Calculations cannot be performed in the Report Builder, so raw values have been exported.</li>
                         <?php if ($rights[$user]["data_export_tool"] === "2") :?>
                             <li> Data has been de-identified according to user access rights</li>
                         <?php endif;?>
