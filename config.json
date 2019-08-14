@@ -27,7 +27,7 @@
     "system-settings": [
         {
             "key": "templates-folder",
-            "name": "Saved Templates Folder",
+            "name": "Saved Templates Folder. Please end with a trailing slash.",
             "required": true,
             "type": "text",
             "repeatable": false,
@@ -35,7 +35,7 @@
         },
         {
             "key": "compiled-templates-folder",
-            "name": "Compiled Templates Folder **Used by Smarty to store compiled templates**",
+            "name": "Compiled Templates Folder. Please end with a trailing slash. **Used by Smarty to store compiled templates**",
             "required": true,
             "type": "text",
             "repeatable": false,
@@ -43,7 +43,7 @@
         },
         {
             "key": "img-folder",
-            "name": "Images Folder **Must be publically accessible**",
+            "name": "Images Folder. Please end with a trailing slash. **Must be publically accessible**",
             "required": true,
             "type": "text",
             "repeatable": false,
