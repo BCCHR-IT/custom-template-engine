@@ -3,5 +3,5 @@
  * Create instance of Custom Report Buidler, 
  * and upload image.
  */
-$customReportBuilder = new \BCCHR\CustomReportBuilder\CustomReportBuilder();
+$customReportBuilder = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
 $customReportBuilder->uploadImages();

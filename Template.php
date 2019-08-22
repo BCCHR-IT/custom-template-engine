@@ -1,6 +1,6 @@
 <?php 
 
-namespace BCCHR\CustomReportBuilder;
+namespace BCCHR\CustomTemplateEngine;
 
 /**
  * Require Smarty class.

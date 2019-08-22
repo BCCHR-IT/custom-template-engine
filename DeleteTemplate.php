@@ -3,7 +3,7 @@
  * Initialize Custom Report Builder object, and call method to delete a
  * template.
  */
-$customReportBuilder = new \BCCHR\CustomReportBuilder\CustomReportBuilder();
+$customReportBuilder = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
 $result = $customReportBuilder->deleteTemplate();
 
 /**

@@ -3,7 +3,7 @@
  * Create an instance of the Custom Report Builder class,
  * and save template.
  */
-$customReportBuilder = new \BCCHR\CustomReportBuilder\CustomReportBuilder();
+$customReportBuilder = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
 $result = $customReportBuilder->saveTemplate();
 
 /**

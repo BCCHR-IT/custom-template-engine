@@ -1,9 +1,9 @@
 <?php
 
-namespace BCCHR\CustomReportBuilder;
+namespace BCCHR\CustomTemplateEngine;
 
 /**
- * Require Report Builder Template class, 
+ * Require Template Engine Template class, 
  * and autoload.php from Composer.
  */
 require_once "Template.php";
@@ -16,7 +16,7 @@ use Dompdf\Dompdf;
 use DOMDocument;
 use HtmlPage;
 
-class CustomReportBuilder extends \ExternalModules\AbstractExternalModule 
+class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule 
 {
     /**
      * Class variables.
@@ -47,6 +47,24 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
         $this->compiled_dir = $this->getSystemSetting("compiled-templates-folder");
         $this->img_dir = $this->getSystemSetting("img-folder");
         $this->pid = $this->getProjectId();
+
+        /**
+         * Checks and adds trailing directory separator
+         */
+        if (substr($this->templates_dir, -1) != "/")
+        {
+            $this->templates_dir = $this->templates_dir . "/";
+        }
+
+        if (substr($this->compiled_dir, -1) != "/")
+        {
+            $this->compiled_dir = $this->compiled_dir . "/";
+        }
+
+        if (substr($this->img_dir, -1) != "/")
+        {
+            $this->img_dir = $this->img_dir . "/";
+        }
     }
 
     /**
@@ -1111,7 +1129,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
      * 
      * Code to save file to the File Repository was taken from redcap version/FileRepository/index.php.
      * 
-     * @see CustomReportBuilder::deleteRepositoryFile() For deleting a file from the repository, if metadata failed to create.
+     * @see CustomTemplateEngine::deleteRepositoryFile() For deleting a file from the repository, if metadata failed to create.
      * @since 2.2
      */
     public function downloadTemplate()
@@ -1239,7 +1257,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                                 }
 
                                 // Logging
-                                REDCap::logEvent("Custom Report Builder - Uploaded document to file repository", "Successfully uploaded $filename");
+                                REDCap::logEvent("Custom Template Engine - Uploaded document to file repository", "Successfully uploaded $filename");
                                 $context_msg = str_replace('{fetched}', '', $context_msg_insert);
                                 $database_success = TRUE;
                             } 
@@ -1387,7 +1405,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         <li>Tables and images may be cut off in PDF, because of size. If so, there is no current fix and you must edit your content until it fits. Some suggestions are to break up content into
                         multiple tables, shrink font, etc...</li>
                         <li>Any image uploaded to the plugin will be saved for future use by <strong>ALL</strong> users. <strong>Do not upload any identifying images.</strong></li>
-                        <li>Calculations cannot be performed in the Report Builder, so raw values have been exported.</li>
+                        <li>Calculations cannot be performed in the Template Engine, so raw values have been exported.</li>
                         <?php if ($rights[$user]["data_export_tool"] === "2") :?>
                             <li> Data has been de-identified according to user access rights</li>
                         <?php endif;?>
@@ -1462,8 +1480,8 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
      * Else retrieve template name passed via HTTP Posed, and return template contents are to user in 
      * editors. Template validation is performed upon saving.
      * 
-     * @see CustomReportBuilder::checkPermissions() For checking if the user has permissions to view the page.
-     * @see CustomReportBuilder::generateInstructions() For generating instructions on page.
+     * @see CustomTemplateEngine::checkPermissions() For checking if the user has permissions to view the page.
+     * @see CustomTemplateEngine::generateInstructions() For generating instructions on page.
      * @param Array $info   Array containing validation errors, and the template's contents.
      * @since 2.0
      */
@@ -1625,9 +1643,9 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
     /**
      * Generates a page to create a new template.
      * 
-     * @see CustomReportBuilder::checkPermissions() For checking if the user has permissions to view the page.
-     * @see CustomReportBuilder::generateInstructions() For generating instructions on page.
-     * @see CustomReportBuilder::initializeEditor() For initializing editors on page.
+     * @see CustomTemplateEngine::checkPermissions() For checking if the user has permissions to view the page.
+     * @see CustomTemplateEngine::generateInstructions() For generating instructions on page.
+     * @see CustomTemplateEngine::initializeEditor() For initializing editors on page.
      * @since 1.0 
      */
     public function generateCreateTemplatePage()
@@ -1702,7 +1720,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
      * edit, or delete a template. Only valid templates are available to fill, but all templates can be 
      * edited or deleted.
      * 
-     * @see CustomReportBuilder::createModuleFolders() For initializing module folders.
+     * @see CustomTemplateEngine::createModuleFolders() For initializing module folders.
      * @since 2.7
      */
     public function generateIndexPage()
@@ -1775,7 +1793,7 @@ class CustomReportBuilder extends \ExternalModules\AbstractExternalModule
                         print "<div class='red container'>Something went wrong! Your template was not deleted. Please contact your REDCap administrator.</div><br/>";
                     }
                 ?>
-                <h3>REDCap Report Builder</h3>
+                <h3>Custom Template Engine</h3>
                 <hr>
                 <h4>This plugin allows you to create report templates and fill them with data from records in your REDCap project.</h4> 
                 <br>

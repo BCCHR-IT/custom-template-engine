@@ -1,6 +1,6 @@
 {
-    "name": "Custom Report Builder",
-    "namespace": "BCCHR\\CustomReportBuilder",
+    "name": "Custom Template Engine",
+    "namespace": "BCCHR\\CustomTemplateEngine",
     "description": "This module allows you to create HTML templates and fill them with record data from your project. You can download the filled templates as a PDF, which are saved to the File Repository.",
     "authors": [
         {
@@ -12,7 +12,7 @@
     "links": {
         "project": [
             {
-                "name": "Custom Report Builder",
+                "name": "Custom Template Engine",
                 "url": "index.php",
                 "icon": "link"
             }
@@ -27,7 +27,7 @@
     "system-settings": [
         {
             "key": "templates-folder",
-            "name": "Saved Templates Folder. Please end with a trailing slash.",
+            "name": "Saved Templates Folder.",
             "required": true,
             "type": "text",
             "repeatable": false,
@@ -35,7 +35,7 @@
         },
         {
             "key": "compiled-templates-folder",
-            "name": "Compiled Templates Folder. Please end with a trailing slash. **Used by Smarty to store compiled templates**",
+            "name": "Compiled Templates Folder. **Used by Smarty to store compiled templates**",
             "required": true,
             "type": "text",
             "repeatable": false,
@@ -43,7 +43,7 @@
         },
         {
             "key": "img-folder",
-            "name": "Images Folder. Please end with a trailing slash. **Must be publically accessible**",
+            "name": "Images Folder. **Must be publically accessible**",
             "required": true,
             "type": "text",
             "repeatable": false,
