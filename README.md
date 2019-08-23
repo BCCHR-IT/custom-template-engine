@@ -5,7 +5,7 @@ This module works for classic, longitudinal, and multiple arm projects, but has 
 
 ## Switching from Custom Report Builder to Custom Template Engine
 
-When switching from the old module to the rebranded module, you must delete the old module from your REDCap installation first!
+When switching from the old module to the rebranded module, you must disable the old module first!
 
 ## Configuration
 
