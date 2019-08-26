@@ -3,7 +3,9 @@ REDCap module that allows you to create HTML templates and fill them with record
 
 This module works for classic, longitudinal, and multiple arm projects, but has not been tested with repeatable events.
 
-## Switching from Custom Report Builder to Custom Template Engine
+## IMPORTANT: Switching from Custom Report Builder to Custom Template Engine
+
+As of 2019-08-23, the Custom Report Builder has been rebranded as the Custom Template Engine, and has been re-submitted as a new module in the REDcap External Module Repository. __All subsequent updates will be made to the Custom Template Engine, not to the Custom Report Builder__
 
 When switching from the old module to the rebranded module, you must disable the old module first!
 
