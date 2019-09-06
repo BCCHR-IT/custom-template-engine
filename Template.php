@@ -1045,10 +1045,11 @@ class Template
 
         $json = json_decode($template, true);
 
+        $repeatable_instruments_parsed = array();
+
         if (REDCap::isLongitudinal())
         {
             $this->redcap = array();
-            $repeatable_instruments_parsed = array();
 
             $event_ids = array_values(REDCap::getEventNames(TRUE));
             $event_labels = array_values(REDCap::getEventNames(FALSE, TRUE));
@@ -1091,7 +1092,7 @@ class Template
                             // Merges repeatable instrument data with non-repeatable instrument data in same event.
                             $data = $this->redcap[$event];
                             $repeatable_instrument_data = $this->parseEventData($repeatable_instrument_instances[$key]);
-
+                            
                             foreach($repeatable_instrument_data as $field => $value)
                             {
                                 if (empty($data[$field]))
@@ -1147,7 +1148,7 @@ class Template
                 if ($event_data["redcap_repeat_instance"] != "")
                 {
                     // Repeatable instrument
-                    if ($event_data["redcap_repeat_instrument"] != null && empty($this->redcap[$event]["redcap_repeat_instance"])) 
+                    if ($event_data["redcap_repeat_instrument"] != null && !in_array($event_data["redcap_repeat_instrument"], $repeatable_instruments_parsed)) 
                     {
                         // Get latest instance of repeatable instrument.
                         // Retrieve all repeatable instances of event. 
@@ -1168,6 +1169,8 @@ class Template
                             if (empty($this->redcap[$field]))
                                 $this->redcap[$field] = $value;
                         }
+
+                        $repeatable_instruments_parsed[] = $event_data["redcap_repeat_instrument"];
                     }
                 }
                 else
