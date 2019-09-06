@@ -1,7 +1,7 @@
 <?php
 /**
- * Create instance of Custom Report Buidler, 
+ * Create instance of Custom Template Engine, 
  * and upload image.
  */
-$customReportBuilder = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
-$customReportBuilder->uploadImages();
+$customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
+$customTemplateEngine->uploadImages();

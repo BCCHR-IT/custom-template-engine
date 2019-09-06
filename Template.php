@@ -17,7 +17,6 @@ class Template
      * Class properties.
      * 
      * @var Smarty $smarty      Instance of Smarty object.
-     * @var Array $dictionary   REDCap data dictionary for current project.
      * @var Array $redcap       Stores variables that will be used by Smarty template engine to fill data.
      * 
      * @var Boolean $show_label_and_row         Whether to show a label or row or not in template.
@@ -25,8 +24,9 @@ class Template
      * @var Array $logical_operators            Allowed logical operators.
      */
     private $smarty;
-    private $dictionary;
     private $redcap;
+    private $dictionary;
+    private $instruments;
 
     private $show_label_and_row = true;
     private $de_identified_replacement = "[DE-IDENTIFIED]";
@@ -40,6 +40,8 @@ class Template
      */
     function __construct($templates_dir, $compiled_dir) 
     {
+        $this->dictionary = REDCap::getDataDictionary('array', false);
+        $this->instruments = REDCap::getInstrumentNames();
         $this->smarty = new Smarty();
         $this->smarty->setTemplateDir($templates_dir);
         $this->smarty->setCompileDir($compiled_dir);
@@ -204,13 +206,10 @@ class Template
     {
         $user = strtolower(USERID);
         $rights = REDCap::getUserRights($user);
-
-        $dictionary = REDCap::getDataDictionary('array', false);
-
+        
         $external_fields = array();
-
-        $instruments = REDCap::getInstrumentNames();
-        foreach ($instruments as $unique_name => $label)
+        $this->instruments = REDCap::getInstrumentNames();
+        foreach ($this->instruments as $unique_name => $label)
         {   
             $external_fields[] = "{$unique_name}_complete";
             $external_fields[] = "{$unique_name}_timestamp";
@@ -226,7 +225,7 @@ class Template
             }
             else if ($field_name !== "redcap_event_name")
             {
-                if ($dictionary[$field_name]["field_type"] === "checkbox")
+                if ($this->dictionary[$field_name]["field_type"] === "checkbox")
                 {
                     /*
                     * Check if user's data rights
@@ -236,14 +235,14 @@ class Template
                     * Remove all tagged Identifier Fields: Only identifiers removed.
                     * 
                     */
-                    if (($rights[$user]["data_export_tool"] === "2" || $rights[$user]["data_export_tool"] === "3") && $dictionary[$field_name]["identifier"] === "y")
+                    if (($rights[$user]["data_export_tool"] === "2" || $rights[$user]["data_export_tool"] === "3") && $this->dictionary[$field_name]["identifier"] === "y")
                     {
                         $event_fields_and_vals[$field_name] = array();
                         $event_fields_and_vals[$field_name]["allValues"] = $this->de_identified_replacement;
                     }
                     else
                     {
-                        $all_choices = explode("|", $dictionary[$field_name]["select_choices_or_calculations"]);
+                        $all_choices = explode("|", $this->dictionary[$field_name]["select_choices_or_calculations"]);
                         $all_choices = array_map(function ($v) {
                             $v = strip_tags($v);
                             $first_comma = strpos($v, ",");
@@ -272,15 +271,15 @@ class Template
                     * 
                     */
                     if (($rights[$user]["data_export_tool"] === "2" && 
-                            ($dictionary[$field_name]["field_type"] === "notes" ||
-                            ($dictionary[$field_name]["field_type"] === "text" && (in_array($dictionary[$field_name]["text_validation_type_or_show_slider_number"], $this->date_formats) ||
-                                                                                    empty($dictionary[$field_name]["text_validation_type_or_show_slider_number"]))))
+                            ($this->dictionary[$field_name]["field_type"] === "notes" ||
+                            ($this->dictionary[$field_name]["field_type"] === "text" && (in_array($this->dictionary[$field_name]["text_validation_type_or_show_slider_number"], $this->date_formats) ||
+                                                                                    empty($this->dictionary[$field_name]["text_validation_type_or_show_slider_number"]))))
                         ) ||
-                        (($rights[$user]["data_export_tool"] === "2" || $rights[$user]["data_export_tool"] === "3") && $dictionary[$field_name]["identifier"] === "y"))
+                        (($rights[$user]["data_export_tool"] === "2" || $rights[$user]["data_export_tool"] === "3") && $this->dictionary[$field_name]["identifier"] === "y"))
                     {
                         $event_fields_and_vals[$field_name] = $this->de_identified_replacement;
                     }
-                    else if($dictionary[$field_name]["field_type"] === "notes")
+                    else if($this->dictionary[$field_name]["field_type"] === "notes")
                     {
                         $event_fields_and_vals[$field_name] = str_replace("\r\n", "", $value);
                     }
@@ -309,8 +308,7 @@ class Template
         $events = REDCap::getEventNames(true, true); // If there are no events (the project is classical), the method will return false
 
         $external_fields = array();
-        $instruments = REDCap::getInstrumentNames();
-        foreach ($instruments as $unique_name => $label)
+        foreach ($this->instruments as $unique_name => $label)
         {   
             $external_fields[] = "{$unique_name}_complete";
             $external_fields[] = "{$unique_name}_timestamp";
@@ -339,7 +337,7 @@ class Template
 
                     if ($var !== "allValues" && !in_array($var, $external_fields))
                     {
-                        $dictionary = REDCap::getDataDictionary('array', FALSE, array($var));
+                        $dictionary = $this->dictionary[$var];
                         if ($events === FALSE && empty($dictionary))
                         {
                             $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] <strong>'$var'</strong> is not a valid event/field in this project";
@@ -389,7 +387,7 @@ class Template
      * @access private
      * @see Template::getSyntaxParts() For retreiving blocks of syntax from the given condition string.
      * @param String $condition     The condition to validate.
-     * @param Integer $lin_num      The current line number in the template.
+     * @param Integer $line_num      The current line number in the template.
      * @return Array An array of errors, with the line number appended to indicate where it occured.
      */
     private function validateSyntax($condition, $line_num)
@@ -1029,6 +1027,7 @@ class Template
      * template with data. After using Smarty to fill the template, empty nodes are 
      * found and deleted.
      * 
+     * @since 2.9.2
      * @see Template::parseEventData() For parsing event data into Array used in Smarty.
      * @see Template::getEmptyNodes()  For retrieving empty nodes in HTML.
      * @param String $template_name     The Template name.
@@ -1049,6 +1048,7 @@ class Template
         if (REDCap::isLongitudinal())
         {
             $this->redcap = array();
+            $repeatable_instruments_parsed = array();
 
             $event_ids = array_values(REDCap::getEventNames(TRUE));
             $event_labels = array_values(REDCap::getEventNames(FALSE, TRUE));
@@ -1059,19 +1059,122 @@ class Template
                 $events[$event_labels[$i]] = $event_ids[$i];
             }
 
+            $first_event = $event_ids[0];
+
             foreach($json as $index => $event_data)
             {
-                if ($index == 0)
-                {
-                    $this->redcap = $this->parseEventData($event_data);
-                }
+                $data = array();
                 $event = $events[$event_data["redcap_event_name"]];
-                $this->redcap[$event] = $this->parseEventData($event_data);
+                if ($event_data["redcap_repeat_instance"] != "")
+                {
+                    // Repeatable instrument
+                    if ($event_data["redcap_repeat_instrument"] != null && !in_array($event_data["redcap_repeat_instrument"], $repeatable_instruments_parsed)) 
+                    {
+                        // Get latest instance of repeatable instrument.
+                        // Retrieve all repeatable instances of event. 
+                        $repeatable_instrument_instances = array_filter($json, function($value) use($event_data){
+                            return $value["redcap_repeat_instrument"] == $event_data["redcap_repeat_instrument"];
+                        });
+                        $repeatable_instrument_instances = array_values($repeatable_instrument_instances);
+
+                        // Get the latest instance and parse it. 
+                        $repeat_instances = array_column($repeatable_instrument_instances, "redcap_repeat_instance");
+                        $latest_instance = max($repeat_instances);
+                        $key = array_search($latest_instance, $repeat_instances);
+
+                        if (empty($this->redcap[$event]))
+                        {
+                            $data = $this->parseEventData($repeatable_instrument_instances[$key]);   
+                        }
+                        else
+                        { 
+                            // Merges repeatable instrument data with non-repeatable instrument data in same event.
+                            $data = $this->redcap[$event];
+                            $repeatable_instrument_data = $this->parseEventData($repeatable_instrument_instances[$key]);
+
+                            foreach($repeatable_instrument_data as $field => $value)
+                            {
+                                if (empty($data[$field]))
+                                    $data[$field] = $value;
+                            }
+                        }
+                        
+                        $repeatable_instruments_parsed[] = $event_data["redcap_repeat_instrument"];
+                    }
+                    // Repeatable event
+                    else if (empty($this->redcap[$event]))
+                    {
+                        // Retrieve all repeatable instances of event. 
+                        $repeatable_event_instances = array_filter($json, function($value) use($event_data){
+                            return $value["redcap_event_name"] == $event_data["redcap_event_name"];
+                        });
+                        $repeatable_event_instances = array_values($repeatable_event_instances);
+                        
+                        // Get the latest instance and parse it. 
+                        $repeat_instances = array_column($repeatable_event_instances, "redcap_repeat_instance");
+                        $latest_instance = max($repeat_instances);
+                        $key = array_search($latest_instance, $repeat_instances);
+                        $data = $this->parseEventData($repeatable_event_instances[$key]);
+                    }
+                }
+                else
+                {
+                    if (empty($this->redcap[$event]))
+                    {   
+                        $data = $this->parseEventData($event_data);
+                    }
+                    else
+                    {
+                        $data = array_merge($this->redcap[$event], $this->parseEventData($event_data));
+                    }
+                }
+
+                if (!empty($data))
+                {
+                    if ($first_event == $event)
+                    {
+                        $this->redcap = array_merge($this->redcap, $data);
+                    }
+                    $this->redcap[$event] = $data;
+                }
             }
         }
         else
         {
-            $this->redcap = $this->parseEventData($json[0]);
+            foreach($json as $index => $event_data)
+            {
+                // Repeatable instrument
+                if ($event_data["redcap_repeat_instance"] != "")
+                {
+                    // Repeatable instrument
+                    if ($event_data["redcap_repeat_instrument"] != null && empty($this->redcap[$event]["redcap_repeat_instance"])) 
+                    {
+                        // Get latest instance of repeatable instrument.
+                        // Retrieve all repeatable instances of event. 
+                        $repeatable_instrument_instances = array_filter($json, function($value) use($event_data){
+                            return $value["redcap_repeat_instrument"] == $event_data["redcap_repeat_instrument"];
+                        });
+                        $repeatable_instrument_instances = array_values($repeatable_instrument_instances);
+
+                        // Get the latest instance and parse it. 
+                        $repeat_instances = array_column($repeatable_instrument_instances, "redcap_repeat_instance");
+                        $latest_instance = max($repeat_instances);
+                        $key = array_search($latest_instance, $repeat_instances);
+
+                        // Merges repeatable instrument data with non-repeatable instrument data in same event.
+                        $repeatable_instrument_data = $this->parseEventData($repeatable_instrument_instances[$key]);
+                        foreach($repeatable_instrument_data as $field => $value)
+                        {
+                            if (empty($this->redcap[$field]))
+                                $this->redcap[$field] = $value;
+                        }
+                    }
+                }
+                else
+                {
+                    $this->redcap = $this->parseEventData($event_data);
+                }
+            }
         }
 
         try 

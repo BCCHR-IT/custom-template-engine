@@ -211,7 +211,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         ?>
         <div class="container syntax-rule">
             <h4><u>Instructions</u></h4>
-            <p>Build your template in the WYSIWYG editor using the syntax guidelines below. Variables that you wish to pull must be contained in this template. You may format the template however you wish, including using tables.<strong style="color:red"> This plugin currently doesn't work with repeatable events.</strong></p>
+            <p>
+                Build your template in the WYSIWYG editor using the syntax guidelines below. Variables that you wish to pull must be contained in this template. 
+                You may format the template however you wish, including using tables.
+                <strong style="color:red"> 
+                    When accessing fields in a repeatable event or instrument, this module will automatically pull data from the latest instance.
+                </strong>
+            </p>
             <p>**The project id will be appended to the template name for identification purposes**</p>
             <p><strong style="color:red">**IMPORTANT**</strong> Any image uploaded to the plugin will be saved for future use by <strong>ALL</strong> users. <strong>Do not upload any identifying images.</strong></p>
         </div>
@@ -1189,7 +1195,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $doc->appendChild($style);
 
             // Add page numbers to the footer of every page
-
             $dompdf = new Dompdf();
             $dompdf->set_option("isHtml5ParserEnabled", true);
             $dompdf->set_option("isPhpEnabled", true);
@@ -1406,6 +1411,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         multiple tables, shrink font, etc...</li>
                         <li>Any image uploaded to the plugin will be saved for future use by <strong>ALL</strong> users. <strong>Do not upload any identifying images.</strong></li>
                         <li>Calculations cannot be performed in the Template Engine, so raw values have been exported.</li>
+                        <li>Fields in a repeatable event or instrument had their data pulled from the latest instance.</li>
                         <?php if ($rights[$user]["data_export_tool"] === "2") :?>
                             <li> Data has been de-identified according to user access rights</li>
                         <?php endif;?>
@@ -1532,7 +1538,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <?php if (!empty($info)) :?>
                     <div class="red container">
                         <h4>Template Validation Failed!</h4>
-                        <p>Template was saved with the following errors...</p>
+                        <p>Template was saved with the following errors. To discover where the error occured, match the line numbers in the error message to the ones in the Source view...</p>
                         <p><a id="readmore-link" href="#">Click to view errors</a></p>
                         <div id="readmore" style="display:none">
                             <?php if (sizeof($errors['otherErrors']) > 0): ?>
@@ -1725,6 +1731,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      */
     public function generateIndexPage()
     {
+        $template = REDCap::getData("json", 1, null, null, null, TRUE, FALSE, TRUE, null, TRUE);
+
         $this->createModuleFolders();
 
         $rights = REDCap::getUserRights($this->userid);

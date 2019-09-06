@@ -1,10 +1,10 @@
 <?php
 /**
- * Create an instance of the Custom Report Builder class,
+ * Create an instance of the Custom Template Engine class,
  * and save template.
  */
-$customReportBuilder = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
-$result = $customReportBuilder->saveTemplate();
+$customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
+$result = $customTemplateEngine->saveTemplate();
 
 /**
  * If TRUE, then redirect to index and set param created = 1.
@@ -12,7 +12,7 @@ $result = $customReportBuilder->saveTemplate();
  */
 if ($result === TRUE)
 {
-    header("Location:" . $customReportBuilder->getUrl("index.php") . "&created=1");
+    header("Location:" . $customTemplateEngine->getUrl("index.php") . "&created=1");
 }
 else
 {
@@ -21,7 +21,7 @@ else
      */
     require_once APP_PATH_DOCROOT . "ProjectGeneral/header.php";
 
-    $customReportBuilder->generateEditTemplatePage($result);
+    $customTemplateEngine->generateEditTemplatePage($result);
     
     /**
      * Include REDCap footer.

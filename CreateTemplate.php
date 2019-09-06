@@ -5,11 +5,11 @@
 require_once APP_PATH_DOCROOT . "ProjectGeneral/header.php"; 
 
 /**
- * Initialize Custom Report Builder object, and call method
+ * Initialize Custom Template Engine object, and call method
  * to generate Create Template page.
  */
-$customReportBuilder = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
-$customReportBuilder->generateCreateTemplatePage();
+$customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
+$customTemplateEngine->generateCreateTemplatePage();
 
 /**
  * Include REDCap footer.

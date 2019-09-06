@@ -1,10 +1,10 @@
 <?php
 /**
- * Initialize Custom Report Builder object, and call method to delete a
+ * Initialize Custom Template Engine object, and call method to delete a
  * template.
  */
-$customReportBuilder = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
-$result = $customReportBuilder->deleteTemplate();
+$customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
+$result = $customTemplateEngine->deleteTemplate();
 
 /**
  * If TRUE, then template was deleted successfullly and redirect to index with param deleted = 1.
@@ -12,9 +12,9 @@ $result = $customReportBuilder->deleteTemplate();
  */
 if ($result === TRUE)
 {
-    header("Location:" . $customReportBuilder->getUrl("index.php") . "&deleted=1");
+    header("Location:" . $customTemplateEngine->getUrl("index.php") . "&deleted=1");
 }
 else
 {
-    header("Location:" . $customReportBuilder->getUrl("index.php") . "&deleted=0");
+    header("Location:" . $customTemplateEngine->getUrl("index.php") . "&deleted=0");
 }
