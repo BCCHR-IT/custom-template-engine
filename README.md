@@ -1,7 +1,7 @@
 # Custom Template Engine
 REDCap module that allows you to create HTML templates and fill them with record data from your project. You can download the filled templates as a PDF.
 
-This module works for classic, longitudinal, and multiple arm projects, but has not been tested with repeatable events.
+This module works for classic, longitudinal, and multiple arm projects, and the last instances of repeatable events and instruments.
 
 ## IMPORTANT: Switching from Custom Report Builder to Custom Template Engine
 
