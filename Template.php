@@ -128,32 +128,30 @@ class Template
     }
 
     /**
-     * Parses a conditional string into blocks.
+     * Parses a syntax string into blocks.
      * 
      * @access private
-     * @param String $condition     The condition to parse.
-     * @return Array An array of blocks that make up the condition passed.
+     * @param String $syntax     The syntax to parse.
+     * @return Array An array of blocks that make up the syntax passed.
      */
-    private function getSyntaxParts($condition)
+    private function getSyntaxParts($syntax)
     {
         //Replace strings with ''
-        $condition = $this->replaceStrings(trim($condition), "''");
+        $syntax = $this->replaceStrings(trim($syntax), "''");
 
         $parts = array();
         $previous = array();
 
         $i = 0;
-        while($i < strlen($condition))
+        while($i < strlen($syntax))
         {
-            $char = $condition[$i];
+            $char = $syntax[$i];
             switch($char)
             {
                 case ",":
                 case "(":
                 case ")":
-                case "[":
                 case "]":
-                case "''":
                     $part = trim(implode("", $previous));
                     $previous = array();
                     if ($part !== "")
@@ -161,6 +159,20 @@ class Template
                         $parts[] = $part;
                     }
                     $parts[] = $char;
+                    $i++;
+                    break;
+                case "[":
+                    if ($syntax[$i-1] == " ")
+                    {
+                        $parts[] = " ";
+                    }
+                    $part = trim(implode("", $previous));
+                    if ($part !== "")
+                    {
+                        $parts[] = $part;
+                    }
+                    $parts[] = $char;
+                    $previous = array();
                     $i++;
                     break;
                 case " ":
@@ -174,7 +186,7 @@ class Template
                     break;
                 default:
                     $previous[] = $char;
-                    if ($i == strlen($condition) - 1)
+                    if ($i == strlen($syntax) - 1)
                     {
                         $part = trim(implode("", $previous));
                         if ($part !== "")
@@ -385,16 +397,16 @@ class Template
      * Validate general syntax.
      * 
      * @access private
-     * @see Template::getSyntaxParts() For retreiving blocks of syntax from the given condition string.
-     * @param String $condition     The condition to validate.
+     * @see Template::getSyntaxParts() For retreiving blocks of syntax from the given syntax string.
+     * @param String $syntax     The syntax to validate.
      * @param Integer $line_num      The current line number in the template.
      * @return Array An array of errors, with the line number appended to indicate where it occured.
      */
-    private function validateSyntax($condition, $line_num)
+    private function validateSyntax($syntax, $line_num)
     {
         $errors = array();
         
-        $parts = $this->getSyntaxParts($condition);
+        $parts = $this->getSyntaxParts($syntax);
 
         $opening_squares = array_keys($parts, "[");
         $closing_squares = array_keys($parts, "]");
@@ -625,7 +637,7 @@ class Template
                             && $next_part !== "["
                             && !in_array($next_part, $this->logical_operators))
                         {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>$part</strong>.";
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>'$next_part'</strong> after <strong>$part</strong>.";
                         }
                     }
                     break;
