@@ -996,7 +996,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
         else if (strpos($name, "/") !== FALSE)
         {
-            $other_errors[] = "<b>ERROR</b> You cannot have '/' in your template name!";
+            $other_errors[] = "<b>ERROR</b> You cannot have '/' in your template name! Template was not saved!";
             $filename = $name;
         }
         else
