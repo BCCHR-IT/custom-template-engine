@@ -994,10 +994,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             exit("<div class='yellow'>Nothing was in the editor, therefore, no file was saved</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
             $HtmlPage->PrintFooterExt();
         }
+        else if (strpos($name, "/") !== FALSE)
+        {
+            $other_errors[] = "<b>ERROR</b> You cannot have '/' in your template name!";
+            $filename = $name;
+        }
         else
         {
-            // Save template
-            
             // Validate Template
             $template = new Template($this->templates_dir, $this->compiled_dir);
 
@@ -1008,6 +1011,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $doc = new DOMDocument();
             $doc->loadHTML("<html><body><header>$header</header><footer>$footer</footer><main>$data</main></body></html>");
 
+            // Save Template
             if ($action === "create")
             {  
                 if (!file_exists("$this->templates_dir{$name}_$this->pid.html") && !file_exists("$this->templates_dir{$name}_{$this->pid} - INVALID.html"))
@@ -1065,14 +1069,15 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             if (!empty($template_errors) || !empty($header_errors) || !empty($footer_errors))
                             {
                                 $filename = "{$name}_$this->pid - INVALID.html";
-                                rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
                             }
                             else
                             {
                                 $filename = "{$name}_$this->pid.html";
-                                rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
                             }
+
+                            rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
                             REDCap::logEvent("Template edited", "Renamed template from '$currTemplateName' to '$filename'");
+                            $templateName = $currTemplateName = $filename;
                         }
                     }
                     else 
@@ -1112,11 +1117,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         if (!empty($errors))
         {
             return array(
+                "action" => $action,
                 "errors" => $errors,
                 "main" => $data,
                 "header" => $header,
                 "footer" => $footer,
-                "templateName" => $filename
+                "templateName" => $filename,
+                "currTemplateName" => $action == "create" ? "" : $_POST["currTemplateName"]
             );
         }
         else
@@ -1501,10 +1508,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $footer_data = $info["footer"];
             $main_data = $info["main"];
             $template_name = $info["templateName"];
+            $curr_template_name = $info["currTemplateName"];
+            $action = $info["action"];
         }
         else
         {
-            $template_name = $_POST["template"];
+            $template_name = $curr_template_name = $_POST["template"];
             $template = file_get_contents($this->templates_dir . $template_name);
 
             $doc = new DOMDocument();
@@ -1517,6 +1526,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $main_data = $doc->saveHTML($main);
             $header_data = empty($header) ? "" : $doc->saveHTML($header);
             $footer_data = empty($footer)? "" : $doc->saveHTML($footer);
+
+            $action = "edit";
         }
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
@@ -1524,11 +1535,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             <div class="jumbotron">
                 <div class="row">
                     <div class="col-md-10">
-                        <?php if (!empty($errors) && (file_exists("$this->templates_dir{$template_name}_$this->pid.html") || file_exists("$this->templates_dir{$template_name}_$this->pid - INVALID.html"))):?>
-                            <h3>Create Template</h3>
-                        <?php else: ?>
-                            <h3>Edit Template</h3>
-                        <?php endif;?>
+                        <h3><?php print ucfirst($action);?> Template</h3>
                     </div>
                     <div class="col-md-2">
                         <a class="btn btn-primary" style="color:white" href="<?php print $this->getUrl("index.php")?>">Back to Front</a>
@@ -1599,11 +1606,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 <td class="data">
                                     <div class="col-sm-5">
                                         <input name="templateName" type="text" class="form-control" value="<?php print str_replace(array("_$this->pid", " - INVALID", ".html"), "", $template_name); ?>">
-                                        <input type="hidden" name="action" 
-                                            value="<?php !empty($errors) && (file_exists("$this->templates_dir{$template_name}_$this->pid.html") || file_exists("$this->templates_dir{$template_name}_$this->pid - INVALID.html")) ?
-                                                     print "create" : print "edit"?>"
-                                        >
-                                        <input name="currTemplateName" type="hidden" class="form-control" value="<?php print $template_name; ?>">
+                                        <input type="hidden" name="action" value="<?php print $action; ?>">
+                                        <input name="currTemplateName" type="hidden" class="form-control" value="<?php print $curr_template_name; ?>">
                                     </div>
                                 </td>
                             </tr>
