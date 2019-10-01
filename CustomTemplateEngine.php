@@ -51,19 +51,19 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         /**
          * Checks and adds trailing directory separator
          */
-        if (substr($this->templates_dir, -1) != "/")
+        if (substr($this->templates_dir, -1) != DIRECTORY_SEPARATOR)
         {
-            $this->templates_dir = $this->templates_dir . "/";
+            $this->templates_dir = $this->templates_dir . DIRECTORY_SEPARATOR;
         }
 
-        if (substr($this->compiled_dir, -1) != "/")
+        if (substr($this->compiled_dir, -1) != DIRECTORY_SEPARATOR)
         {
-            $this->compiled_dir = $this->compiled_dir . "/";
+            $this->compiled_dir = $this->compiled_dir . DIRECTORY_SEPARATOR;
         }
 
-        if (substr($this->img_dir, -1) != "/")
+        if (substr($this->img_dir, -1) != DIRECTORY_SEPARATOR)
         {
-            $this->img_dir = $this->img_dir . "/";
+            $this->img_dir = $this->img_dir . DIRECTORY_SEPARATOR;
         }
     }
 
@@ -994,9 +994,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             exit("<div class='yellow'>Nothing was in the editor, therefore, no file was saved</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
             $HtmlPage->PrintFooterExt();
         }
-        else if (strpos($name, "/") !== FALSE)
+        else if (strpos($name, DIRECTORY_SEPARATOR) !== FALSE)
         {
-            $other_errors[] = "<b>ERROR</b> You cannot have '/' in your template name! Template was not saved!";
+            $other_errors[] = "<b>ERROR</b> You cannot have " . DIRECTORY_SEPARATOR . " in your template name! Template was not saved!";
             $filename = $name;
         }
         else
