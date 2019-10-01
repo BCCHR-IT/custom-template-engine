@@ -973,7 +973,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * Performs validation on the template contents, and saves regardless. If there's
      * any validation errors then the template is saved on server as '<template name>_<pid> - INVALID.html'.
      * 
-     * @since 2.8
+     * @since 2.9.3
      * @return Array An array containing any validation errors, and the template's body, header, and footer contents.
      * @return Boolean If the template passed validation, then return TRUE.
      */
@@ -986,7 +986,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $name = trim($_POST["templateName"]);
         $action = $_POST["action"];
 
-        // Check if template has content and a name
+        // Check if template has content
         if (empty($data))
         {
             $HtmlPage = new HtmlPage();
@@ -994,10 +994,16 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             exit("<div class='yellow'>Nothing was in the editor, therefore, no file was saved</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
             $HtmlPage->PrintFooterExt();
         }
+        // Template name cannot have director separator in it
         else if (strpos($name, DIRECTORY_SEPARATOR) !== FALSE)
         {
             $other_errors[] = "<b>ERROR</b> You cannot have " . DIRECTORY_SEPARATOR . " in your template name! Template was not saved!";
             $filename = $name;
+
+            if ($action == "edit")
+            {
+                $currTemplateName = $_POST["currTemplateName"];
+            }
         }
         else
         {
@@ -1011,9 +1017,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $doc = new DOMDocument();
             $doc->loadHTML("<html><body><header>$header</header><footer>$footer</footer><main>$data</main></body></html>");
 
-            // Save Template
+            // Creating a new template
             if ($action === "create")
             {  
+                /**
+                 * If template already exists, return error, if not save template.
+                 */
                 if (!file_exists("$this->templates_dir{$name}_$this->pid.html") && !file_exists("$this->templates_dir{$name}_{$this->pid} - INVALID.html"))
                 {
                     $filename = !empty($template_errors) || !empty($header_errors) || !empty($footer_errors) ? "{$name}_{$this->pid} - INVALID.html" : "{$name}_$this->pid.html";
@@ -1023,6 +1032,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     }
                     else
                     {
+                        /**
+                         * Since the template has been saved:
+                         *  - All changes are not edits
+                         *  - It's current template name = the filename it was saved under
+                         */
+                        $action = "edit";
+                        $currTemplateName = $filename;
                         REDCap::logEvent("Template created", $filename);
                     }
                 }
@@ -1032,8 +1048,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $filename = $name;
                 }
             }
+            // Editing an existing template
             else
             {
+                /**
+                 * If template doesn't exist, return error.
+                 * Else if template names are the same save the template.
+                 * Else, if the new template name is already in use return error, else save template and rename.
+                 */
                 $currTemplateName = $_POST["currTemplateName"];
                 if (file_exists($this->templates_dir . $currTemplateName))
                 {
@@ -1056,6 +1078,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 $filename = str_replace(" - INVALID", "", $currTemplateName);
                                 rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
                             }
+                            $currTemplateName = $filename;
                         }
                     }
                     else if (!file_exists("$this->templates_dir{$name}_$this->pid.html") && !file_exists("$this->templates_dir{$name}_{$this->pid} - INVALID.html") )
@@ -1066,18 +1089,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         }
                         else
                         {
-                            if (!empty($template_errors) || !empty($header_errors) || !empty($footer_errors))
-                            {
-                                $filename = "{$name}_$this->pid - INVALID.html";
-                            }
-                            else
-                            {
-                                $filename = "{$name}_$this->pid.html";
-                            }
-
+                            $filename = !empty($template_errors) || !empty($header_errors) || !empty($footer_errors) ? "{$name}_$this->pid - INVALID.html" : "{$name}_$this->pid.html";
                             rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
                             REDCap::logEvent("Template edited", "Renamed template from '$currTemplateName' to '$filename'");
-                            $templateName = $currTemplateName = $filename;
+                            $currTemplateName = $filename;
                         }
                     }
                     else 
@@ -1094,6 +1109,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             }
         }
 
+        /**
+         * Check for any errors
+         */
         if (!empty($header_errors))
         {
             $errors["headerErrors"] = $header_errors;
@@ -1123,7 +1141,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 "header" => $header,
                 "footer" => $footer,
                 "templateName" => $filename,
-                "currTemplateName" => $action == "create" ? "" : $_POST["currTemplateName"]
+                "currTemplateName" => $currTemplateName
             );
         }
         else
@@ -1496,7 +1514,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * @see CustomTemplateEngine::checkPermissions() For checking if the user has permissions to view the page.
      * @see CustomTemplateEngine::generateInstructions() For generating instructions on page.
      * @param Array $info   Array containing validation errors, and the template's contents.
-     * @since 2.0
+     * @since 2.9.3
      */
     public function generateEditTemplatePage($info = NULL)
     {
