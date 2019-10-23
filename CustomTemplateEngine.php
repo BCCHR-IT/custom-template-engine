@@ -1182,15 +1182,15 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         <footer>$footer</footer>
                         <main>$main</main>
                         <script type='text/php'>
-                            // Add page number to every page
+                            // Add page number and timestamp to every page
                             if (isset(\$pdf)) { 
                                 \$pdf->page_script('
                                     \$font = \$fontMetrics->get_font(\"Arial, Helvetica, sans-serif\", \"normal\");
                                     \$size = 12;
-                                    \$pageText = \"Page \" . \$PAGE_NUM . \" of \" . \$PAGE_COUNT;
+                                    \$pageNum = \"Page \" . \$PAGE_NUM . \" of \" . \$PAGE_COUNT;
                                     \$y = 750;
-                                    \$x = 275;
-                                    \$pdf->text(\$x, \$y, \$pageText, \$font, \$size);
+                                    \$pdf->text(520, \$y, \$pageNum, \$font, \$size);
+                                    \$pdf->text(30, \$y, date(\"Y-m-d H:m:s\", time()), \$font, \$size);
                                 ');
                             }
                         </script>
