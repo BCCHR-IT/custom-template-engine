@@ -918,7 +918,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
                         $arr = $all_imgs[$i];
                         print "
-                        <div class='col-sm-2'>
+                        <div class='col-md-2'>
                             <div class='img-file' img-url ='" . $arr["url"]. "'>
                                 <div style='background-image: url(\"". $arr["url"]. "\");'></div>
                                 <p style='background-color:#286090;color:white'>" . $arr["name"] . "</p>
@@ -1168,7 +1168,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor"]));
         $footer = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]));
         $main = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["editor"]));
+
         $filename = $_POST["filename"];
+        $record = $_POST["record"];
 
         if (isset($main) && !empty($main))
         {
@@ -1231,6 +1233,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             // Render the HTML as PDF
             $dompdf->render();
 
+            $filled_template_pdf_content = $dompdf->output();
+
             if ($this->getProjectSetting("save-report-to-repo"))
             {
                 // Stolen code from redcap version/FileRepository/index.php with several modifications
@@ -1247,7 +1251,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 $file_extension = "pdf";
                 $stored_name = date('YmdHis') . "_pid" . $this->pid . "_" . generateRandomHash(6) . ".pdf";
 
-                $upload_success = file_put_contents(EDOC_PATH . $stored_name, $dompdf->output());
+                $upload_success = file_put_contents(EDOC_PATH . $stored_name, $filled_template_pdf_content);
 
                 if ($upload_success !== FALSE) 
                 {
@@ -1327,18 +1331,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     print "<div class='red'>" . $context_msg . "</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>";
                     $HtmlPage->PrintFooterExt();
                 }
-                else
-                {
-                    // Output the generated PDF to Browser
-                    $dompdf->stream($filename);
-                    REDCap::logEvent("Downloaded Report ", $filename , "" ,$_GET["record"]);
-                }
             }
-            else
-            {
-                $dompdf->stream($filename);
-                REDCap::logEvent("Downloaded Report ", $filename , "" ,$_GET["record"]);
-            }
+
+            $dompdf->stream($filename);
+            REDCap::logEvent("Downloaded Report ", $filename , "" ,$_GET["record"]);
         }
         else
         {
@@ -1347,6 +1343,37 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             print "<div class='yellow'>Nothing was in the editor, therefore, no file was downloaded</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>";
             $HtmlPage->PrintFooterExt();
         }
+    }
+
+    /**
+     * Outputs a PDF of a REDcap instrument to browser.
+     * 
+     * Retrieve POSTED record, instrument, and event (if longitudinal) and pass it to a REDcap
+     * method that builds the PDF.
+     * 
+     * @since 2.2.4
+     */
+    public function downloadInstrumentScale()
+    {
+        $record = $_POST["record"];
+        $attach_instrument = $_POST["attach-instrument"];
+
+        if (REDCap::isLongitudinal())
+        {
+            $attach_event = $_POST["attach-event"];
+            $instrument_pdf_contents = REDCap::getPDF($record, $attach_instrument, $attach_event);
+        }
+        else
+        {
+            $instrument_pdf_contents = REDCap::getPDF($record, $attach_instrument);
+        }
+
+        $filename = "{$attach_instrument}_record_$record.pdf";
+
+        header('Content-Description: File Transfer');
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="'.basename($filename).'"');
+        print $instrument_pdf_contents;
     }
 
     /**
@@ -1359,10 +1386,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * 
      * @see Template::fillTemplate() For filling template with REDCap record data.
      * @see CustomReporBuilder::initializeEditor() For initializing editors on page.
-     * @since 2.0
+     * @since 2.2.4
      */
     public function generateFillTemplatePage()
-    {
+    {   
         $rights = REDCap::getUserRights($this->userid);
         if ($rights[$this->userid]["data_export_tool"] === "0") 
         {
@@ -1430,6 +1457,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <div class="container syntax-rule">
                     <h4><u>Instructions</u></h4>
                     <p>You may download the report as is, or edit until you're satisfied, then download. You may also copy/paste the report into another editor and save, if you prefer a format other than PDF</p>
+                    <p>Additionally, the user may download a REDCap generated report of the chosen record for an instrument and event (if longitudinal)</p>
                     <p><strong style="color:red">**IMPORTANT**</strong></p>
                     <ul>
                         <li>Tables and images may be cut off in PDF, because of size. If so, there is no current fix and you must edit your content until it fits. Some suggestions are to break up content into
@@ -1452,14 +1480,53 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     <?php endif;?>
                 </div>
                 <br/>
+                <form action="<?php print $this->getUrl("DownloadInstrument.php"); ?>" method="post">
+                    <table class="table" style="width:100%; margin-bottom:0px">
+                        <tr>
+                            <td style="width:25%;">Select Instrument to Download <i>* Instruments that have no data will download a blank PDF</i></td>
+                            <td class="data">
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <select id="attach-instrument" name="attach-instrument" class="form-control attach-select">
+                                                <option value="">--Select Instrument--</option>
+                                                <?php 
+                                                    $instruments = REDCap::getInstrumentNames();
+                                                    foreach($instruments as $unique_name => $label)
+                                                    {
+                                                        print "<option value='$unique_name'>$label</option>";
+                                                    }
+                                                ?>
+                                        </select>
+                                    </div>
+                                    <?php if (REDCap::isLongitudinal()): ?>
+                                        <div class="col-md-1"><p>of </p></div>
+                                        <div class="col-md-5">
+                                            <select id="attach-event" name="attach-event" class="form-control attach-select">
+                                                    <option value="">--Select Event--</option>
+                                            </select>
+                                        </div>
+                                    <?php endif; ?>
+                                    <input name="record" type="hidden" value="<?php print $record; ?>">
+                                </div>
+                                <div class="row" style="margin-top:10px">
+                                    <div class="col-md-5">
+                                        <button type="submit" id="redcap-instr-scale-link" class="btn btn-link" style="display:none">Download Instrument PDF</button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </form>
                 <form action="<?php print $this->getUrl("DownloadFilledTemplate.php"); ?>" method="post">
                     <table class="table" style="width:100%;">
                         <tbody>
                             <tr>
                                 <td style="width:25%;">Template Name <strong style="color:red">* Required</strong></td>
                                 <td class="data">
-                                    <div class="col-sm-5">
-                                        <input id="filename" name="filename" type="text" class="form-control" value="<?php print basename($template_filename, "_$this->pid.html") . " - $record";?>" required>
+                                    <div class="row">
+                                        <div class="col-md-5">
+                                            <input id="filename" name="filename" type="text" class="form-control" value="<?php print basename($template_filename, "_$this->pid.html") . " - $record";?>" required>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -1496,11 +1563,70 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         </div>
         <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
         <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
-        <script>CKEDITOR.dtd.\$removeEmpty['p'] = true;</script>
-        <?php
-        $this->initializeEditor("header-editor", 200);
-        $this->initializeEditor("footer-editor", 200);
-        $this->initializeEditor("editor", 1000);
+        <?php 
+            $events = REDCap::getEventNames(true);
+            $str = implode(",", array_keys($events));
+            $events_query = "SELECT * FROM rccfri_redcap.redcap_events_forms where event_id in ($str)";
+            $result = $this->query($events_query);
+            while($row = mysqli_fetch_assoc($result))
+            {
+                $event_forms[$row["form_name"]][] = $row["event_id"];
+            }
+
+            print "<script> var event_forms = {";
+            foreach($event_forms as $form => $ids)
+            {
+                print "$form:[";
+                foreach($ids as $id)
+                {
+                    print "{name:'" . $events[$id] . "', value:" . $id . "},";
+                }
+                print "],";
+            }
+            print "};
+            CKEDITOR.dtd.\$removeEmpty['p'] = true;
+            $('#attach-instrument').change(function() {
+                var key = $(this).val();
+                $('#attach-event option:gt(0)').remove(); // remove old options
+                $.each(event_forms[key], function(name,value) {
+                    $('#attach-event').append($('<option></option>').attr('value', value.value).text(value.name));
+                });
+            });
+            ";
+            if (REDCap::isLongitudinal())
+            {
+                print "
+                $('.attach-select').change(function() {
+                    if ($('#attach-instrument').val() != '' && $('#attach-event').val() != '')
+                    {
+                        $('#redcap-instr-scale-link').show();
+                    }
+                    else
+                    {
+                        $('#redcap-instr-scale-link').hide();
+                    }
+                })
+                ";
+            }
+            else
+            {
+                print "
+                $('.attach-select').change(function() {
+                    if ($('#attach-instrument').val() != '')
+                    {
+                        $('#redcap-instr-scale-link').show();
+                    }
+                    else
+                    {
+                        $('#redcap-instr-scale-link').hide();
+                    }
+                })
+                ";
+            }
+            print "</script>";
+            $this->initializeEditor("header-editor", 200);
+            $this->initializeEditor("footer-editor", 200);
+            $this->initializeEditor("editor", 1000);
     }
 
     /**
@@ -1622,10 +1748,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             <tr>
                                 <td style="width:25%;">Template Name <strong style="color:red">*Required</strong></td>
                                 <td class="data">
-                                    <div class="col-sm-5">
-                                        <input name="templateName" type="text" class="form-control" value="<?php print str_replace(array("_$this->pid", " - INVALID", ".html"), "", $template_name); ?>">
+                                    <div class="col-md-5">
+                                        <input name="templateName" type="text" class="form-control" value="<?php print str_replace(array("_$this->pid", " - INVALID", ".html"), "", $template_name); ?>" required>
                                         <input type="hidden" name="action" value="<?php print $action; ?>">
-                                        <input name="currTemplateName" type="hidden" class="form-control" value="<?php print $curr_template_name; ?>">
+                                        <input name="currTemplateName" type="hidden" value="<?php print $curr_template_name; ?>">
                                     </div>
                                 </td>
                             </tr>
@@ -1700,7 +1826,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             <tr>
                                 <td style="width:25%;">Template Name <strong style="color:red">*Required</strong></td>
                                 <td class="data">
-                                    <div class="col-sm-5">
+                                    <div class="col-md-5">
                                         <input name="templateName" type="text" class="form-control" required>
                                         <input type="hidden" name="action" value="create">
                                     </div>
