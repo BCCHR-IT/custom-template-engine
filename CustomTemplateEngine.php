@@ -1190,7 +1190,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     \$pageNum = \"Page \" . \$PAGE_NUM . \" of \" . \$PAGE_COUNT;
                                     \$y = 750;
                                     \$pdf->text(520, \$y, \$pageNum, \$font, \$size);
-                                    \$pdf->text(30, \$y, date(\"Y-m-d H:m:s\", time()), \$font, \$size);
+                                    \$pdf->text(30, \$y, date(\"Y-m-d H:i:s\", time()), \$font, \$size);
                                 ');
                             }
                         </script>
