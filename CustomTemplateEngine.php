@@ -995,9 +995,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $HtmlPage->PrintFooterExt();
         }
         // Template name cannot have director separator in it
-        else if (strpos($name, DIRECTORY_SEPARATOR) !== FALSE)
+        else if (strpos($name, "/") !== FALSE || strpos($name, "\\") !== FALSE)
         {
-            $other_errors[] = "<b>ERROR</b> You cannot have " . DIRECTORY_SEPARATOR . " in your template name! Template was not saved!";
+            $other_errors[] = "<b>ERROR</b> You cannot have '/' or '\\' in your template name! Template was not saved!";
             $filename = $name;
 
             if ($action == "edit")
@@ -1457,7 +1457,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <div class="container syntax-rule">
                     <h4><u>Instructions</u></h4>
                     <p>You may download the report as is, or edit until you're satisfied, then download. You may also copy/paste the report into another editor and save, if you prefer a format other than PDF</p>
-                    <p>Additionally, the user may download a REDCap generated report of the chosen record for an instrument and event (if longitudinal)</p>
+                    <p>Additionally, the user may download a REDCap generated report of all its data for an instrument and event (if longitudinal)</p>
                     <p><strong style="color:red">**IMPORTANT**</strong></p>
                     <ul>
                         <li>Tables and images may be cut off in PDF, because of size. If so, there is no current fix and you must edit your content until it fits. Some suggestions are to break up content into
@@ -1480,43 +1480,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     <?php endif;?>
                 </div>
                 <br/>
-                <form action="<?php print $this->getUrl("DownloadInstrument.php"); ?>" method="post">
-                    <table class="table" style="width:100%; margin-bottom:0px">
-                        <tr>
-                            <td style="width:25%;">Select Instrument to Download <i>* Instruments that have no data will download a blank PDF</i></td>
-                            <td class="data">
-                                <div class="row">
-                                    <div class="col-md-5">
-                                        <select id="attach-instrument" name="attach-instrument" class="form-control attach-select">
-                                                <option value="">--Select Instrument--</option>
-                                                <?php 
-                                                    $instruments = REDCap::getInstrumentNames();
-                                                    foreach($instruments as $unique_name => $label)
-                                                    {
-                                                        print "<option value='$unique_name'>$label</option>";
-                                                    }
-                                                ?>
-                                        </select>
-                                    </div>
-                                    <?php if (REDCap::isLongitudinal()): ?>
-                                        <div class="col-md-1"><p>of </p></div>
-                                        <div class="col-md-5">
-                                            <select id="attach-event" name="attach-event" class="form-control attach-select">
-                                                    <option value="">--Select Event--</option>
-                                            </select>
-                                        </div>
-                                    <?php endif; ?>
-                                    <input name="record" type="hidden" value="<?php print $record; ?>">
-                                </div>
-                                <div class="row" style="margin-top:10px">
-                                    <div class="col-md-5">
-                                        <button type="submit" id="redcap-instr-scale-link" class="btn btn-link" style="display:none">Download Instrument PDF</button>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                    </table>
-                </form>
                 <form action="<?php print $this->getUrl("DownloadFilledTemplate.php"); ?>" method="post">
                     <table class="table" style="width:100%;">
                         <tbody>
@@ -1530,11 +1493,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     </div>
                                 </td>
                             </tr>
-                            <tr>
-                                <td><button id="download-pdf" type="submit" class="btn btn-primary">Download PDF</button></td>
-                            </tr>
                         </tbody>
                     </table>
+                    <div class="row" style="margin-bottom:20px">
+                        <div class="col-md-2"><button id="download-pdf" type="submit" class="btn btn-primary">Download PDF</button></div>
+                        <div class="col-md-3"><button id="download-pdf" type="button" class="btn btn-primary" data-toggle="modal" data-target="#downloadInstrumentModal">Download Instrument Data</button></div>
+                    </div>
                     <div class="collapsible-container">
                         <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                         <div class="collapsible-content">
@@ -1559,18 +1523,59 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         </textarea>
                     </div>
                 </form>
+                <div class="modal fade" id="downloadInstrumentModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5>Select Instrument to Download</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <form action=<?php print $this->getUrl("DownloadInstrument.php");?> method="post">
+                                <div class="modal-body">
+                                    <p><i>An instrument without any data will produce a blank PDF</i></p>
+                                    <select id="attach-instrument" name="attach-instrument" class="form-control attach-select">
+                                            <option value="">--Select Instrument--</option>
+                                            <?php 
+                                                $instruments = REDCap::getInstrumentNames();
+                                                foreach($instruments as $unique_name => $label)
+                                                {
+                                                    print "<option value='$unique_name'>$label</option>";
+                                                }
+                                            ?>
+                                    </select>
+                                    <?php if (REDCap::isLongitudinal()): ?>
+                                        <p style="text-align:center">of</p>
+                                        <select id="attach-event" name="attach-event" class="form-control attach-select">
+                                            <option value="">--Select Event--</option>
+                                        </select>
+                                    <?php endif;?>
+                                    <input name="record" type="hidden" value="<?php print $record; ?>">
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                    <button type="submit" class="btn btn-primary">Download</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
         <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
         <?php 
             $events = REDCap::getEventNames(true);
-            $str = implode(",", array_keys($events));
-            $events_query = "SELECT * FROM rccfri_redcap.redcap_events_forms where event_id in ($str)";
-            $result = $this->query($events_query);
-            while($row = mysqli_fetch_assoc($result))
+            if ($events !== FALSE)
             {
-                $event_forms[$row["form_name"]][] = $row["event_id"];
+                $str = implode(",", array_keys($events));
+                $events_query = "SELECT * FROM redcap_events_forms where event_id in ($str)";
+                $result = $this->query($events_query);
+                while($row = mysqli_fetch_assoc($result))
+                {
+                    $event_forms[$row["form_name"]][] = $row["event_id"];
+                }
             }
 
             print "<script> var event_forms = {";
