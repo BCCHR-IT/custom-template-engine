@@ -1176,7 +1176,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             $doc = new DOMDocument();
             $doc->loadHtml("
+                <!DOCTYPE html>
                 <html>
+                    <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
                     <body>
                         <header>$header</header>
                         <footer>$footer</footer>
@@ -1497,7 +1499,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     </table>
                     <div class="row" style="margin-bottom:20px">
                         <div class="col-md-2"><button id="download-pdf" type="submit" class="btn btn-primary">Download PDF</button></div>
-                        <div class="col-md-3"><button id="download-pdf" type="button" class="btn btn-primary" data-toggle="modal" data-target="#downloadInstrumentModal">Download Instrument Data</button></div>
+                        <div class="col-md-3"><button id="download-pdf" type="button" class="btn btn-primary" data-toggle="modal" data-target="#downloadInstrumentModal" style="display:none">Download Instrument Data</button></div>
                     </div>
                     <div class="collapsible-container">
                         <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>

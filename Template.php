@@ -293,7 +293,7 @@ class Template
                     }
                     else if($this->dictionary[$field_name]["field_type"] === "notes")
                     {
-                        $event_fields_and_vals[$field_name] = str_replace("\r\n", "", $value);
+                        $event_fields_and_vals[$field_name] = str_replace("\r\n", "<br/>", htmlentities($value));
                     }
                     else
                     {
