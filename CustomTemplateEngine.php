@@ -1557,7 +1557,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                                    <button type="submit" class="btn btn-primary">Download</button>
+                                    <button type="submit" class="btn btn-primary" id="download-instrument-btn" disabled>Download</button>
                                 </div>
                             </form>
                         </div>
@@ -1606,11 +1606,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 $('.attach-select').change(function() {
                     if ($('#attach-instrument').val() != '' && $('#attach-event').val() != '')
                     {
-                        $('#redcap-instr-scale-link').show();
+                        $('#download-instrument-btn').attr('disabled', false);
                     }
                     else
                     {
-                        $('#redcap-instr-scale-link').hide();
+                        $('#download-instrument-btn').attr('disabled', true);
                     }
                 })
                 ";
@@ -1621,11 +1621,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 $('.attach-select').change(function() {
                     if ($('#attach-instrument').val() != '')
                     {
-                        $('#redcap-instr-scale-link').show();
+                        $('#download-instrument-btn').attr('disabled', false);
                     }
                     else
                     {
-                        $('#redcap-instr-scale-link').hide();
+                        $('#download-instrument-btn').attr('disabled', true);
                     }
                 })
                 ";
