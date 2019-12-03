@@ -626,6 +626,20 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         </div>
                     </div>
                 </div>
+                <div class="collapsible-container">
+                    <button class="collapsible">Add page breaks in template. <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                    <div class="collapsible-content">
+                        <p><strong style="color:red">IMPORTANT:</strong> When using page breaks, they must never be attached to an if condition, otherwise the temple will have rendering errors</p>
+                        <u>Syntax:</u> In the Source view of the editor find the element you want to add a page break before and add <b>style="page-break-before:always"</b>
+                        <br/><br/>
+                        <div class="syntax-example">
+                            Example:
+                            <div>
+                              <?php print htmlspecialchars("<h1 ") . "<b>style=\"page-break-before:always\"</b>" . htmlspecialchars(">Add a page break before this header</h1>"); ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         <h4><u>Fields & Events</u></h4>
@@ -1013,9 +1027,20 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $template_errors = $template->validateTemplate($data);
             $header_errors = $template->validateTemplate($header);
             $footer_errors = $template->validateTemplate($footer);
-
+               
             $doc = new DOMDocument();
-            $doc->loadHTML("<html><body><header>$header</header><footer>$footer</footer><main>$data</main></body></html>");
+            $doc->loadHTML("
+                <html>
+                    <head>
+                        <meta http-equiv='Content-Type' content='text/html;charset=utf-8'/>
+                    </head>
+                    <body>
+                        <header>$header</header>
+                        <footer>$footer</footer>
+                        <main>$data</main>
+                    </body>
+                </html>
+            ");
 
             // Creating a new template
             if ($action === "create")
@@ -1178,7 +1203,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $doc->loadHtml("
                 <!DOCTYPE html>
                 <html>
-                    <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
+                    <head>
+                        <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
+                    </head>
                     <body>
                         <header>$header</header>
                         <footer>$footer</footer>
@@ -1458,8 +1485,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <?php endif;?>
                 <div class="container syntax-rule">
                     <h4><u>Instructions</u></h4>
-                    <p>You may download the report as is, or edit until you're satisfied, then download. You may also copy/paste the report into another editor and save, if you prefer a format other than PDF</p>
-                    <p>Additionally, the user may download a REDCap generated report of all its data for an instrument and event (if longitudinal)</p>
+                    <p>You may download the report as is, or edit until you're satisfied, then download. You may also copy/paste the report into another editor and save, if you prefer a format other than PDF.</p>
                     <p><strong style="color:red">**IMPORTANT**</strong></p>
                     <ul>
                         <li>Tables and images may be cut off in PDF, because of size. If so, there is no current fix and you must edit your content until it fits. Some suggestions are to break up content into
