@@ -487,7 +487,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     </div>
                 </div>
                 <div class="collapsible-container">
-                    <button class="collapsible">Query checkbox values using <strong>in_array</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                    <button class="collapsible">Query checkbox/matrix values using <strong>in_array</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                     <div class="collapsible-content">
                         <p><u>Syntax:</u> <strong>{if in_array('someValue', $redcap['variable'])}</strong> show this text <strong>{/if}</strong></p>
                         <div class="syntax-example">
@@ -509,7 +509,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     </div>
                 </div>
                 <div class="collapsible-container">
-                    <button class="collapsible">Print all checkbox values using <strong>{$redcap['variable']['allValues']}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                    <button class="collapsible">Print all checkbox/matrix values using <strong>{$redcap['variable']['allValues']}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                     <div class="collapsible-content">
                         <div class="syntax-example">
                             Example:
