@@ -487,7 +487,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     </div>
                 </div>
                 <div class="collapsible-container">
-                    <button class="collapsible">Query checkbox/matrix values using <strong>in_array</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                    <button class="collapsible">Query checkbox values using <strong>in_array</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                     <div class="collapsible-content">
                         <p><u>Syntax:</u> <strong>{if in_array('someValue', $redcap['variable'])}</strong> show this text <strong>{/if}</strong></p>
                         <div class="syntax-example">
@@ -1926,7 +1926,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         foreach($data as $record)
         {
             $to_add = $record[$id_field];
-            if (!in_array($to_add, array_keys($participant_options)))
+            if (!in_array($to_add, array_keys($participant_options), true))
             {
                 $arm = REDCap::isLongitudinal() ? array_pop(explode("arm_", $record["redcap_event_name"])) : "1";
                 $label = Records::getCustomRecordLabelsSecondaryFieldAllRecords($to_add, true, $arm, false, '');
