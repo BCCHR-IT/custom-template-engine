@@ -509,7 +509,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     </div>
                 </div>
                 <div class="collapsible-container">
-                    <button class="collapsible">Print all checkbox/matrix values using <strong>{$redcap['variable']['allValues']}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                    <button class="collapsible">Print all checkbox values using <strong>{$redcap['variable']['allValues']}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                     <div class="collapsible-content">
                         <div class="syntax-example">
                             Example:
@@ -1264,7 +1264,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
             $filled_template_pdf_content = $dompdf->output();
 
-            if ($this->getProjectSetting("save-report-to-repo"))
+            if (!$this->getProjectSetting("save-report-to-repo"))
             {
                 // Stolen code from redcap version/FileRepository/index.php with several modifications
                 // Upload the compiled report to the File Repository
@@ -1497,7 +1497,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             <li> Data has been de-identified according to user access rights</li>
                         <?php endif;?>
                     </ul>
-                    <?php if ($this->getProjectSetting("save-report-to-repo")) :?>
+                    <?php if (!$this->getProjectSetting("save-report-to-repo")) :?>
                         <div class="green" style="max-width: initial;">
                             <p>This module can save reports to the File Repository, upon download. This is currently <strong>enabled</strong> if you'd like to disable this contact your REDCap administrator.</p>
                         </div>
@@ -1985,6 +1985,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <h3>Custom Template Engine</h3>
                 <hr>
                 <h4>This plugin allows you to create report templates and fill them with data from records in your REDCap project.</h4> 
+                <br>
+                <h6>For Further Information <a href="https://hub.bcchr.ca/pages/viewpage.action?pageId=63607198" style="font-size:inherit; font-family:inherit">Click Here to Go To the Hub Page</a></h6>
                 <br>
                 <?php if ($rights[$this->userid]["reports"]) :?> 
                     <div class="container syntax-rule">

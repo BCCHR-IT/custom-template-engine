@@ -53,7 +53,7 @@
     "project-settings": [
         {
             "key": "save-report-to-repo",
-            "name": "Save Filled Reports to File Repository?",
+            "name": "Do Not Save Filled Reports to File Repository",
             "type": "checkbox",
             "repeatable": false,
             "super-users-only": true
