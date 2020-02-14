@@ -15,6 +15,7 @@ use Records;
 use Dompdf\Dompdf;
 use DOMDocument;
 use HtmlPage;
+use ZipArchive;
 
 class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule 
 {
@@ -29,6 +30,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      */
     private $templates_dir;
     private $compiled_dir;
+    private $temp_dir;
     private $img_dir;
     private $pid;
     private $userid;
@@ -45,6 +47,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
          */
         $this->templates_dir = $this->getSystemSetting("templates-folder");
         $this->compiled_dir = $this->getSystemSetting("compiled-templates-folder");
+        $this->temp_dir = $this->getSystemSetting("temp-folder");
         $this->img_dir = $this->getSystemSetting("img-folder");
         $this->pid = $this->getProjectId();
 
@@ -59,6 +62,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         if (substr($this->compiled_dir, -1) != DIRECTORY_SEPARATOR)
         {
             $this->compiled_dir = $this->compiled_dir . DIRECTORY_SEPARATOR;
+        }
+
+        if (substr($this->temp_dir, -1) != DIRECTORY_SEPARATOR)
+        {
+            $this->temp_dir = $this->temp_dir . DIRECTORY_SEPARATOR;
         }
 
         if (substr($this->img_dir, -1) != DIRECTORY_SEPARATOR)
@@ -104,6 +112,21 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 if (!mkdir($this->compiled_dir, 0777, true))
                 {
                     exit("<div class='red'><b>ERROR</b> Unable to create directory $this->compiled_dir to store compiled templates. Please contact your systems administrator to  make sure the location is writable.</div>");
+                }
+            }
+        }
+
+        if (empty($this->temp_dir))
+        {
+            exit("<div class='red'><b>ERROR</b> Compiled templates directory has not been set. Please contact your REDCap administrator.</div>");
+        }
+        else
+        {
+            if (!file_exists($this->temp_dir))
+            {
+                if (!mkdir($this->temp_dir, 0777, true))
+                {
+                    exit("<div class='red'><b>ERROR</b> Unable to create directory $this->temp_dir to store temporary files. Please contact your systems administrator to  make sure the location is writable.</div>");
                 }
             }
         }
@@ -768,6 +791,179 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
+     * Saves a file to REDCap's File Repository. Based off stolen code from redcap version/FileRepository/index.php
+     * with several modifications
+     * 
+     * @see CustomTemplateEngine::deleteRepositoryFile() For deleting a file from the repository, if metadata failed to create.
+     * @since 3.0
+     */
+    private function saveToFileRepository($filename, $file_contents, $file_extension)  
+    {   
+        // Upload the compiled report to the File Repository
+        $errors = array();
+        $database_success = FALSE;
+        $upload_success = FALSE;
+
+        $dummy_file_name = $filename;
+        $dummy_file_name = preg_replace("/[^a-zA-Z-._0-9]/","_",$dummy_file_name);
+        $dummy_file_name = str_replace("__","_",$dummy_file_name);
+        $dummy_file_name = str_replace("__","_",$dummy_file_name);
+
+        $stored_name = date('YmdHis') . "_pid" . $this->pid . "_" . generateRandomHash(6) . ".$file_extension";
+
+        $upload_success = file_put_contents(EDOC_PATH . $stored_name, $file_contents);
+
+        if ($upload_success !== FALSE) 
+        {
+            $dummy_file_size = $upload_success;
+            $dummy_file_type = "application/$file_extension";
+            
+            $file_repo_name = date("Y/m/d H:i:s");
+
+            $sql = "INSERT INTO redcap_docs (project_id,docs_date,docs_name,docs_size,docs_type,docs_comment,docs_rights)
+                    VALUES ($this->pid,CURRENT_DATE,'$dummy_file_name.$file_extension','$dummy_file_size','$dummy_file_type',
+                    \"$file_repo_name - $filename ($this->userid)\",NULL)";
+                            
+            if ($this->query($sql)) 
+            {
+                $docs_id = db_insert_id();
+
+                $sql = "INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date)
+                        VALUES('".$stored_name."','".$dummy_file_type."','".$dummy_file_name."','".$dummy_file_size."',
+                        '".$file_extension."','".$this->pid."','".date('Y-m-d H:i:s')."');";
+                            
+                if ($this->query($sql)) 
+                {
+                    $doc_id = db_insert_id();
+                    $sql = "INSERT INTO redcap_docs_to_edocs (docs_id,doc_id) VALUES ('".$docs_id."','".$doc_id."');";
+                                
+                    if ($this->query($sql)) 
+                    {
+                        if ($project_language == 'English') 
+                        {
+                            // ENGLISH
+                            $context_msg_insert = "{$lang['docs_22']} {$lang['docs_08']}";
+                        } 
+                        else 
+                        {
+                            // NON-ENGLISH
+                            $context_msg_insert = ucfirst($lang['docs_22'])." {$lang['docs_08']}";
+                        }
+
+                        // Logging
+                        REDCap::logEvent("Custom Template Engine - Uploaded document to file repository", "Successfully uploaded $filename");
+                        $context_msg = str_replace('{fetched}', '', $context_msg_insert);
+                        $database_success = TRUE;
+                    } 
+                    else 
+                    {
+                        /* if this failed, we need to roll back redcap_edocs_metadata and redcap_docs */
+                        $this->query("DELETE FROM redcap_edocs_metadata WHERE doc_id='".$doc_id."';");
+                        $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
+                        $this->deleteRepositoryFile($stored_name);
+                    }
+                } 
+                else
+                {
+                    /* if we failed here, we need to roll back redcap_docs */
+                    $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
+                    $this->deleteRepositoryFile($stored_name);
+                }
+            }
+            else 
+            {
+                /* if we failed here, we need to delete the file */
+                $this->deleteRepositoryFile($stored_name);
+            }            
+        }
+
+        if ($database_success === FALSE) 
+        {
+            $context_msg = "<b>{$lang['global_01']}{$lang['colon']} {$lang['docs_47']}</b><br>" . $lang['docs_65'] . ' ' . maxUploadSizeFileRespository().'MB'.$lang['period'];
+                            
+            if ($super_user) 
+            {
+                $context_msg .= '<br><br>' . $lang['system_config_69'];
+            }
+
+            return $context_msg;
+        }
+
+        return true;
+    }
+
+    /**
+     * Formats a report to give to DOMPdf, with appropriate CSS
+     * and scripts to add page numbers/timestamps, at the bottom of the page.
+     * 
+     * @param String $header    Header contents of report
+     * @param String $footer    Footer contents of report
+     * @param String $main      Main content of report
+     * @since 3.0
+     * @return String   PDF contents
+     */
+    private function formatPDFContents($header = "", $footer = "", $main)
+    {
+        if (isset($main) && !empty($main))
+        {
+            $doc = new DOMDocument();
+            $doc->loadHtml("
+                <!DOCTYPE html>
+                <html>
+                    <head>
+                        <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
+                    </head>
+                    <body>
+                        <header>$header</header>
+                        <footer>$footer</footer>
+                        <main>$main</main>
+                        <script type='text/php'>
+                            // Add page number and timestamp to every page
+                            if (isset(\$pdf)) { 
+                                \$pdf->page_script('
+                                    \$font = \$fontMetrics->get_font(\"Arial, Helvetica, sans-serif\", \"normal\");
+                                    \$size = 12;
+                                    \$pageNum = \"Page \" . \$PAGE_NUM . \" of \" . \$PAGE_COUNT;
+                                    \$y = 750;
+                                    \$pdf->text(520, \$y, \$pageNum, \$font, \$size);
+                                    \$pdf->text(36, \$y, date(\"Y-m-d H:i:s\", time()), \$font, \$size);
+                                ');
+                            }
+                        </script>
+                    </body>
+                </html>
+            ");
+
+            // DOMPdf renders what's passed in, and if default font-size is used then
+            // the editor will use what's in app.css. Set the general CSS to be 12px.
+            // Any styling done by the user should appear as inline styling, which should
+            // override this.
+            if (!empty($header) && !empty($footer))
+            {
+                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 25px; } header { position: fixed; left: 0px; top: -100px; } footer { position: fixed; left: 0px; bottom:0px; } @page { margin: 130px 50px; }");
+            }
+            else if (!empty($header))
+            {
+                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 15px; } header { position: fixed; left: 0px; top: -100px; } @page { margin: 130px 50px 50px 50px; }");
+            }
+            else if (!empty($footer))
+            {
+                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 15px; } footer { position: fixed; left: 0px; bottom: 0px; } @page { margin: 50px 50px 130px 50px; }");
+            }
+            else
+            {
+                $style = $doc->createElement("style", "body, body > table { font-size: 12px;} @page { margin: 50px 50px; }");
+            }   
+            
+            $doc->appendChild($style);
+        
+            return $doc->saveHTML();
+        }
+
+        return "";
+    }
+
+    /**
      * Uploads images from file browser object to server.
      * 
      * Uploades images from file browser object to server, after performing 
@@ -1185,8 +1381,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * 
      * Code to save file to the File Repository was taken from redcap version/FileRepository/index.php.
      * 
-     * @see CustomTemplateEngine::deleteRepositoryFile() For deleting a file from the repository, if metadata failed to create.
-     * @since 2.2
+     * @since 3.0
      */
     public function downloadTemplate()
     {
@@ -1199,62 +1394,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
         if (isset($main) && !empty($main))
         {
-            $doc = new DOMDocument();
-            $doc->loadHtml("
-                <!DOCTYPE html>
-                <html>
-                    <head>
-                        <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
-                    </head>
-                    <body>
-                        <header>$header</header>
-                        <footer>$footer</footer>
-                        <main>$main</main>
-                        <script type='text/php'>
-                            // Add page number and timestamp to every page
-                            if (isset(\$pdf)) { 
-                                \$pdf->page_script('
-                                    \$font = \$fontMetrics->get_font(\"Arial, Helvetica, sans-serif\", \"normal\");
-                                    \$size = 12;
-                                    \$pageNum = \"Page \" . \$PAGE_NUM . \" of \" . \$PAGE_COUNT;
-                                    \$y = 750;
-                                    \$pdf->text(520, \$y, \$pageNum, \$font, \$size);
-                                    \$pdf->text(36, \$y, date(\"Y-m-d H:i:s\", time()), \$font, \$size);
-                                ');
-                            }
-                        </script>
-                    </body>
-                </html>
-            ");
-
-            // DOMPdf renders what's passed in, and if default font-size is used then
-            // the editor will use what's in app.css. Set the general CSS to be 12px.
-            // Any styling done by the user should appear as inline styling, which should
-            // override this.
-            if (!empty($header) && !empty($footer))
-            {
-                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 25px; } header { position: fixed; left: 0px; top: -100px; } footer { position: fixed; left: 0px; bottom:0px; } @page { margin: 130px 50px; }");
-            }
-            else if (!empty($header))
-            {
-                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 15px; } header { position: fixed; left: 0px; top: -100px; } @page { margin: 130px 50px 50px 50px; }");
-            }
-            else if (!empty($footer))
-            {
-                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 15px; } footer { position: fixed; left: 0px; bottom: 0px; } @page { margin: 50px 50px 130px 50px; }");
-            }
-            else
-            {
-                $style = $doc->createElement("style", "body, body > table { font-size: 12px;} @page { margin: 50px 50px; }");
-            }   
-            
-            $doc->appendChild($style);
+            $contents = $this->formatPDFContents($header, $footer, $main);
 
             // Add page numbers to the footer of every page
             $dompdf = new Dompdf();
             $dompdf->set_option("isHtml5ParserEnabled", true);
             $dompdf->set_option("isPhpEnabled", true);
-            $dompdf->loadHtml($doc->saveHtml());
+            $dompdf->loadHtml($contents);
 
             // Setup the paper size and orientation
             $dompdf->setPaper("letter", "portrait");
@@ -1266,98 +1412,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
             if (!$this->getProjectSetting("save-report-to-repo"))
             {
-                // Stolen code from redcap version/FileRepository/index.php with several modifications
-                // Upload the compiled report to the File Repository
-                $database_success = FALSE;
-                $upload_success = FALSE;
-                $errors = array();
-
-                $dummy_file_name = $filename;
-                $dummy_file_name = preg_replace("/[^a-zA-Z-._0-9]/","_",$dummy_file_name);
-                $dummy_file_name = str_replace("__","_",$dummy_file_name);
-                $dummy_file_name = str_replace("__","_",$dummy_file_name);
-                
-                $file_extension = "pdf";
-                $stored_name = date('YmdHis') . "_pid" . $this->pid . "_" . generateRandomHash(6) . ".pdf";
-
-                $upload_success = file_put_contents(EDOC_PATH . $stored_name, $filled_template_pdf_content);
-
-                if ($upload_success !== FALSE) 
+                $saved = $this->saveToFileRepository($filename, $filled_template_pdf_content, "pdf");
+                if ($saved !== true)
                 {
-                    $dummy_file_size = $upload_success;
-                    $dummy_file_type = "application/pdf";
-                    
-                    $file_repo_name = date("Y/m/d H:i:s");
-
-                    $sql = "INSERT INTO redcap_docs (project_id,docs_date,docs_name,docs_size,docs_type,docs_comment,docs_rights)
-                            VALUES ($this->pid,CURRENT_DATE,'$dummy_file_name.pdf','$dummy_file_size','$dummy_file_type',
-                            \"$file_repo_name - $filename ($this->userid)\",NULL)";
-                                    
-                    if ($this->query($sql)) 
-                    {
-                        $docs_id = db_insert_id();
-
-                        $sql = "INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date)
-                                VALUES('".$stored_name."','".$dummy_file_type."','".$dummy_file_name."','".$dummy_file_size."',
-                                '".$file_extension."','".$this->pid."','".date('Y-m-d H:i:s')."');";
-                                    
-                        if ($this->query($sql)) 
-                        {
-                            $doc_id = db_insert_id();
-                            $sql = "INSERT INTO redcap_docs_to_edocs (docs_id,doc_id) VALUES ('".$docs_id."','".$doc_id."');";
-                                        
-                            if ($this->query($sql)) 
-                            {
-                                if ($project_language == 'English') 
-                                {
-                                    // ENGLISH
-                                    $context_msg_insert = "{$lang['docs_22']} {$lang['docs_08']}";
-                                } 
-                                else 
-                                {
-                                    // NON-ENGLISH
-                                    $context_msg_insert = ucfirst($lang['docs_22'])." {$lang['docs_08']}";
-                                }
-
-                                // Logging
-                                REDCap::logEvent("Custom Template Engine - Uploaded document to file repository", "Successfully uploaded $filename");
-                                $context_msg = str_replace('{fetched}', '', $context_msg_insert);
-                                $database_success = TRUE;
-                            } 
-                            else 
-                            {
-                                /* if this failed, we need to roll back redcap_edocs_metadata and redcap_docs */
-                                $this->query("DELETE FROM redcap_edocs_metadata WHERE doc_id='".$doc_id."';");
-                                $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
-                                $this->deleteRepositoryFile($stored_name);
-                            }
-                        } 
-                        else
-                        {
-                            /* if we failed here, we need to roll back redcap_docs */
-                            $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
-                            $this->deleteRepositoryFile($stored_name);
-                        }
-                    }
-                    else 
-                    {
-                        /* if we failed here, we need to delete the file */
-                        $this->deleteRepositoryFile($stored_name);
-                    }            
-                }
-
-                if ($database_success === FALSE) 
-                {
-                    $context_msg = "<b>{$lang['global_01']}{$lang['colon']} {$lang['docs_47']}</b><br>" . $lang['docs_65'] . ' ' . maxUploadSizeFileRespository().'MB'.$lang['period'];
-                                    
-                    if ($super_user) 
-                    {
-                        $context_msg .= '<br><br>' . $lang['system_config_69'];
-                    }
-
                     $HtmlPage = new HtmlPage();
                     $HtmlPage->PrintHeaderExt();
-                    print "<div class='red'>" . $context_msg . "</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>";
+                    print "<div class='red'>" . $saved . "</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>";
                     $HtmlPage->PrintFooterExt();
                 }
             }
@@ -1406,6 +1466,116 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
+     * Fills multiple reports, saves them to the File Repository, & downloads them.
+     * 
+     * @since 3.0
+     */
+    public function batchFillReports()
+    {
+        $errors = array();
+
+        $records = $_POST["participantID"];
+        $template_filename = $_POST['template'];
+        $template = new Template($this->templates_dir, $this->compiled_dir);
+
+        $zip_name = "{$this->temp_dir}reports.zip";
+        $z = new ZipArchive();
+        
+        if ($z->open($zip_name, ZIPARCHIVE::CREATE) !== true)
+        {
+            $errors[] = "<p>ERROR</p> Could not create ZIP file";
+        }
+        else
+        {
+            try
+            {
+                foreach($records as $record)
+                {
+                    $filename = basename($template_filename, "_$this->pid.html") . "_$record";
+                    $filled_template = $template->fillTemplate($template_filename, $record);
+
+                    $doc = new DOMDocument();
+                    $doc->loadHTML($filled_template);
+
+                    $header = $doc->getElementsByTagName("header")->item(0);
+                    $footer = $doc->getElementsByTagName("footer")->item(0);
+                    $main = $doc->getElementsByTagName("main")->item(0);
+                    
+                    $header = empty($header) ? "" : $doc->saveHTML($header);
+                    $footer = empty($footer)? "" : $doc->saveHTML($footer);
+                    $main = $doc->saveHTML($main);
+                
+                    $contents = $this->formatPDFContents($header, $footer, $main);
+
+                    if (!empty($contents))
+                    {
+                        $dompdf = new Dompdf();
+                        $dompdf->set_option("isHtml5ParserEnabled", true);
+                        $dompdf->set_option("isPhpEnabled", true);
+                        $dompdf->loadHtml($contents);
+
+                        // Setup the paper size and orientation
+                        $dompdf->setPaper("letter", "portrait");
+                        // Render the HTML as PDF
+                        $dompdf->render();
+                        $filled_template_pdf_content = $dompdf->output();
+
+                        // Add PDF to ZIP
+                        if ($z->addFromString("reports/$filename.pdf", $filled_template_pdf_content) !== true)
+                        {
+                            $errors[] = "<p>ERROR</p> Could not add $filename to the ZIP";
+                            break;
+                        }
+                    }
+                }
+
+                if ($z->close() !== true)
+                {
+                    $errors[] = "<p>ERROR</p> Could not close ZIP file";
+                }
+                else if (!$this->getProjectSetting("save-report-to-repo"))
+                {
+                    $saved = $this->saveToFileRepository("reports", file_get_contents($zip_name), "zip");
+                    if ($saved !== true)
+                    {
+                        $errors[] = $saved;
+                    }
+                }
+            }
+            catch (Exception $e)
+            {
+                $errors[] = "<b>ERROR</b> [" . $e->getCode() . "] LINE [" . $e->getLine() . "] FILE [" . $e->getFile() . "] " . str_replace("Undefined index", "Field name does not exist", $e->getMessage());
+            }
+        }
+
+        /**
+         * Download the ZIP if there are no errors
+         */
+        if (!empty($errors))
+        {
+            $HtmlPage = new HtmlPage();
+            $HtmlPage->PrintHeaderExt();
+            print "<p>Received the following errors, please contact your REDCap administrator</p>";
+            print "<div class='red'>";
+            foreach($errors as $error)
+            {
+                print "<p>$error</p>";
+            }
+            print "</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>";
+            $HtmlPage->PrintFooterExt();
+        }
+        else
+        {
+            header('Content-Description: File Transfer');
+            header('Content-Type: application/zip');
+            header('Content-Disposition: attachment; filename="'.basename($zip_name).'"');
+            header('Content-length: '.filesize($zip_name));
+            readfile($zip_name);
+        }
+        unlink($zip_name);
+    }   
+
+    /**
      * Fills a template with REDCap record data, and displays in 
      * editors for customization, before download.
      * 
@@ -1425,7 +1595,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             exit("<div class='red'>You don't have premission to view this page</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
         }
         
-        $record = $_POST["participantID"];
+        $record = $_POST["participantID"][0];
         
         if (empty($record))
         {
@@ -1962,6 +2132,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             }
         }
         ?>
+        <!-- boostrap-select files -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.9/dist/css/bootstrap-select.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.9/dist/js/bootstrap-select.min.js"></script>
+        <!-- Module CSS -->
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
         <div class="container"> 
             <div class="jumbotron">
@@ -2020,12 +2194,19 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 </tr>
                                 <tr>
                                     <td style="width:25%;">
-                                        Choose an existing Record ID
+                                        Choose up to 10 records
                                     </td>
                                     <td class="data">
                                         <?php if (sizeof($participant_options) > 0):?>
-                                            <input id="participantIDs" class="form-control" style="width:initial;" required>
-                                            <input name="participantID" id="participantID-value" type="hidden">
+                                            <select id="participantIDs" name="participantID[]" class="form-control selectpicker" style="background-color:white" data-live-search="true" data-max-options="10" multiple required>
+                                            <?php 
+                                                foreach($participant_options as $id => $option)
+                                                {
+                                                    print "<option value='$id'>$option</option>";
+                                                }
+                                            ?>
+                                            </select>
+                                            <p><i style="color:red">If you have more than 1 record, you are unable to preview the report before it downloads.</i></p>
                                         <?php else:?>
                                             <span>No Existing Records</span>        
                                         <?php endif;?>
@@ -2035,7 +2216,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     <td style="width:25%;">Choose Template</td>
                                     <td class="data">
                                         <?php if (sizeof($valid_templates) > 0):?>
-                                            <select name="template" class="form-control" style="width:initial;">
+                                            <select name="template" class="form-control">
                                                 <?php
                                                     foreach($valid_templates as $template)
                                                     {
@@ -2139,32 +2320,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             </div>
         </div>
         <script>
-            var options = [
-                <?php 
-                    foreach($participant_options as $id => $option)
-                    {
-                        print "{label: \"" . addslashes($option) ."\", id: '$id'},";
-                    }
-                ?>
-            ]
-
             $(function() {
-                $("#participantIDs" ).autocomplete({
-                    minLength: 0,
-                    source: options,
-                    change: function(event, ui) {
-                        if (ui.item)
-                        {
-                            $("#participantID-value").val(ui.item.id);
-                        }
-                        else
-                        {
-                            $("#participantID-value").val($('#participantIDs').val());
-                        }
-                    }
-                }).focus(function () {
-                    $(this).autocomplete("search", "");
-                })
                 $("#toDelete").text($("#deleteTemplateDropdown").val());
                 $("#templateToDelete").val($("#deleteTemplateDropdown").val());
                 $("#deleteTemplateDropdown").change(function() {

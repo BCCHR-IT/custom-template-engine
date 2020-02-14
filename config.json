@@ -42,6 +42,13 @@
             "super-users-only": true
         },
         {
+            "key": "temp-folder",
+            "name": "Temporary Files Folder. Use for batch filling reports.",
+            "required": true,
+            "type": "text",
+            "super-users-only": true
+        },
+        {
             "key": "img-folder",
             "name": "Images Folder. Will create the folder if it doesn't exist. **Must be a publically acccessible folder given as a path relative to your REDCap external modules folder i.e '../../images'**",
             "required": true,
