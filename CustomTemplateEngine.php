@@ -153,10 +153,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * Injects Javascript to initialize the CKEditor in the given textarea element, alongside all its plugins,
      * adjusting its height according to the argument passed.
      * 
-     * @since 1.0
-     * @access private
      * @param String $id    The id of the textarea element to replace with the editor.
      * @param Integer $height   The height of the editor in pixels.
+     * @since 1.0
+     * @access private
      */
     private function initializeEditor($id, $height)
     {
@@ -770,6 +770,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * Helper function that deletes a file from the File Repository, if REDCap data about it fails
      * to be inserted to the database.Stolen code from redcap version/FileRepository/index.php.
      * 
+     * @param String $file     Name of file to delete
      * @since 1.0
      * @access private
      */
@@ -794,6 +795,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * Saves a file to REDCap's File Repository. Based off stolen code from redcap version/FileRepository/index.php
      * with several modifications
      * 
+     * @param String $filename         Name of file
+     * @param String $file_contents    Contents of file
+     * @param STring $file_extension   File extension
      * @see CustomTemplateEngine::deleteRepositoryFile() For deleting a file from the repository, if metadata failed to create.
      * @since 3.0
      */
@@ -1435,38 +1439,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
-     * Outputs a PDF of a REDcap instrument to browser.
-     * 
-     * Retrieve POSTED record, instrument, and event (if longitudinal) and pass it to a REDcap
-     * method that builds the PDF.
-     * 
-     * @since 2.2.4
-     */
-    public function downloadInstrumentScale()
-    {
-        $record = $_POST["record"];
-        $attach_instrument = $_POST["attach-instrument"];
-
-        if (REDCap::isLongitudinal())
-        {
-            $attach_event = $_POST["attach-event"];
-            $instrument_pdf_contents = REDCap::getPDF($record, $attach_instrument, $attach_event);
-        }
-        else
-        {
-            $instrument_pdf_contents = REDCap::getPDF($record, $attach_instrument);
-        }
-
-        $filename = "{$attach_instrument}_record_$record.pdf";
-
-        header('Content-Description: File Transfer');
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: attachment; filename="'.basename($filename).'"');
-        print $instrument_pdf_contents;
-    }
-
-    /**
-     * Fills multiple reports, saves them to the File Repository, & downloads them.
+     * Fills multiple reports, saves them to a ZIP, then saves them to the File Repository, 
+     * & outputs them for download.
      * 
      * @since 3.0
      */
@@ -1481,6 +1455,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $zip_name = "{$this->temp_dir}reports.zip";
         $z = new ZipArchive();
         
+        /**
+         * Create ZIP
+         */
         if ($z->open($zip_name, ZIPARCHIVE::CREATE) !== true)
         {
             $errors[] = "<p>ERROR</p> Could not create ZIP file";
@@ -1489,6 +1466,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             try
             {
+                /**
+                 * Fill the template with each record data, then add them to the ZIP
+                 */
                 foreach($records as $record)
                 {
                     $filename = basename($template_filename, "_$this->pid.html") . "_$record";
@@ -1695,7 +1675,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     </table>
                     <div class="row" style="margin-bottom:20px">
                         <div class="col-md-2"><button id="download-pdf" type="submit" class="btn btn-primary">Download PDF</button></div>
-                        <div class="col-md-3"><button id="download-pdf" type="button" class="btn btn-primary" data-toggle="modal" data-target="#downloadInstrumentModal" style="display:none">Download Instrument Data</button></div>
                     </div>
                     <div class="collapsible-container">
                         <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
@@ -1721,112 +1700,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         </textarea>
                     </div>
                 </form>
-                <div class="modal fade" id="downloadInstrumentModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered" role="document">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5>Select Instrument to Download</h5>
-                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                                </button>
-                            </div>
-                            <form action=<?php print $this->getUrl("DownloadInstrument.php");?> method="post">
-                                <div class="modal-body">
-                                    <p><i>An instrument without any data will produce a blank PDF</i></p>
-                                    <select id="attach-instrument" name="attach-instrument" class="form-control attach-select">
-                                            <option value="">--Select Instrument--</option>
-                                            <?php 
-                                                $instruments = REDCap::getInstrumentNames();
-                                                foreach($instruments as $unique_name => $label)
-                                                {
-                                                    print "<option value='$unique_name'>$label</option>";
-                                                }
-                                            ?>
-                                    </select>
-                                    <?php if (REDCap::isLongitudinal()): ?>
-                                        <p style="text-align:center">of</p>
-                                        <select id="attach-event" name="attach-event" class="form-control attach-select">
-                                            <option value="">--Select Event--</option>
-                                        </select>
-                                    <?php endif;?>
-                                    <input name="record" type="hidden" value="<?php print $record; ?>">
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                                    <button type="submit" class="btn btn-primary" id="download-instrument-btn" disabled>Download</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
         <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
         <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
         <?php 
-            $events = REDCap::getEventNames(true);
-            if ($events !== FALSE)
-            {
-                $str = implode(",", array_keys($events));
-                $events_query = "SELECT * FROM redcap_events_forms where event_id in ($str)";
-                $result = $this->query($events_query);
-                while($row = mysqli_fetch_assoc($result))
-                {
-                    $event_forms[$row["form_name"]][] = $row["event_id"];
-                }
-            }
-
-            print "<script> var event_forms = {";
-            foreach($event_forms as $form => $ids)
-            {
-                print "$form:[";
-                foreach($ids as $id)
-                {
-                    print "{name:'" . $events[$id] . "', value:" . $id . "},";
-                }
-                print "],";
-            }
-            print "};
-            CKEDITOR.dtd.\$removeEmpty['p'] = true;
-            $('#attach-instrument').change(function() {
-                var key = $(this).val();
-                $('#attach-event option:gt(0)').remove(); // remove old options
-                $.each(event_forms[key], function(name,value) {
-                    $('#attach-event').append($('<option></option>').attr('value', value.value).text(value.name));
-                });
-            });
-            ";
-            if (REDCap::isLongitudinal())
-            {
-                print "
-                $('.attach-select').change(function() {
-                    if ($('#attach-instrument').val() != '' && $('#attach-event').val() != '')
-                    {
-                        $('#download-instrument-btn').attr('disabled', false);
-                    }
-                    else
-                    {
-                        $('#download-instrument-btn').attr('disabled', true);
-                    }
-                })
-                ";
-            }
-            else
-            {
-                print "
-                $('.attach-select').change(function() {
-                    if ($('#attach-instrument').val() != '')
-                    {
-                        $('#download-instrument-btn').attr('disabled', false);
-                    }
-                    else
-                    {
-                        $('#download-instrument-btn').attr('disabled', true);
-                    }
-                })
-                ";
-            }
-            print "</script>";
+            print "<script>CKEDITOR.dtd.\$removeEmpty['p'] = true;</script>";
             $this->initializeEditor("header-editor", 200);
             $this->initializeEditor("footer-editor", 200);
             $this->initializeEditor("editor", 1000);
@@ -2183,7 +2062,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <?php endif; ?>
                 <br/>
                 <div class="container syntax-rule">
-                    <p><i>Select the record and template you wish to fill. Only valid templates will be accessible. Invalid templates must be edited before they can run.</i></p>
+                    <p><i>Select the record(s) and template you wish to fill. Only valid templates will be accessible. Invalid templates must be edited before they can run.</i></p>
                     <form action=<?php print $this->getUrl("FillTemplate.php"); ?> method="post">
                         <table class="table" style="width:100%;">
                             <tbody>
