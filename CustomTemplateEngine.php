@@ -1187,7 +1187,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * Performs validation on the template contents, and saves regardless. If there's
      * any validation errors then the template is saved on server as '<template name>_<pid> - INVALID.html'.
      * 
-     * @since 2.9.3
+     * @since 3.0
      * @return Array An array containing any validation errors, and the template's body, header, and footer contents.
      * @return Boolean If the template passed validation, then return TRUE.
      */
@@ -1556,7 +1556,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * 
      * @see Template::fillTemplate() For filling template with REDCap record data.
      * @see CustomReporBuilder::initializeEditor() For initializing editors on page.
-     * @since 2.2.4
+     * @since 3.0
      */
     public function generateFillTemplatePage()
     {   
@@ -1713,7 +1713,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * @see CustomTemplateEngine::checkPermissions() For checking if the user has permissions to view the page.
      * @see CustomTemplateEngine::generateInstructions() For generating instructions on page.
      * @param Array $info   Array containing validation errors, and the template's contents.
-     * @since 2.9.3
+     * @since 3.0
      */
     public function generateEditTemplatePage()
     {
@@ -2039,7 +2039,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * edited or deleted.
      * 
      * @see CustomTemplateEngine::createModuleFolders() For initializing module folders.
-     * @since 2.7
+     * @since 3.0
      */
     public function generateIndexPage()
     {
