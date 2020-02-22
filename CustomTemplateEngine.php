@@ -1357,22 +1357,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $errors["otherErrors"] = $other_errors;
         }
         
-        if (!empty($errors))
-        {
-            return array(
-                "action" => $action,
-                "errors" => $errors,
-                "main" => $data,
-                "header" => $header,
-                "footer" => $footer,
-                "templateName" => $filename,
-                "currTemplateName" => $currTemplateName
-            );
-        }
-        else
-        {
-            return TRUE;
-        }
+        return array(
+            "errors" => $errors,
+            "redirect" => $this->getUrl("index.php") . "&created=1",
+            "currTemplateName" => $currTemplateName
+        );
     }
 
     /**
@@ -1548,11 +1537,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             header('Content-Description: File Transfer');
             header('Content-Type: application/zip');
+            setCookie("fileDownloadToken", $_POST["download_token_value"], time() + 30, $this->getUrl("index.php"));
             header('Content-Disposition: attachment; filename="'.basename($zip_name).'"');
             header('Content-length: '.filesize($zip_name));
             readfile($zip_name);
         }
         unlink($zip_name);
+        exit;
     }   
 
     /**
@@ -1724,107 +1715,56 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * @param Array $info   Array containing validation errors, and the template's contents.
      * @since 2.9.3
      */
-    public function generateEditTemplatePage($info = NULL)
+    public function generateEditTemplatePage()
     {
         $this->checkPermissions();
-        if (!empty($info))
-        {
-            $errors = $info["errors"];
-            $header_data = $info["header"];
-            $footer_data = $info["footer"];
-            $main_data = $info["main"];
-            $template_name = $info["templateName"];
-            $curr_template_name = $info["currTemplateName"];
-            $action = $info["action"];
-        }
-        else
-        {
-            $template_name = $curr_template_name = $_POST["template"];
-            $template = file_get_contents($this->templates_dir . $template_name);
+        $template_name = $curr_template_name = $_POST["template"];
+        $template = file_get_contents($this->templates_dir . $template_name);
 
-            $doc = new DOMDocument();
-            $doc->loadHTML($template);
+        $doc = new DOMDocument();
+        $doc->loadHTML($template);
 
-            $header = $doc->getElementsByTagName("header")->item(0);
-            $footer = $doc->getElementsByTagName("footer")->item(0);
-            $main = $doc->getElementsByTagName("main")->item(0);
+        $header = $doc->getElementsByTagName("header")->item(0);
+        $footer = $doc->getElementsByTagName("footer")->item(0);
+        $main = $doc->getElementsByTagName("main")->item(0);
 
-            $main_data = $doc->saveHTML($main);
-            $header_data = empty($header) ? "" : $doc->saveHTML($header);
-            $footer_data = empty($footer)? "" : $doc->saveHTML($footer);
-
-            $action = "edit";
-        }
+        $main_data = $doc->saveHTML($main);
+        $header_data = empty($header) ? "" : $doc->saveHTML($header);
+        $footer_data = empty($footer)? "" : $doc->saveHTML($footer);
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
         <div class="container"> 
             <div class="jumbotron">
                 <div class="row">
                     <div class="col-md-10">
-                        <h3><?php print ucfirst($action);?> Template</h3>
+                        <h3>Edit Template</h3>
                     </div>
                     <div class="col-md-2">
                         <a class="btn btn-primary" style="color:white" href="<?php print $this->getUrl("index.php")?>">Back to Front</a>
                     </div>
                 </div>
                 <hr/>
-                <?php if (!empty($info)) :?>
+                <div id="errors-container" style="display:none">
                     <div class="red container">
                         <h4>Template Validation Failed!</h4>
                         <p>Template was saved with the following errors. To discover where the error occured, match the line numbers in the error message to the ones in the Source view...</p>
                         <p><a id="readmore-link" href="#">Click to view errors</a></p>
                         <div id="readmore" style="display:none">
-                            <?php if (sizeof($errors['otherErrors']) > 0): ?>
-                                <p><strong>General Errors...</strong></p>
-                                <div>
-                                <?php
-                                    foreach($errors['otherErrors'] as $error)
-                                    {
-                                        print "<p>$error</p>";
-                                    }
-                                ?>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (sizeof($errors['headerErrors']) > 0): ?>
-                                <p><strong>Header Errors...</strong></p>
-                                <div>
-                                <?php
-                                    foreach($errors['headerErrors'] as $error)
-                                    {
-                                        print "<p>$error</p>";
-                                    }
-                                ?>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (sizeof($errors['footerErrors']) > 0): ?>
-                                <p><strong>Footer Errors...</strong></p>
-                                <div>
-                                <?php
-                                    foreach($errors['footerErrors'] as $error)
-                                    {
-                                        print "<p>$error</p>";
-                                    }
-                                ?>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (sizeof($errors['templateErrors']) > 0): ?>
-                                <p><strong>Body Errors...</strong></p>
-                                <div>
-                                <?php
-                                    foreach($errors['templateErrors'] as $error)
-                                    {
-                                        print "<p>$error</p>";
-                                    }
-                                ?>
-                                </div>
-                            <?php endif; ?>
+                            <p><strong>General Errors...</strong></p>
+                            <div id="general-errors"></div>
+                            <p><strong>Header Errors...</strong></p>
+                            <div id="header-errors"></div>
+                            <p><strong>Footer Errors...</strong></p>
+                            <div id="footer-errors"></div>
+                            <p><strong>Body Errors...</strong></p>
+                            <div id="body-errors"></div>
                         </div>
                     </div>
                     <hr/>
-                <?php endif;?>
+                </div>
                 <?php $this->generateInstructions() ?>
                 <br/><br/>
-                <form action="<?php print $this->getUrl("SaveTemplate.php"); ?>" method="post">
+                <form>
                     <table class="table" style="width:100%;">
                         <tbody>
                             <tr>
@@ -1832,13 +1772,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 <td class="data">
                                     <div class="col-md-5">
                                         <input name="templateName" type="text" class="form-control" value="<?php print str_replace(array("_$this->pid", " - INVALID", ".html"), "", $template_name); ?>" required>
-                                        <input type="hidden" name="action" value="<?php print $action; ?>">
-                                        <input name="currTemplateName" type="hidden" value="<?php print $curr_template_name; ?>">
+                                        <input type="hidden" name="action" value="edit">
+                                        <input id="currTemplateName" name="currTemplateName" type="hidden" value="<?php print $curr_template_name; ?>">
                                     </div>
                                 </td>
                             </tr>
                             <tr>
-                                <td style="width:25%;"><button type="submit" class="btn btn-primary">Save Template</button></td>
+                                <td style="width:25%;"><button id="save-template-btn" type="button" class="btn btn-primary">Save Template</button></td>
                             </tr>
                         </tbody>
                     </table>
@@ -1846,7 +1786,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                         <div class="collapsible-content"> 
                             <p>Anything in the header will appear at the top of every page in the template. All syntax rules apply. <strong>If the header content is too big, it will overlap template data in the PDF.</strong></p>
-                            <textarea cols="80" id="header-editor" name="header-editor" rows="10">
+                            <textarea cols="80" id="headerEditor" name="header-editor" rows="10">
                                 <?php print $header_data; ?>
                             </textarea>
                         </div>
@@ -1855,7 +1795,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         <button type="button" class="collapsible">Add Footer **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                         <div class="collapsible-content">
                             <p>Anything in the footer will appear at the bottom of every page in the template. All syntax rules apply. <strong>If the footer content is too big, it will cutoff in the PDF.</strong></p>
-                            <textarea cols="80" id="footer-editor" name="footer-editor" rows="10">
+                            <textarea cols="80" id="footerEditor" name="footer-editor" rows="10">
                                 <?php print $footer_data; ?>
                             </textarea>
                         </div>
@@ -1870,9 +1810,70 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         </div>
         <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
         <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
+        <script>
+            $("#save-template-btn").click(function () {
+                // Updates the textare elements that CKEDITOR replaces
+                CKEDITOR.instances.headerEditor.updateElement();
+                CKEDITOR.instances.footerEditor.updateElement();
+                CKEDITOR.instances.editor.updateElement();
+
+                $.ajax({
+                    url: "<?php print $this->getUrl("SaveTemplate.php"); ?>",
+                    method: "POST",
+                    data: $('form').serialize(),
+                    success: function(data) {
+                        var json = JSON.parse(data);
+                        if (json.errors)
+                        {
+                            var toAppend;
+
+                            if (json.errors.otherErrors) {
+                                json.errors.otherErrors.forEach(function(item) {
+                                    toAppend += "<p>" + item + "</p>";
+                                })
+                                $("#general-errors").empty().append(toAppend);
+                            }
+
+                            if (json.errors.headerErrors) {
+                                toAppend = "";
+                                json.errors.headerErrors.forEach(function(item) {
+                                    toAppend += "<p>" + item + "</p>";
+                                })
+                                $("#header-errors").empty().append(toAppend);
+                            }
+
+                            if (json.errors.footerErrors) {
+                                toAppend = "";
+                                json.errors.footerErrors.forEach(function(item) {
+                                    toAppend += "<p>" + item + "</p>";
+                                })
+                                $("#footer-errors").empty().append(toAppend);
+                            }
+                            
+                            if (json.errors.templateErrors) {
+                                toAppend = "";
+                                json.errors.templateErrors.forEach(function(item) {
+                                    toAppend += "<p>" + item + "</p>";
+                                })
+                                $("#body-errors").empty().append(toAppend);
+                            }
+
+                            $("#currTemplateName").val(json.currTemplateName);
+                            $("#errors-container").show();
+                            window.scroll(0,0); // Errors are at top of page
+                        }
+                        else
+                        {
+                            // Go to homepage
+                            window.location.href = json.redirect;
+                        }
+                    }
+                })
+            });
+        </script>
         <?php
-        $this->initializeEditor("header-editor", 200);
-        $this->initializeEditor("footer-editor", 200);
+        $this->initializeEditor("headerEditor", 200);
+        $this->initializeEditor("footerEditor", 200);
         $this->initializeEditor("editor", 1000);
     }
 
@@ -1900,9 +1901,27 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     </div>
                 </div>
                 <hr/>
+                <div id="errors-container" style="display:none">
+                    <div class="red container">
+                        <h4>Template Validation Failed!</h4>
+                        <p>Template was saved with the following errors. To discover where the error occured, match the line numbers in the error message to the ones in the Source view...</p>
+                        <p><a id="readmore-link" href="#">Click to view errors</a></p>
+                        <div id="readmore" style="display:none">
+                            <p><strong>General Errors...</strong></p>
+                            <div id="general-errors"></div>
+                            <p><strong>Header Errors...</strong></p>
+                            <div id="header-errors"></div>
+                            <p><strong>Footer Errors...</strong></p>
+                            <div id="footer-errors"></div>
+                            <p><strong>Body Errors...</strong></p>
+                            <div id="body-errors"></div>
+                        </div>
+                    </div>
+                    <hr/>
+                </div>
                 <?php $this->generateInstructions() ?>
                 <br/><br/>
-                <form action="<?php print $this->getUrl("SaveTemplate.php"); ?>" method="post">
+                <form>
                     <table class="table" style="width:100%;">
                         <tbody>
                             <tr>
@@ -1910,12 +1929,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 <td class="data">
                                     <div class="col-md-5">
                                         <input name="templateName" type="text" class="form-control" required>
-                                        <input type="hidden" name="action" value="create">
+                                        <input id="action" type="hidden" name="action" value="create">
+                                        <input id="currTemplateName" name="currTemplateName" type="hidden" value="">
                                     </div>
                                 </td>
                             </tr>
                             <tr>
-                                <td style="width:25%;"><button type="submit" class="btn btn-primary">Save Template</button></td>
+                                <td style="width:25%;"><button id="save-template-btn" type="button" class="btn btn-primary">Save Template</button></td>
                             </tr>
                         </tbody>
                     </table>
@@ -1923,14 +1943,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                         <div class="collapsible-content"> 
                             <p>Anything in the header will appear at the top of every page in the template. All syntax rules apply. <strong>If the header content is too big, it will overlap template data in the PDF.</strong></p>
-                            <textarea cols="80" id="header-editor" name="header-editor" rows="10"></textarea>
+                            <textarea cols="80" id="headerEditor" name="header-editor" rows="10"></textarea>
                         </div>
                     </div>
                     <div class="collapsible-container">
                         <button type="button" class="collapsible">Add Footer **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                         <div class="collapsible-content">
                             <p>Anything in the footer will appear at the bottom of every page in the template. All syntax rules apply. <strong>If the footer content is too big, it will cutoff in the PDF.</strong></p>
-                            <textarea cols="80" id="footer-editor" name="footer-editor" rows="10"></textarea>
+                            <textarea cols="80" id="footerEditor" name="footer-editor" rows="10"></textarea>
                         </div>
                     </div>
                     <div style="margin-top:20px">
@@ -1942,9 +1962,71 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         </div>
         <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
         <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
+        <script>
+            $("#save-template-btn").click(function () {
+                // Updates the textare elements that CKEDITOR replaces
+                CKEDITOR.instances.headerEditor.updateElement();
+                CKEDITOR.instances.footerEditor.updateElement();
+                CKEDITOR.instances.editor.updateElement();
+
+                $.ajax({
+                    url: "<?php print $this->getUrl("SaveTemplate.php"); ?>",
+                    method: "POST",
+                    data: $('form').serialize(),
+                    success: function(data) {
+                        var json = JSON.parse(data);
+                        if (json.errors)
+                        {
+                            var toAppend;
+
+                            if (json.errors.otherErrors) {
+                                json.errors.otherErrors.forEach(function(item) {
+                                    toAppend += "<p>" + item + "</p>";
+                                })
+                                $("#general-errors").empty().append(toAppend);
+                            }
+
+                            if (json.errors.headerErrors) {
+                                toAppend = "";
+                                json.errors.headerErrors.forEach(function(item) {
+                                    toAppend += "<p>" + item + "</p>";
+                                })
+                                $("#header-errors").empty().append(toAppend);
+                            }
+
+                            if (json.errors.footerErrors) {
+                                toAppend = "";
+                                json.errors.footerErrors.forEach(function(item) {
+                                    toAppend += "<p>" + item + "</p>";
+                                })
+                                $("#footer-errors").empty().append(toAppend);
+                            }
+                            
+                            if (json.errors.templateErrors) {
+                                toAppend = "";
+                                json.errors.templateErrors.forEach(function(item) {
+                                    toAppend += "<p>" + item + "</p>";
+                                })
+                                $("#body-errors").empty().append(toAppend);
+                            }
+
+                            $("#currTemplateName").val(json.currTemplateName);
+                            $("#action").val("edit");
+                            $("#errors-container").show();
+                            window.scroll(0,0); // Errors are at top of page
+                        }
+                        else
+                        {
+                            // Go to homepage
+                            window.location.href = json.redirect;
+                        }
+                    }
+                })
+            });
+        </script>
         <?php
-        $this->initializeEditor("header-editor", 200);
-        $this->initializeEditor("footer-editor", 200);
+        $this->initializeEditor("headerEditor", 200);
+        $this->initializeEditor("footerEditor", 200);
         $this->initializeEditor("editor", 1000);
     }
 
@@ -2014,6 +2096,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         <!-- boostrap-select files -->
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.9/dist/css/bootstrap-select.min.css">
         <script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.9/dist/js/bootstrap-select.min.js"></script>
+        <!-- jquery-cookie-->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
         <!-- Module CSS -->
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
         <div class="container"> 
@@ -2063,7 +2147,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <br/>
                 <div class="container syntax-rule">
                     <p><i>Select the record(s) and template you wish to fill. Only valid templates will be accessible. Invalid templates must be edited before they can run.</i></p>
-                    <form action=<?php print $this->getUrl("FillTemplate.php"); ?> method="post">
+                    <form id="fill-template-form" action="<?php print $this->getUrl("FillTemplate.php");?>" method="post">
                         <table class="table" style="width:100%;">
                             <tbody>
                                 <tr>
@@ -2085,7 +2169,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                                 }
                                             ?>
                                             </select>
-                                            <p><i style="color:red">If you select than 1 record, you are unable to preview the report before it downloads.</i></p>
+                                            <p><i style="color:red">If you select more than 1 record, you are unable to preview the report before it downloads.</i></p>
                                             <p><i style="color:red">Large templates may take several seconds, when batch filling.</i></p>
                                         <?php else:?>
                                             <span>No Existing Records</span>        
@@ -2111,12 +2195,18 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 </tr>
                             </tbody>
                         </table>
-                        <?php if (sizeof($valid_templates) > 0 && sizeof($participant_options) > 0):?>
-                            <button type="submit" class="btn btn-primary">Fill Template</button>
-                        <?php else:?>
-                            <button type="submit" class="btn btn-primary" disabled>Fill Template</button>
-                            <span><i style="color:red"> **At least one record and one template must exist</i></span>
-                        <?php endif;?>
+                        <input type="hidden" name="download_token_value" id="download_token_value_id"/>
+                        <div class="row">
+                            <?php if (sizeof($valid_templates) > 0 && sizeof($participant_options) > 0):?>
+                                <div class="col-md-3"><button id="fill-template-btn" type="submit" class="btn btn-primary">Fill Template</button></div>
+                            <?php else:?>
+                                <div class="col-md-6">
+                                    <button id="fill-template-btn" type="submit" class="btn btn-primary" disabled>Fill Template</button>
+                                    <span><i style="color:red"> **At least one record and one template must exist</i></span>
+                                </div>
+                            <?php endif;?>
+                            <div id="progressBar" class="col"></div>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -2200,13 +2290,48 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             </div>
         </div>
         <script>
-            $(function() {
-                $("#toDelete").text($("#deleteTemplateDropdown").val());
-                $("#templateToDelete").val($("#deleteTemplateDropdown").val());
-                $("#deleteTemplateDropdown").change(function() {
-                    $("#toDelete").text($(this).val());
-                    $("#templateToDelete").val($(this).val());
-                });
+            $("#toDelete").text($("#deleteTemplateDropdown").val());
+            $("#templateToDelete").val($("#deleteTemplateDropdown").val());
+            $("#deleteTemplateDropdown").change(function() {
+                $("#toDelete").text($(this).val());
+                $("#templateToDelete").val($(this).val());
+            });
+
+            $("#participantIDs").change(function () {
+                if ($(this).val().length > 1)
+                {
+                    $("#fill-template-btn").text("Download Reports");
+                }
+                else
+                {
+                    $("#fill-template-btn").text("Fill Template");
+                }
+            })
+
+            var fileDownloadCheckTimer;
+            $('#fill-template-form').submit(function () {
+                if ($("#participantIDs").val().length > 1)
+                {
+                    $("#fill-template-btn").prop("disabled", true);
+                    $("#progressBar").progressbar({value: false});
+
+                    var token = new Date().getTime();
+                    $('#download_token_value_id').val(token);
+
+                    fileDownloadCheckTimer = window.setInterval(function () {
+                        var cookieValue = $.cookie('fileDownloadToken');
+                        if (cookieValue == token)
+                        {
+                            window.clearInterval(fileDownloadCheckTimer);
+                            $.removeCookie('fileDownloadToken');
+                            $("#fill-template-btn").prop("disabled", false);
+                            $("#progressBar").progressbar("destroy");
+                            $("#participantIDs").val("default");
+                            $("#participantIDs").selectpicker("refresh");
+                            $("#fill-template-btn").text("Fill Template");
+                        }
+                    }, 1000)
+                }
             });
         </script>
         <?php
