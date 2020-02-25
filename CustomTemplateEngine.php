@@ -1537,7 +1537,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             header('Content-Description: File Transfer');
             header('Content-Type: application/zip');
-            setCookie("fileDownloadToken", $_POST["download_token_value"], time() + 30, $this->getUrl("index.php"));
+            setCookie("fileDownloadToken", $_POST["download_token_value"], time() + 60, "", $_SERVER["SERVER_NAME"]); // Cannot specify path due to issue in IE that prevents cookie from being read. Default sets path as current directory.
             header('Content-Disposition: attachment; filename="'.basename($zip_name).'"');
             header('Content-length: '.filesize($zip_name));
             readfile($zip_name);
@@ -1982,8 +1982,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         <!-- boostrap-select files -->
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.9/dist/css/bootstrap-select.min.css">
         <script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.9/dist/js/bootstrap-select.min.js"></script>
-        <!-- jquery-cookie-->
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
+        <!-- js-cookie-->
+        <script src="https://cdn.jsdelivr.net/npm/js-cookie@2/src/js.cookie.min.js"></script>
         <!-- Module CSS -->
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
         <div class="container"> 
@@ -2043,11 +2043,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 </tr>
                                 <tr>
                                     <td style="width:25%;">
-                                        Choose up to 10 records
+                                        Choose up to 20 records
                                     </td>
                                     <td class="data">
                                         <?php if (sizeof($participant_options) > 0):?>
-                                            <select id="participantIDs" name="participantID[]" class="form-control selectpicker" style="background-color:white" data-live-search="true" data-max-options="10" multiple required>
+                                            <select id="participantIDs" name="participantID[]" class="form-control selectpicker" style="background-color:white" data-live-search="true" data-max-options="20" multiple required>
                                             <?php 
                                                 foreach($participant_options as $id => $option)
                                                 {
@@ -2203,13 +2203,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
                     var token = new Date().getTime();
                     $('#download_token_value_id').val(token);
-
+                    
                     fileDownloadCheckTimer = window.setInterval(function () {
-                        var cookieValue = $.cookie('fileDownloadToken');
+                        var cookieValue = Cookies.get('fileDownloadToken');
                         if (cookieValue == token)
                         {
                             window.clearInterval(fileDownloadCheckTimer);
-                            $.removeCookie('fileDownloadToken');
+                            Cookies.remove('fileDownloadToken');
                             $("#fill-template-btn").prop("disabled", false);
                             $("#progressBar").progressbar("destroy");
                             $("#participantIDs").val("default");
