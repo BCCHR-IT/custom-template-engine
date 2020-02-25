@@ -1703,41 +1703,48 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
-     * Generates a page to edit existing templates, or to fix validation errors.
+     * Generates a page to create a template, or edit existing templates.
      * 
-     * If the page is being generated as a result of validation errors, 
-     * then retrieve validation errors, and template contents from the Array given, and display errors at the top of the page. 
-     * Else retrieve template name passed via HTTP Posed, and return template contents are to user in 
-     * editors. Template validation is performed upon saving.
+     * If a template name is given, then the function retrieves the contents of the template
+     * for editing.
+     * Else generate page with empty editors for creation. 
      * 
      * @see CustomTemplateEngine::checkPermissions() For checking if the user has permissions to view the page.
      * @see CustomTemplateEngine::generateInstructions() For generating instructions on page.
-     * @param Array $info   Array containing validation errors, and the template's contents.
+     * @param String $template   An existing template's name
      * @since 3.0
      */
-    public function generateEditTemplatePage()
+    public function generateCreateEditTemplatePage($template = "")
     {
-        $this->checkPermissions();
-        $template_name = $curr_template_name = $_POST["template"];
-        $template = file_get_contents($this->templates_dir . $template_name);
+        if (!empty($template))
+        {
+            $this->checkPermissions();
+            $template_name = $curr_template_name = $template;
+            $template = file_get_contents($this->templates_dir . $template_name);
 
-        $doc = new DOMDocument();
-        $doc->loadHTML($template);
+            $doc = new DOMDocument();
+            $doc->loadHTML($template);
 
-        $header = $doc->getElementsByTagName("header")->item(0);
-        $footer = $doc->getElementsByTagName("footer")->item(0);
-        $main = $doc->getElementsByTagName("main")->item(0);
+            $header = $doc->getElementsByTagName("header")->item(0);
+            $footer = $doc->getElementsByTagName("footer")->item(0);
+            $main = $doc->getElementsByTagName("main")->item(0);
 
-        $main_data = $doc->saveHTML($main);
-        $header_data = empty($header) ? "" : $doc->saveHTML($header);
-        $footer_data = empty($footer)? "" : $doc->saveHTML($footer);
+            $main_data = $doc->saveHTML($main);
+            $header_data = empty($header) ? "" : $doc->saveHTML($header);
+            $footer_data = empty($footer)? "" : $doc->saveHTML($footer);
+            $action = "edit";
+        }
+        else
+        {
+            $action = "create";
+        }
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
         <div class="container"> 
             <div class="jumbotron">
                 <div class="row">
                     <div class="col-md-10">
-                        <h3>Edit Template</h3>
+                        <h3><?php print ucfirst($action); ?> Template</h3>
                     </div>
                     <div class="col-md-2">
                         <a class="btn btn-primary" style="color:white" href="<?php print $this->getUrl("index.php")?>">Back to Front</a>
@@ -1771,8 +1778,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 <td style="width:25%;">Template Name <strong style="color:red">*Required</strong></td>
                                 <td class="data">
                                     <div class="col-md-5">
-                                        <input name="templateName" type="text" class="form-control" value="<?php print str_replace(array("_$this->pid", " - INVALID", ".html"), "", $template_name); ?>" required>
-                                        <input type="hidden" name="action" value="edit">
+                                        <input id="templateName" name="templateName" type="text" class="form-control" value="<?php print str_replace(array("_$this->pid", " - INVALID", ".html"), "", $template_name); ?>">
+                                        <input id="action" type="hidden" name="action" value="<?php print $action;?>">
                                         <input id="currTemplateName" name="currTemplateName" type="hidden" value="<?php print $curr_template_name; ?>">
                                     </div>
                                 </td>
@@ -1817,260 +1824,90 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 CKEDITOR.instances.footerEditor.updateElement();
                 CKEDITOR.instances.editor.updateElement();
 
-                $.ajax({
-                    url: "<?php print $this->getUrl("SaveTemplate.php"); ?>",
-                    method: "POST",
-                    data: $('form').serialize(),
-                    success: function(data) {
-                        var json = JSON.parse(data);
-                        if (json.errors)
-                        {
-                            var toAppend;
+                if ($("#editor").val() == "" || $("#templateName").val() == "")
+                {
+                    alert("You need to enter a template name, AND something in the main editor to save.");
+                }
+                else
+                {
+                    $.ajax({
+                        url: "<?php print $this->getUrl("SaveTemplate.php"); ?>",
+                        method: "POST",
+                        data: $('form').serialize(),
+                        success: function(data) {
+                            var json = JSON.parse(data);
+                            if (json.errors)
+                            {
+                                var toAppend;
 
-                            if (json.errors.otherErrors) {
-                                json.errors.otherErrors.forEach(function(item) {
-                                    toAppend += "<p>" + item + "</p>";
-                                })
-                                $("#general-errors-header").show();
-                                $("#general-errors").empty().append(toAppend).show();
+                                if (json.errors.otherErrors) {
+                                    json.errors.otherErrors.forEach(function(item) {
+                                        toAppend += "<p>" + item + "</p>";
+                                    })
+                                    $("#general-errors-header").show();
+                                    $("#general-errors").empty().append(toAppend).show();
+                                }
+                                else
+                                {
+                                    $("#general-errors-header").hide();
+                                    $("#general-errors").hide()
+                                }
+
+                                if (json.errors.headerErrors) {
+                                    toAppend = "";
+                                    json.errors.headerErrors.forEach(function(item) {
+                                        toAppend += "<p>" + item + "</p>";
+                                    })
+                                    $("#header-errors-header").show();
+                                    $("#header-errors").empty().append(toAppend).show();
+                                }
+                                else
+                                {
+                                    $("#header-errors-header").hide();
+                                    $("#header-errors").hide()
+                                }
+
+                                if (json.errors.footerErrors) {
+                                    toAppend = "";
+                                    json.errors.footerErrors.forEach(function(item) {
+                                        toAppend += "<p>" + item + "</p>";
+                                    })
+                                    $("#footer-errors-header").show();
+                                    $("#footer-errors").empty().append(toAppend).show();
+                                }
+                                else
+                                {
+                                    $("#footer-errors-header").hide();
+                                    $("#footer-errors").hide()
+                                }
+                                
+                                if (json.errors.templateErrors) {
+                                    toAppend = "";
+                                    json.errors.templateErrors.forEach(function(item) {
+                                        toAppend += "<p>" + item + "</p>";
+                                    })
+                                    $("#body-errors-header").show();
+                                    $("#body-errors").empty().append(toAppend).show();
+                                }
+                                else
+                                {
+                                    $("#body-errors-header").hide();
+                                    $("#body-errors").hide()
+                                }
+
+                                $("#currTemplateName").val(json.currTemplateName);
+                                $("#action").val("edit");
+                                $("#errors-container").show();
+                                window.scroll(0,0); // Errors are at top of page
                             }
                             else
                             {
-                                $("#general-errors-header").hide();
-                                $("#general-errors").hide()
+                                // Go to homepage
+                                window.location.href = json.redirect;
                             }
-
-                            if (json.errors.headerErrors) {
-                                toAppend = "";
-                                json.errors.headerErrors.forEach(function(item) {
-                                    toAppend += "<p>" + item + "</p>";
-                                })
-                                $("#header-errors-header").show();
-                                $("#header-errors").empty().append(toAppend).show();
-                            }
-                            else
-                            {
-                                $("#header-errors-header").hide();
-                                $("#header-errors").hide()
-                            }
-
-                            if (json.errors.footerErrors) {
-                                toAppend = "";
-                                json.errors.footerErrors.forEach(function(item) {
-                                    toAppend += "<p>" + item + "</p>";
-                                })
-                                $("#footer-errors-header").show();
-                                $("#footer-errors").empty().append(toAppend).show();
-                            }
-                            else
-                            {
-                                $("#footer-errors-header").hide();
-                                $("#footer-errors").hide()
-                            }
-                            
-                            if (json.errors.templateErrors) {
-                                toAppend = "";
-                                json.errors.templateErrors.forEach(function(item) {
-                                    toAppend += "<p>" + item + "</p>";
-                                })
-                                $("#body-errors-header").show();
-                                $("#body-errors").empty().append(toAppend).show();
-                            }
-                            else
-                            {
-                                $("#body-errors-header").hide();
-                                $("#body-errors").hide()
-                            }
-
-                            $("#currTemplateName").val(json.currTemplateName);
-                            $("#action").val("edit");
-                            $("#errors-container").show();
-                            window.scroll(0,0); // Errors are at top of page
                         }
-                        else
-                        {
-                            // Go to homepage
-                            window.location.href = json.redirect;
-                        }
-                    }
-                })
-            });
-        </script>
-        <?php
-        $this->initializeEditor("headerEditor", 200);
-        $this->initializeEditor("footerEditor", 200);
-        $this->initializeEditor("editor", 1000);
-    }
-
-    /**
-     * Generates a page to create a new template.
-     * 
-     * @see CustomTemplateEngine::checkPermissions() For checking if the user has permissions to view the page.
-     * @see CustomTemplateEngine::generateInstructions() For generating instructions on page.
-     * @see CustomTemplateEngine::initializeEditor() For initializing editors on page.
-     * @since 1.0 
-     */
-    public function generateCreateTemplatePage()
-    {
-        $this->checkPermissions();
-        ?>
-        <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
-        <div class="container"> 
-            <div class="jumbotron">
-                <div class="row">
-                    <div class="col-md-10">
-                            <h3>Create New Template</h3>
-                    </div>
-                    <div class="col-md-2">
-                        <a class="btn btn-primary" style="color:white" href="<?php print $this->getUrl("index.php")?>">Back to Front</a>
-                    </div>
-                </div>
-                <hr/>
-                <div id="errors-container" style="display:none">
-                    <div class="red container">
-                        <h4>Template Validation Failed!</h4>
-                        <p>Template was saved with the following errors. To discover where the error occured, match the line numbers in the error message to the ones in the Source view...</p>
-                        <p><a id="readmore-link" href="#">Click to view errors</a></p>
-                        <div id="readmore" style="display:none">
-                            <p id="general-errors-header"><strong>General Errors...</strong></p>
-                            <div id="general-errors"></div>
-                            <p id="header-errors-header"><strong>Header Errors...</strong></p>
-                            <div id="header-errors"></div>
-                            <p id="footer-errors-header" ><strong>Footer Errors...</strong></p>
-                            <div id="footer-errors"></div>
-                            <p id="body-errors-header"><strong>Body Errors...</strong></p>
-                            <div id="body-errors"></div>
-                        </div>
-                    </div>
-                    <hr/>
-                </div>
-                <?php $this->generateInstructions() ?>
-                <br/><br/>
-                <form>
-                    <table class="table" style="width:100%;">
-                        <tbody>
-                            <tr>
-                                <td style="width:25%;">Template Name <strong style="color:red">*Required</strong></td>
-                                <td class="data">
-                                    <div class="col-md-5">
-                                        <input name="templateName" type="text" class="form-control" required>
-                                        <input id="action" type="hidden" name="action" value="create">
-                                        <input id="currTemplateName" name="currTemplateName" type="hidden" value="">
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="width:25%;"><button id="save-template-btn" type="button" class="btn btn-primary">Save Template</button></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div class="collapsible-container">
-                        <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                        <div class="collapsible-content"> 
-                            <p>Anything in the header will appear at the top of every page in the template. All syntax rules apply. <strong>If the header content is too big, it will overlap template data in the PDF.</strong></p>
-                            <textarea cols="80" id="headerEditor" name="header-editor" rows="10"></textarea>
-                        </div>
-                    </div>
-                    <div class="collapsible-container">
-                        <button type="button" class="collapsible">Add Footer **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                        <div class="collapsible-content">
-                            <p>Anything in the footer will appear at the bottom of every page in the template. All syntax rules apply. <strong>If the footer content is too big, it will cutoff in the PDF.</strong></p>
-                            <textarea cols="80" id="footerEditor" name="footer-editor" rows="10"></textarea>
-                        </div>
-                    </div>
-                    <div style="margin-top:20px">
-                        <textarea cols="80" id="editor" name="editor" rows="10">
-                        </textarea>
-                    </div>
-                </form>
-            </div>
-        </div>
-        <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
-        <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
-        <script>
-            $("#save-template-btn").click(function () {
-                // Updates the textare elements that CKEDITOR replaces
-                CKEDITOR.instances.headerEditor.updateElement();
-                CKEDITOR.instances.footerEditor.updateElement();
-                CKEDITOR.instances.editor.updateElement();
-
-                $.ajax({
-                    url: "<?php print $this->getUrl("SaveTemplate.php"); ?>",
-                    method: "POST",
-                    data: $('form').serialize(),
-                    success: function(data) {
-                        var json = JSON.parse(data);
-                        if (json.errors)
-                        {
-                            var toAppend;
-
-                            if (json.errors.otherErrors) {
-                                json.errors.otherErrors.forEach(function(item) {
-                                    toAppend += "<p>" + item + "</p>";
-                                })
-                                $("#general-errors-header").show();
-                                $("#general-errors").empty().append(toAppend).show();
-                            }
-                            else
-                            {
-                                $("#general-errors-header").hide();
-                                $("#general-errors").hide()
-                            }
-
-                            if (json.errors.headerErrors) {
-                                toAppend = "";
-                                json.errors.headerErrors.forEach(function(item) {
-                                    toAppend += "<p>" + item + "</p>";
-                                })
-                                $("#header-errors-header").show();
-                                $("#header-errors").empty().append(toAppend).show();
-                            }
-                            else
-                            {
-                                $("#header-errors-header").hide();
-                                $("#header-errors").hide()
-                            }
-
-                            if (json.errors.footerErrors) {
-                                toAppend = "";
-                                json.errors.footerErrors.forEach(function(item) {
-                                    toAppend += "<p>" + item + "</p>";
-                                })
-                                $("#footer-errors-header").show();
-                                $("#footer-errors").empty().append(toAppend).show();
-                            }
-                            else
-                            {
-                                $("#footer-errors-header").hide();
-                                $("#footer-errors").hide()
-                            }
-                            
-                            if (json.errors.templateErrors) {
-                                toAppend = "";
-                                json.errors.templateErrors.forEach(function(item) {
-                                    toAppend += "<p>" + item + "</p>";
-                                })
-                                $("#body-errors-header").show();
-                                $("#body-errors").empty().append(toAppend).show();
-                            }
-                            else
-                            {
-                                $("#body-errors-header").hide();
-                                $("#body-errors").hide()
-                            }
-
-                            $("#currTemplateName").val(json.currTemplateName);
-                            $("#action").val("edit");
-                            $("#errors-container").show();
-                            window.scroll(0,0); // Errors are at top of page
-                        }
-                        else
-                        {
-                            // Go to homepage
-                            window.location.href = json.redirect;
-                        }
-                    }
-                })
+                    });
+                };
             });
         </script>
         <?php
