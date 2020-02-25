@@ -1750,13 +1750,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         <p>Template was saved with the following errors. To discover where the error occured, match the line numbers in the error message to the ones in the Source view...</p>
                         <p><a id="readmore-link" href="#">Click to view errors</a></p>
                         <div id="readmore" style="display:none">
-                            <p><strong>General Errors...</strong></p>
+                            <p id="general-errors-header"><strong>General Errors...</strong></p>
                             <div id="general-errors"></div>
-                            <p><strong>Header Errors...</strong></p>
+                            <p id="header-errors-header"><strong>Header Errors...</strong></p>
                             <div id="header-errors"></div>
-                            <p><strong>Footer Errors...</strong></p>
+                            <p id="footer-errors-header" ><strong>Footer Errors...</strong></p>
                             <div id="footer-errors"></div>
-                            <p><strong>Body Errors...</strong></p>
+                            <p id="body-errors-header"><strong>Body Errors...</strong></p>
                             <div id="body-errors"></div>
                         </div>
                     </div>
@@ -1831,7 +1831,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 json.errors.otherErrors.forEach(function(item) {
                                     toAppend += "<p>" + item + "</p>";
                                 })
-                                $("#general-errors").empty().append(toAppend);
+                                $("#general-errors-header").show();
+                                $("#general-errors").empty().append(toAppend).show();
+                            }
+                            else
+                            {
+                                $("#general-errors-header").hide();
+                                $("#general-errors").hide()
                             }
 
                             if (json.errors.headerErrors) {
@@ -1839,7 +1845,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 json.errors.headerErrors.forEach(function(item) {
                                     toAppend += "<p>" + item + "</p>";
                                 })
-                                $("#header-errors").empty().append(toAppend);
+                                $("#header-errors-header").show();
+                                $("#header-errors").empty().append(toAppend).show();
+                            }
+                            else
+                            {
+                                $("#header-errors-header").hide();
+                                $("#header-errors").hide()
                             }
 
                             if (json.errors.footerErrors) {
@@ -1847,7 +1859,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 json.errors.footerErrors.forEach(function(item) {
                                     toAppend += "<p>" + item + "</p>";
                                 })
-                                $("#footer-errors").empty().append(toAppend);
+                                $("#footer-errors-header").show();
+                                $("#footer-errors").empty().append(toAppend).show();
+                            }
+                            else
+                            {
+                                $("#footer-errors-header").hide();
+                                $("#footer-errors").hide()
                             }
                             
                             if (json.errors.templateErrors) {
@@ -1855,10 +1873,17 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 json.errors.templateErrors.forEach(function(item) {
                                     toAppend += "<p>" + item + "</p>";
                                 })
-                                $("#body-errors").empty().append(toAppend);
+                                $("#body-errors-header").show();
+                                $("#body-errors").empty().append(toAppend).show();
+                            }
+                            else
+                            {
+                                $("#body-errors-header").hide();
+                                $("#body-errors").hide()
                             }
 
                             $("#currTemplateName").val(json.currTemplateName);
+                            $("#action").val("edit");
                             $("#errors-container").show();
                             window.scroll(0,0); // Errors are at top of page
                         }
@@ -1907,13 +1932,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         <p>Template was saved with the following errors. To discover where the error occured, match the line numbers in the error message to the ones in the Source view...</p>
                         <p><a id="readmore-link" href="#">Click to view errors</a></p>
                         <div id="readmore" style="display:none">
-                            <p><strong>General Errors...</strong></p>
+                            <p id="general-errors-header"><strong>General Errors...</strong></p>
                             <div id="general-errors"></div>
-                            <p><strong>Header Errors...</strong></p>
+                            <p id="header-errors-header"><strong>Header Errors...</strong></p>
                             <div id="header-errors"></div>
-                            <p><strong>Footer Errors...</strong></p>
+                            <p id="footer-errors-header" ><strong>Footer Errors...</strong></p>
                             <div id="footer-errors"></div>
-                            <p><strong>Body Errors...</strong></p>
+                            <p id="body-errors-header"><strong>Body Errors...</strong></p>
                             <div id="body-errors"></div>
                         </div>
                     </div>
@@ -1983,7 +2008,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 json.errors.otherErrors.forEach(function(item) {
                                     toAppend += "<p>" + item + "</p>";
                                 })
-                                $("#general-errors").empty().append(toAppend);
+                                $("#general-errors-header").show();
+                                $("#general-errors").empty().append(toAppend).show();
+                            }
+                            else
+                            {
+                                $("#general-errors-header").hide();
+                                $("#general-errors").hide()
                             }
 
                             if (json.errors.headerErrors) {
@@ -1991,7 +2022,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 json.errors.headerErrors.forEach(function(item) {
                                     toAppend += "<p>" + item + "</p>";
                                 })
-                                $("#header-errors").empty().append(toAppend);
+                                $("#header-errors-header").show();
+                                $("#header-errors").empty().append(toAppend).show();
+                            }
+                            else
+                            {
+                                $("#header-errors-header").hide();
+                                $("#header-errors").hide()
                             }
 
                             if (json.errors.footerErrors) {
@@ -1999,7 +2036,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 json.errors.footerErrors.forEach(function(item) {
                                     toAppend += "<p>" + item + "</p>";
                                 })
-                                $("#footer-errors").empty().append(toAppend);
+                                $("#footer-errors-header").show();
+                                $("#footer-errors").empty().append(toAppend).show();
+                            }
+                            else
+                            {
+                                $("#footer-errors-header").hide();
+                                $("#footer-errors").hide()
                             }
                             
                             if (json.errors.templateErrors) {
@@ -2007,7 +2050,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 json.errors.templateErrors.forEach(function(item) {
                                     toAppend += "<p>" + item + "</p>";
                                 })
-                                $("#body-errors").empty().append(toAppend);
+                                $("#body-errors-header").show();
+                                $("#body-errors").empty().append(toAppend).show();
+                            }
+                            else
+                            {
+                                $("#body-errors-header").hide();
+                                $("#body-errors").hide()
                             }
 
                             $("#currTemplateName").val(json.currTemplateName);
