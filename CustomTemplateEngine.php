@@ -1819,7 +1819,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
         <script>
             $("#save-template-btn").click(function () {
-                // Updates the textare elements that CKEDITOR replaces
+                // Updates the textarea elements that CKEDITOR replaces
                 CKEDITOR.instances.headerEditor.updateElement();
                 CKEDITOR.instances.footerEditor.updateElement();
                 CKEDITOR.instances.editor.updateElement();
