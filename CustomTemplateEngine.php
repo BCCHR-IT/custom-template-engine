@@ -222,549 +222,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
     }
 
-    /**
-     * Include HTML to display instructions on Create Record, and Edit Record page.
-     * 
-     * @since 2.6
-     * @access private
-     */
-    private function generateInstructions()
-    {
-        $Proj = new Project();
-        ?>
-        <div class="container syntax-rule">
-            <h4><u>Instructions</u></h4>
-            <p>
-                Build your template in the WYSIWYG editor using the syntax guidelines below. Variables that you wish to pull must be contained in this template. 
-                You may format the template however you wish, including using tables.
-                <strong style="color:red"> 
-                    When accessing fields in a repeatable event or instrument, this module will automatically pull data from the latest instance.
-                </strong>
-            </p>
-            <p>**The project id will be appended to the template name for identification purposes**</p>
-            <p><strong style="color:red">**IMPORTANT**</strong> Any image uploaded to the plugin will be saved for future use by <strong>ALL</strong> users. <strong>Do not upload any identifying images.</strong></p>
-        </div>
-        <h4><u>Syntax</u></h4>
-        <div class="collapsible-container">
-            <button class="collapsible">Click to view syntax rules <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-            <div class="collapsible-content">
-                <p><strong style="color:red">**IMPORTANT**</strong></p>
-                <ul>
-                    <li>'{' and '}' are special characters that should only be used to indicate the start and end of syntax</li>
-                    <li>All HTML tags must wrap around syntax. i.e "<strong>&lt;strong&gt;</strong>{$redcap['variable']}<strong>&lt;/strong&gt;</strong>" is valid, "{$redcap<strong>&lt;strong&gt;</strong>['variable']}<strong>&lt;/strong&gt;</strong>" will throw an error</li>
-                </ul>
-                <div class="collapsible-container">
-                    <button class="collapsible">Adding fields to your project: <strong>{$redcap['variable']}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <div class="syntax-example">
-                            Example:
-                            <div>
-                                First Name: <strong>{$redcap['first_name']}</strong>, Last Name: <strong>{$redcap['last_name']}</strong>
-                            </div>
-                            Output:
-                            <div>
-                                First Name: <strong>John</strong>, Last Name: <strong>Smith</strong>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible">Adding events for longitudinal projects: <strong>{$redcap['event name']['variable']}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <p><strong style="color:red">IMPORTANT:</strong> If an event is not indicated, it will default to the first event in a record's arm. You do not need to specify the event for classical projects.</p>
-                        <div class="syntax-example">
-                            Example:
-                            <div>
-                                First Name: <strong>{$redcap['enrollment_arm_1']['first_name']}</strong>, Last Name: <strong>{$redcap['enrollment_arm_1']['last_name']}</strong>
-                            </div>
-                            Output:
-                            <div>
-                                First Name: <strong>John</strong>, Last Name: <strong>Smith</strong>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible">Show/Hide text and data using <strong>IF</strong> conditions: If something is true then display some text. <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <p><u>Syntax:</u><strong> {if $redcap['event name']['variable'] eq someValue}</strong> show this text <strong>{/if}</strong></p>
-                        <div class="syntax-example">
-                            Example:
-                            <div>
-                                <strong>{if $redcap['enrollment_arm_1']['gender'] eq 'male'}</strong> The candidate sex is: {$redcap['enrollment_arm_1']['gender']} <strong>{/if}</strong>
-                            </div>
-                            Output if condition is true:
-                            <div>
-                                The candidate sex is <strong>male</strong>
-                            </div>
-                            Output if condition is false:
-                            <div>
-                                <span style="color:red">* If conditions are not met, no text is shown</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible"><strong>{if}</strong> conditions can be nested within one another to an infinite depth <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <p><u>Syntax:</u> <strong>{if $redcap['variable'] eq someValue}</strong> show <strong>{if $redcap['variable'] eq someValue}</strong> some <strong>{/if}</strong> text <strong>{/if}</strong></p>
-                        <div class="syntax-example">
-                                Example:
-                                <div>
-                                    <strong>{if $redcap['age'] gt 16}</strong> Consent: <strong>{if $redcap['consent'] eq 'Yes'}</strong> Yes <strong>{/if}</strong> <strong>{/if}</strong>
-                                </div>
-                                Output:
-                                <br/>
-                                &emsp;<u>Case 1</u> $redcap['age'] eq 18 and $redcap['consent'] eq 'Yes'
-                                <div>
-                                    Consent: Yes
-                                </div>
-                                &emsp;<u>Case 2</u> $redcap['age'] eq 18 and $redcap['consent'] eq 'No'
-                                <div>
-                                    Consent: <span style="color: red">* The text "Yes" is not shown</span>
-                                </div>
-                                &emsp;<u>Case 3</u> $redcap['age'] eq 10 and $redcap['consent'] eq 'No'
-                                <div>
-                                    <span style="color: red">* No text is shown</span>
-                                </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible"><strong>{if}</strong> conditions can be chained with <strong>{elseif}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <p><u>Syntax:</u> <strong>{if $redcap['variable'] eq someValue}</strong> show <strong>{elseif $redcap['variable'] eq someValue}</strong> some text <strong>{/if}</strong></p>
-                        <div class="syntax-example">
-                                Example:
-                                <div>
-                                    <strong>Gender: {if $redcap['gender'] eq 'male'}</strong> Male <strong>{elseif $redcap['gender'] eq 'female'}</strong> Female <strong>{/if}</strong>
-                                </div>
-                                Output:
-                                <br/>
-                                &emsp;<u>Case 1</u> $redcap['gender'] eq 'Male'
-                                <div>
-                                    Gender: Male
-                                </div>
-                                &emsp;<u>Case 2</u> $redcap['gender'] eq 'Female'
-                                <div>
-                                    Gender: Female
-                                </div>
-                                &emsp;<u>Case 3</u> $redcap['gender'] neq 'Male' and $redcap['gender'] neq 'Female'
-                                <div>
-                                    <span style="color: red">* No text is shown</span>
-                                </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible">A default <strong>{if}</strong> condition can be used with <strong>{else}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <p><strong style="color:red">IMPORTANT:</strong> Each {if} can have <strong>at most</strong> one {else} clause, and must be the last clause in the statement.</p>
-                        <p><u>Syntax:</u> <strong>{if $redcap['variable'] eq someValue}</strong> show <strong>{else}</strong> some text <strong>{/if}</strong></p>
-                        <div class="syntax-example">
-                                Example:
-                                <div>
-                                    <strong>Gender: {if $redcap['gender'] eq 'male'}</strong> Male <strong>{else}</strong> Female <strong>{/if}</strong>
-                                </div>
-                                Output:
-                                <br/>
-                                &emsp;<u>Case 1</u> $redcap['gender'] eq 'Male'
-                                <div>
-                                    Gender: Male
-                                </div>
-                                &emsp;<u>Case 2</u> $redcap['gender'] neq 'Male'
-                                <div>
-                                    Gender: Female
-                                </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible">Use a combination of comparison operators to build more complex syntax. <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <p><u>Logical Quantifiers</u></p>
-                        <table border="1">
-                            <colgroup>
-                                <col align="center" class="alternates">
-                                <col class="meaning">
-                                <col class="example">
-                            </colgroup>
-                            <thead><tr>
-                                <th align="center">Qualifier</th>
-                                <th>Syntax Example</th>
-                                <th>Meaning</th>
-                            </tr></thead>
-                            <tbody>
-                                <tr>
-                                    <td align="center">eq</td>
-                                    <td>$a eq $b</td>
-                                    <td>equals</td>
-                                </tr>
-                                <tr>
-                                    <td align="center">ne, neq</td>
-                                    <td>$a neq $b</td>
-                                    <td>not equals</td>
-                                </tr>
-                                <tr>
-                                    <td align="center">gt</td>
-                                    <td>$a gt $b</td>
-                                    <td>greater than</td>
-                                </tr>
-                                <tr>
-                                    <td align="center">lt</td>
-                                    <td>$a lt $b</td>
-                                    <td>less than</td>
-                                </tr>
-                                <tr>
-                                    <td align="center">gte, ge</td>
-                                    <td>$a ge $b</td>
-                                    <td>greater than or equal</td>
-                                </tr>
-                                <tr>
-                                    <td align="center">lte, le</td>
-                                    <td>$a le $b</td>
-                                    <td>less than or equal</td>
-                                </tr>
-                                <tr>
-                                    <td align="center">not</td>
-                                    <td>not $a</td>
-                                    <td>negation (unary)</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <p><u>Syntax:</u> <strong>{if $redcap['event name']['variable'] eq someValue}</strong> show this text <strong>{/if}</strong></p>
-                        <div class="syntax-example">
-                            Example:
-                            <div>
-                                <strong>{if $redcap['enrollment_arm_1']['gender'] eq 'male'}</strong> The candidate sex is: {$redcap['enrollment_arm_1']['gender']} <strong>{/if}</strong>
-                            </div>
-                            Output:
-                            <br/>
-                            &emsp;<u>Case 1:</u> $redcap['enrollment_arm_1']['gender'] eq 'male'
-                            <div>
-                                The candidate sex is male
-                            </div>
-                            &emsp;<u>Case 3:</u> $redcap['enrollment_arm_1']['gender'] neq 'male'
-                            <div>
-                                <span style="color:red">* No text is shown</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible">Chain multiple expressions in the same if statement using the logical operators <strong>or</strong> & <strong>and</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <p><u>Logical Quantifiers</u></p>
-                        <table border="1">
-                            <colgroup>
-                                <col align="center" class="alternates">
-                                <col class="meaning">
-                                <col class="example">
-                            </colgroup>
-                            <thead><tr>
-                                <th align="center">Qualifier</th>
-                                <th>Syntax Example</th>
-                                <th>Meaning</th>
-                            </tr></thead>
-                            <tbody>
-                                <tr>
-                                    <td align="center">and</td>
-                                    <td>$a and $b</td>
-                                    <td>both $a and $b must be true, $a and $b can be expressions i.e. $a = ($c gt $d)</td>
-                                </tr>
-                                <tr>
-                                    <td align="center">or</td>
-                                    <td>$a or $b</td>
-                                    <td>either $a or $b can be true, $a and $b can be expressions i.e. $a = ($c gt $d)</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <p><u>Note:</u> Use parenthesis '(' and ')' to group expressions.</p>
-                        <p>
-                            <u>On operator precedance:</u> 
-                            <strong>and</strong> takes precedance before <strong>or</strong>, therefore 
-                            <strong>"$redcap['enrollment_arm_1']['gender'] eq 'male' or $redcap['enrollment_arm_1']['gender'] eq 'female' and $redcap['enrollment_arm_1']['age'] gt '10'"</strong>
-                            will parse <strong>"$redcap['enrollment_arm_1']['gender'] eq 'female' and $redcap['enrollment_arm_1']['age'] gt '10'"</strong> first. To control the order of precedence, use parenthesis.
-                        </p>
-                        <p><u>Syntax:</u> <strong>{if ($redcap['event name']['variable'] eq someValue) or ($redcap['event name']['variable'] eq someValue2)}</strong> show this text <strong>{/if}</strong></p>
-                        <div class="syntax-example">
-                            Example:
-                            <div>
-                                <strong>{if ($redcap['enrollment_arm_1']['gender'] eq 'male') or ($redcap['dosage_arm_1']['dosage'] gt 10)}</strong> The candidate sex is: {$redcap['enrollment_arm_1']['gender']} <strong>{/if}</strong>
-                            </div>
-                            Output:
-                            <br/>
-                            &emsp;<u>Case 1:</u> $redcap['enrollment_arm_1']['gender'] eq 'male'
-                            <div>
-                                The candidate sex is male
-                            </div>
-                            &emsp;<u>Case 2:</u> $redcap['dosage_arm_1']['dosage'] gt 10
-                            <div>
-                                The candidate sex is male
-                            </div>
-                            &emsp;<u>Case 3:</u> $redcap['enrollment_arm_1']['gender'] eq 'female' and $redcap['dosage_arm_1']['dosage'] lte 10
-                            <div>
-                                <span style="color:red">* No text is shown</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible">Query checkbox/matrix values using <strong>in_array</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <p><u>Syntax:</u> <strong>{if in_array('someValue', $redcap['variable'])}</strong> show this text <strong>{/if}</strong></p>
-                        <div class="syntax-example">
-                            Example:
-                            <div>
-                                <strong>{if in_array('Monday', $redcap['weekdays'])}</strong> The day of the week is {$redcap['weekdays']} <strong>{/if}</strong>
-                            </div>
-                            Output:
-                            <br/>
-                            &emsp;<u>Case 1:</u> $redcap['weekdays'] contains 'Monday'
-                            <div>
-                                The day of the week is Monday
-                            </div>
-                            &emsp;<u>Case 2:</u> $redcap['weekdays'] doesn't contain 'Monday'
-                            <div>
-                                <span style="color:red">* No text is shown</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible">Print all checkbox/matrix values using <strong>{$redcap['variable']['allValues']}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <div class="syntax-example">
-                            Example:
-                            <div>
-                                All options: <strong>{$redcap['options']['allValues']}</strong>
-                            </div>
-                            Output:
-                            <br/>
-                            <div>
-                            All options: <strong>None of the above, All of the above, A and C</strong>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible">Hide/show a table and all its contents by <strong>nesting the table inside an {if} condition.</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <u>Syntax:</u> <strong>{if $redcap['variable'] eq someValue}</strong><table><tbody><tr><td>Text 1</td><td>Text 2</td></tr></tbody></table><strong>{/if}</strong>
-                        <br/><br/>
-                        <div class="syntax-example">
-                            Example:
-                            <div>
-                                <strong>{if $redcap['gender'] eq 'male'}</strong>
-                                <table><tbody><tr><td>{$redcap['gender']}</td><td>{$redcap['gender']}</td></tr></tbody></table>
-                                <strong>{/if}</strong>
-                            </div>
-                            Output:
-                            <br/>
-                            &emsp;<u>Case 1:</u> $redcap['gender'] eq 'male'
-                            <div>
-                                <table><tbody><tr><td>male</td><td>12</td></tr></tbody></table>
-                            </div>
-                            &emsp;<u>Case 2:</u> $redcap['gender'] eq 'female'
-                            <div>
-                                <span style="color:red">* If conditions are not met, no text is shown</span>
-                            </div>
-                        </div>
-                        <br/>
-                        <u>NOTE:</u> If you want to hide sections of a table, place the beginning and end of the if-statements in separate rows.
-                        <br/><br/>
-                        <div class="syntax-example">
-                            Example:
-                            <div>
-                                <table>
-                                    <tbody>
-                                        <tr><td>Text 1</td><td>Text 2</td></tr>
-                                        <tr><td colspan="2"><strong>{if $redcap['gender'] eq 'male'}</strong></td></tr>
-                                        <tr><td>{$redcap['gender']}</td><td>{$redcap['gender']}</td></tr>
-                                        <tr><td colspan="2"><strong>{/if}</strong></td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            Output:
-                            <br/>
-                            &emsp;<u>Case 1:</u> $redcap['gender'] eq 'male'
-                            <div>
-                                <table><tbody><tr><td>Text 1</td><td>Text 2</td></tr><tr><td>male</td><td>12</td></tr></tbody></table>
-                            </div>
-                            &emsp;<u>Case 2:</u> $redcap['gender'] eq 'female'
-                            <div>
-                                <table><tbody><tr><td>Text 1</td><td>Text 2</td></tr></tbody></table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible">Hide/show a row in a table by adding <strong>$showLabelAndRow</strong> to the <strong>{if}</strong> condition that determines if the row should be shown or hidden. <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <u>Syntax:</u> <table><tbody><tr><td>{if $redcap['variable'] eq someValue and <strong>$showLabelAndRow</strong>} Text 1</td><td>Text 2 {/if}</td></tr></tbody></table>
-                        <br/><br/>
-                        <div class="syntax-example">
-                                Example:
-                                <div>
-                                    <table>
-                                        <tbody>
-                                            <tr><td>{if $redcap['age'] gt 20 and <strong>$showLabelAndRow</strong>} Age</td><td>{$redcap['age']} {/if}</td></tr>
-                                            <tr><td>Admitted</td><td>Yes</td></tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                Output:
-                                <br/>
-                                &emsp;<u>Case 1:</u> $redcap['age'] eq 30
-                                <div>
-                                    <table>
-                                        <tbody>
-                                            <tr><td>Age</td><td>30</td></tr>
-                                            <tr><td>Admitted</td><td>Yes</td></tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                &emsp;<u>Case 2:</u> $redcap['age'] eq 18
-                                <div>
-                                    <table>
-                                        <tbody>
-                                            <tr><td>Admitted</td><td>Yes</td></tr>
-                                        </tbody>
-                                    </table>
-                                    <br/>
-                                    <span style="color:red">* The age row isn't shown</span>
-                                </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible">Escape quotes using <strong>\</strong>. <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <p><strong style="color:red">IMPORTANT:</strong> Quotes that appear within quotes must be escaped, otherwise the template will not run.</p>
-                        <div class="syntax-example">
-                            Example:
-                            <div>
-                            {if $redcap['enrollment_arm_1']['institute'] eq 'BC Children<strong style="color:red">\'</strong>s Hospital Research Institute'} The candidate works at the institute. {/if}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collapsible-container">
-                    <button class="collapsible">Add page breaks in template. <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                    <div class="collapsible-content">
-                        <p><strong style="color:red">IMPORTANT:</strong> When using page breaks, they must never be attached to an if condition, otherwise the temple will have rendering errors</p>
-                        <u>Syntax:</u> In the Source view of the editor find the element you want to add a page break before and add <b>style="page-break-before:always"</b>
-                        <br/><br/>
-                        <div class="syntax-example">
-                            Example:
-                            <div>
-                              <?php print htmlspecialchars("<h1 ") . "<b>style=\"page-break-before:always\"</b>" . htmlspecialchars(">Add a page break before this header</h1>"); ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <h4><u>Fields & Events</u></h4>
-        <?php if (REDCap::isLongitudinal()): ?>
-            <div class="collapsible-container">
-                <button class="collapsible">Events <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                <div class="collapsible-content">
-                <p><u>NOTE:</u> Events come preformatted for ease of use. Users will have to replace 'field' with the REDCap field they'd like to use.</p>
-                <?php 
-                    $events = REDCap::getEventNames(TRUE);
-                    foreach ($events as $event)
-                    {
-                        print "<p><strong>$event</strong> -> {\$redcap['$event'][field]}</p>";
-                    }
-                ?>
-                </div>
-            </div>
-        <?php endif; ?>
-        <div class="collapsible-container">
-            <button class="collapsible">Click to view fields <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-            <div class="collapsible-content">
-            <p>
-                <?php if (REDCap::isLongitudinal() && $Proj->project['surveys_enabled']): ?>
-                    <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
-                    To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).</p>
-                    <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
-                <?php elseif (REDCap::isLongitudinal()): ?>
-                    <u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
-                    To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).
-                <?php elseif ($Proj->project['surveys_enabled']): ?> 
-                    <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use.</p>
-                    <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
-                <?php else: ?>
-                    <u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use.
-                <?php endif;?>
-            </p>
-            <?php
-                $instruments = REDCap::getInstrumentNames();
-                foreach ($instruments as $unique_name => $label)
-                {
-                    print "<div class='collapsible-container'><button class='collapsible'>$label <span class='fas fa-caret-down'></span><span class='fas fa-caret-up'></span></button>";
-                    $fields = REDCap::getDataDictionary("array", FALSE, null, array($unique_name));
-                    print "<div class='collapsible-content'>";
-                    foreach ($fields as $index => $field)
-                    {
-                        if ($field["field_type"] !== "descriptive")
-                        {
-                            print "<p><strong>$index</strong> -> {\$redcap['$index']}</p>";
-                                
-                            if (!empty($field["select_choices_or_calculations"]) && $field["field_type"] !== "calc")
-                            {
-                                $valuesAndLabels = explode("|", $field["select_choices_or_calculations"]);
-                                if ($field["field_type"] === "slider")
-                                {
-                                    $labels = $valuesAndLabels;
-                                }
-                                else
-                                {
-                                    $labels = array();
-                                    foreach($valuesAndLabels as $pair)
-                                    {
-                                        array_push($labels, substr($pair, strpos($pair, ",")+1));
-                                    }
-                                }
-
-                                if (sizeof($labels) > 0)
-                                {
-                                    print "<div style='padding-left:20px'><u>OPTIONS</u>: ";
-                                    foreach($labels as $label)
-                                    {
-                                        print "\"" . trim(strip_tags($label)) . "\", ";
-                                    }
-                                    print "</div>";
-                                }
-                            }
-                        }
-                    }
-                    print "<p><strong>{$unique_name}_complete</strong> -> {\$redcap['{$unique_name}_complete']}</p>";
-                    print "<div style='padding-left:20px'><u>OPTIONS</u>: \"Complete\", \"Incomplete\", \"Unverified\"</div>";
-                    print "</div></div>";
-                }
-                ?>
-                <?php if ($Proj->project['surveys_enabled']): ?>
-                <div class='collapsible-container'>
-                    <button class='collapsible'>Survey Completion Timestamps <span class='fas fa-caret-down'></span><span class='fas fa-caret-up'></span></button>
-                    <div class='collapsible-content'>
-                        <?php
-                            foreach ($instruments as $unique_name => $label)
-                            {
-                                if (!empty($Proj->forms[$unique_name]['survey_id']))
-                                {
-                                    print "<p><strong>$label</strong> -> {\$redcap['{$unique_name}_timestamp']}</p>";
-                                }
-                            }
-                        ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-            </div>
-        </div>
-        <?php
-    }
 
     /**
      * Helper function that deletes a file from the File Repository, if REDCap data about it fails
@@ -1710,7 +1167,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * Else generate page with empty editors for creation. 
      * 
      * @see CustomTemplateEngine::checkPermissions() For checking if the user has permissions to view the page.
-     * @see CustomTemplateEngine::generateInstructions() For generating instructions on page.
      * @param String $template   An existing template's name
      * @since 3.0
      */
@@ -1738,6 +1194,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             $action = "create";
         }
+        $Proj = new Project();
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
         <div class="container"> 
@@ -1769,7 +1226,537 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     </div>
                     <hr/>
                 </div>
-                <?php $this->generateInstructions() ?>
+                <div class="container syntax-rule">
+                    <h4><u>Instructions</u></h4>
+                    <p>
+                        Build your template in the WYSIWYG editor using the syntax guidelines below. Variables that you wish to pull must be contained in this template. 
+                        You may format the template however you wish, including using tables.
+                        <strong style="color:red"> 
+                            When accessing fields in a repeatable event or instrument, this module will automatically pull data from the latest instance.
+                        </strong>
+                    </p>
+                    <p>**The project id will be appended to the template name for identification purposes**</p>
+                    <p><strong style="color:red">**IMPORTANT**</strong> Any image uploaded to the plugin will be saved for future use by <strong>ALL</strong> users. <strong>Do not upload any identifying images.</strong></p>
+                </div>
+                <h4><u>Syntax</u></h4>
+                <div class="collapsible-container">
+                    <button class="collapsible">Click to view syntax rules <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                    <div class="collapsible-content">
+                        <p><strong style="color:red">**IMPORTANT**</strong></p>
+                        <ul>
+                            <li>'{' and '}' are special characters that should only be used to indicate the start and end of syntax</li>
+                            <li>All HTML tags must wrap around syntax. i.e "<strong>&lt;strong&gt;</strong>{$redcap['variable']}<strong>&lt;/strong&gt;</strong>" is valid, "{$redcap<strong>&lt;strong&gt;</strong>['variable']}<strong>&lt;/strong&gt;</strong>" will throw an error</li>
+                        </ul>
+                        <div class="collapsible-container">
+                            <button class="collapsible">Adding fields to your project: <strong>{$redcap['variable']}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <div class="syntax-example">
+                                    Example:
+                                    <div>
+                                        First Name: <strong>{$redcap['first_name']}</strong>, Last Name: <strong>{$redcap['last_name']}</strong>
+                                    </div>
+                                    Output:
+                                    <div>
+                                        First Name: <strong>John</strong>, Last Name: <strong>Smith</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible">Adding events for longitudinal projects: <strong>{$redcap['event name']['variable']}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <p><strong style="color:red">IMPORTANT:</strong> If an event is not indicated, it will default to the first event in a record's arm. You do not need to specify the event for classical projects.</p>
+                                <div class="syntax-example">
+                                    Example:
+                                    <div>
+                                        First Name: <strong>{$redcap['enrollment_arm_1']['first_name']}</strong>, Last Name: <strong>{$redcap['enrollment_arm_1']['last_name']}</strong>
+                                    </div>
+                                    Output:
+                                    <div>
+                                        First Name: <strong>John</strong>, Last Name: <strong>Smith</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible">Show/Hide text and data using <strong>IF</strong> conditions: If something is true then display some text. <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <p><u>Syntax:</u><strong> {if $redcap['event name']['variable'] eq someValue}</strong> show this text <strong>{/if}</strong></p>
+                                <div class="syntax-example">
+                                    Example:
+                                    <div>
+                                        <strong>{if $redcap['enrollment_arm_1']['gender'] eq 'male'}</strong> The candidate sex is: {$redcap['enrollment_arm_1']['gender']} <strong>{/if}</strong>
+                                    </div>
+                                    Output if condition is true:
+                                    <div>
+                                        The candidate sex is <strong>male</strong>
+                                    </div>
+                                    Output if condition is false:
+                                    <div>
+                                        <span style="color:red">* If conditions are not met, no text is shown</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible"><strong>{if}</strong> conditions can be nested within one another to an infinite depth <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <p><u>Syntax:</u> <strong>{if $redcap['variable'] eq someValue}</strong> show <strong>{if $redcap['variable'] eq someValue}</strong> some <strong>{/if}</strong> text <strong>{/if}</strong></p>
+                                <div class="syntax-example">
+                                        Example:
+                                        <div>
+                                            <strong>{if $redcap['age'] gt 16}</strong> Consent: <strong>{if $redcap['consent'] eq 'Yes'}</strong> Yes <strong>{/if}</strong> <strong>{/if}</strong>
+                                        </div>
+                                        Output:
+                                        <br/>
+                                        &emsp;<u>Case 1</u> $redcap['age'] eq 18 and $redcap['consent'] eq 'Yes'
+                                        <div>
+                                            Consent: Yes
+                                        </div>
+                                        &emsp;<u>Case 2</u> $redcap['age'] eq 18 and $redcap['consent'] eq 'No'
+                                        <div>
+                                            Consent: <span style="color: red">* The text "Yes" is not shown</span>
+                                        </div>
+                                        &emsp;<u>Case 3</u> $redcap['age'] eq 10 and $redcap['consent'] eq 'No'
+                                        <div>
+                                            <span style="color: red">* No text is shown</span>
+                                        </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible"><strong>{if}</strong> conditions can be chained with <strong>{elseif}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <p><u>Syntax:</u> <strong>{if $redcap['variable'] eq someValue}</strong> show <strong>{elseif $redcap['variable'] eq someValue}</strong> some text <strong>{/if}</strong></p>
+                                <div class="syntax-example">
+                                        Example:
+                                        <div>
+                                            <strong>Gender: {if $redcap['gender'] eq 'male'}</strong> Male <strong>{elseif $redcap['gender'] eq 'female'}</strong> Female <strong>{/if}</strong>
+                                        </div>
+                                        Output:
+                                        <br/>
+                                        &emsp;<u>Case 1</u> $redcap['gender'] eq 'Male'
+                                        <div>
+                                            Gender: Male
+                                        </div>
+                                        &emsp;<u>Case 2</u> $redcap['gender'] eq 'Female'
+                                        <div>
+                                            Gender: Female
+                                        </div>
+                                        &emsp;<u>Case 3</u> $redcap['gender'] neq 'Male' and $redcap['gender'] neq 'Female'
+                                        <div>
+                                            <span style="color: red">* No text is shown</span>
+                                        </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible">A default <strong>{if}</strong> condition can be used with <strong>{else}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <p><strong style="color:red">IMPORTANT:</strong> Each {if} can have <strong>at most</strong> one {else} clause, and must be the last clause in the statement.</p>
+                                <p><u>Syntax:</u> <strong>{if $redcap['variable'] eq someValue}</strong> show <strong>{else}</strong> some text <strong>{/if}</strong></p>
+                                <div class="syntax-example">
+                                        Example:
+                                        <div>
+                                            <strong>Gender: {if $redcap['gender'] eq 'male'}</strong> Male <strong>{else}</strong> Female <strong>{/if}</strong>
+                                        </div>
+                                        Output:
+                                        <br/>
+                                        &emsp;<u>Case 1</u> $redcap['gender'] eq 'Male'
+                                        <div>
+                                            Gender: Male
+                                        </div>
+                                        &emsp;<u>Case 2</u> $redcap['gender'] neq 'Male'
+                                        <div>
+                                            Gender: Female
+                                        </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible">Use a combination of comparison operators to build more complex syntax. <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <p><u>Logical Quantifiers</u></p>
+                                <table border="1">
+                                    <colgroup>
+                                        <col align="center" class="alternates">
+                                        <col class="meaning">
+                                        <col class="example">
+                                    </colgroup>
+                                    <thead><tr>
+                                        <th align="center">Qualifier</th>
+                                        <th>Syntax Example</th>
+                                        <th>Meaning</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        <tr>
+                                            <td align="center">eq</td>
+                                            <td>$a eq $b</td>
+                                            <td>equals</td>
+                                        </tr>
+                                        <tr>
+                                            <td align="center">ne, neq</td>
+                                            <td>$a neq $b</td>
+                                            <td>not equals</td>
+                                        </tr>
+                                        <tr>
+                                            <td align="center">gt</td>
+                                            <td>$a gt $b</td>
+                                            <td>greater than</td>
+                                        </tr>
+                                        <tr>
+                                            <td align="center">lt</td>
+                                            <td>$a lt $b</td>
+                                            <td>less than</td>
+                                        </tr>
+                                        <tr>
+                                            <td align="center">gte, ge</td>
+                                            <td>$a ge $b</td>
+                                            <td>greater than or equal</td>
+                                        </tr>
+                                        <tr>
+                                            <td align="center">lte, le</td>
+                                            <td>$a le $b</td>
+                                            <td>less than or equal</td>
+                                        </tr>
+                                        <tr>
+                                            <td align="center">not</td>
+                                            <td>not $a</td>
+                                            <td>negation (unary)</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <p><u>Syntax:</u> <strong>{if $redcap['event name']['variable'] eq someValue}</strong> show this text <strong>{/if}</strong></p>
+                                <div class="syntax-example">
+                                    Example:
+                                    <div>
+                                        <strong>{if $redcap['enrollment_arm_1']['gender'] eq 'male'}</strong> The candidate sex is: {$redcap['enrollment_arm_1']['gender']} <strong>{/if}</strong>
+                                    </div>
+                                    Output:
+                                    <br/>
+                                    &emsp;<u>Case 1:</u> $redcap['enrollment_arm_1']['gender'] eq 'male'
+                                    <div>
+                                        The candidate sex is male
+                                    </div>
+                                    &emsp;<u>Case 3:</u> $redcap['enrollment_arm_1']['gender'] neq 'male'
+                                    <div>
+                                        <span style="color:red">* No text is shown</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible">Chain multiple expressions in the same if statement using the logical operators <strong>or</strong> & <strong>and</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <p><u>Logical Quantifiers</u></p>
+                                <table border="1">
+                                    <colgroup>
+                                        <col align="center" class="alternates">
+                                        <col class="meaning">
+                                        <col class="example">
+                                    </colgroup>
+                                    <thead><tr>
+                                        <th align="center">Qualifier</th>
+                                        <th>Syntax Example</th>
+                                        <th>Meaning</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        <tr>
+                                            <td align="center">and</td>
+                                            <td>$a and $b</td>
+                                            <td>both $a and $b must be true, $a and $b can be expressions i.e. $a = ($c gt $d)</td>
+                                        </tr>
+                                        <tr>
+                                            <td align="center">or</td>
+                                            <td>$a or $b</td>
+                                            <td>either $a or $b can be true, $a and $b can be expressions i.e. $a = ($c gt $d)</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <p><u>Note:</u> Use parenthesis '(' and ')' to group expressions.</p>
+                                <p>
+                                    <u>On operator precedance:</u> 
+                                    <strong>and</strong> takes precedance before <strong>or</strong>, therefore 
+                                    <strong>"$redcap['enrollment_arm_1']['gender'] eq 'male' or $redcap['enrollment_arm_1']['gender'] eq 'female' and $redcap['enrollment_arm_1']['age'] gt '10'"</strong>
+                                    will parse <strong>"$redcap['enrollment_arm_1']['gender'] eq 'female' and $redcap['enrollment_arm_1']['age'] gt '10'"</strong> first. To control the order of precedence, use parenthesis.
+                                </p>
+                                <p><u>Syntax:</u> <strong>{if ($redcap['event name']['variable'] eq someValue) or ($redcap['event name']['variable'] eq someValue2)}</strong> show this text <strong>{/if}</strong></p>
+                                <div class="syntax-example">
+                                    Example:
+                                    <div>
+                                        <strong>{if ($redcap['enrollment_arm_1']['gender'] eq 'male') or ($redcap['dosage_arm_1']['dosage'] gt 10)}</strong> The candidate sex is: {$redcap['enrollment_arm_1']['gender']} <strong>{/if}</strong>
+                                    </div>
+                                    Output:
+                                    <br/>
+                                    &emsp;<u>Case 1:</u> $redcap['enrollment_arm_1']['gender'] eq 'male'
+                                    <div>
+                                        The candidate sex is male
+                                    </div>
+                                    &emsp;<u>Case 2:</u> $redcap['dosage_arm_1']['dosage'] gt 10
+                                    <div>
+                                        The candidate sex is male
+                                    </div>
+                                    &emsp;<u>Case 3:</u> $redcap['enrollment_arm_1']['gender'] eq 'female' and $redcap['dosage_arm_1']['dosage'] lte 10
+                                    <div>
+                                        <span style="color:red">* No text is shown</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible">Query checkbox/matrix values using <strong>in_array</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <p><u>Syntax:</u> <strong>{if in_array('someValue', $redcap['variable'])}</strong> show this text <strong>{/if}</strong></p>
+                                <div class="syntax-example">
+                                    Example:
+                                    <div>
+                                        <strong>{if in_array('Monday', $redcap['weekdays'])}</strong> The day of the week is {$redcap['weekdays']} <strong>{/if}</strong>
+                                    </div>
+                                    Output:
+                                    <br/>
+                                    &emsp;<u>Case 1:</u> $redcap['weekdays'] contains 'Monday'
+                                    <div>
+                                        The day of the week is Monday
+                                    </div>
+                                    &emsp;<u>Case 2:</u> $redcap['weekdays'] doesn't contain 'Monday'
+                                    <div>
+                                        <span style="color:red">* No text is shown</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible">Print all checkbox/matrix values using <strong>{$redcap['variable']['allValues']}</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <div class="syntax-example">
+                                    Example:
+                                    <div>
+                                        All options: <strong>{$redcap['options']['allValues']}</strong>
+                                    </div>
+                                    Output:
+                                    <br/>
+                                    <div>
+                                    All options: <strong>None of the above, All of the above, A and C</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible">Hide/show a table and all its contents by <strong>nesting the table inside an {if} condition.</strong> <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <u>Syntax:</u> <strong>{if $redcap['variable'] eq someValue}</strong><table><tbody><tr><td>Text 1</td><td>Text 2</td></tr></tbody></table><strong>{/if}</strong>
+                                <br/><br/>
+                                <div class="syntax-example">
+                                    Example:
+                                    <div>
+                                        <strong>{if $redcap['gender'] eq 'male'}</strong>
+                                        <table><tbody><tr><td>{$redcap['gender']}</td><td>{$redcap['gender']}</td></tr></tbody></table>
+                                        <strong>{/if}</strong>
+                                    </div>
+                                    Output:
+                                    <br/>
+                                    &emsp;<u>Case 1:</u> $redcap['gender'] eq 'male'
+                                    <div>
+                                        <table><tbody><tr><td>male</td><td>12</td></tr></tbody></table>
+                                    </div>
+                                    &emsp;<u>Case 2:</u> $redcap['gender'] eq 'female'
+                                    <div>
+                                        <span style="color:red">* If conditions are not met, no text is shown</span>
+                                    </div>
+                                </div>
+                                <br/>
+                                <u>NOTE:</u> If you want to hide sections of a table, place the beginning and end of the if-statements in separate rows.
+                                <br/><br/>
+                                <div class="syntax-example">
+                                    Example:
+                                    <div>
+                                        <table>
+                                            <tbody>
+                                                <tr><td>Text 1</td><td>Text 2</td></tr>
+                                                <tr><td colspan="2"><strong>{if $redcap['gender'] eq 'male'}</strong></td></tr>
+                                                <tr><td>{$redcap['gender']}</td><td>{$redcap['gender']}</td></tr>
+                                                <tr><td colspan="2"><strong>{/if}</strong></td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    Output:
+                                    <br/>
+                                    &emsp;<u>Case 1:</u> $redcap['gender'] eq 'male'
+                                    <div>
+                                        <table><tbody><tr><td>Text 1</td><td>Text 2</td></tr><tr><td>male</td><td>12</td></tr></tbody></table>
+                                    </div>
+                                    &emsp;<u>Case 2:</u> $redcap['gender'] eq 'female'
+                                    <div>
+                                        <table><tbody><tr><td>Text 1</td><td>Text 2</td></tr></tbody></table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible">Hide/show a row in a table by adding <strong>$showLabelAndRow</strong> to the <strong>{if}</strong> condition that determines if the row should be shown or hidden. <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <u>Syntax:</u> <table><tbody><tr><td>{if $redcap['variable'] eq someValue and <strong>$showLabelAndRow</strong>} Text 1</td><td>Text 2 {/if}</td></tr></tbody></table>
+                                <br/><br/>
+                                <div class="syntax-example">
+                                        Example:
+                                        <div>
+                                            <table>
+                                                <tbody>
+                                                    <tr><td>{if $redcap['age'] gt 20 and <strong>$showLabelAndRow</strong>} Age</td><td>{$redcap['age']} {/if}</td></tr>
+                                                    <tr><td>Admitted</td><td>Yes</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        Output:
+                                        <br/>
+                                        &emsp;<u>Case 1:</u> $redcap['age'] eq 30
+                                        <div>
+                                            <table>
+                                                <tbody>
+                                                    <tr><td>Age</td><td>30</td></tr>
+                                                    <tr><td>Admitted</td><td>Yes</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        &emsp;<u>Case 2:</u> $redcap['age'] eq 18
+                                        <div>
+                                            <table>
+                                                <tbody>
+                                                    <tr><td>Admitted</td><td>Yes</td></tr>
+                                                </tbody>
+                                            </table>
+                                            <br/>
+                                            <span style="color:red">* The age row isn't shown</span>
+                                        </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible">Escape quotes using <strong>\</strong>. <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <p><strong style="color:red">IMPORTANT:</strong> Quotes that appear within quotes must be escaped, otherwise the template will not run.</p>
+                                <div class="syntax-example">
+                                    Example:
+                                    <div>
+                                    {if $redcap['enrollment_arm_1']['institute'] eq 'BC Children<strong style="color:red">\'</strong>s Hospital Research Institute'} The candidate works at the institute. {/if}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible">Add page breaks in template. <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <p><strong style="color:red">IMPORTANT:</strong> When using page breaks, they must never be attached to an if condition, otherwise the temple will have rendering errors</p>
+                                <u>Syntax:</u> In the Source view of the editor find the element you want to add a page break before and add <b>style="page-break-before:always"</b>
+                                <br/><br/>
+                                <div class="syntax-example">
+                                    Example:
+                                    <div>
+                                    <?php print htmlspecialchars("<h1 ") . "<b>style=\"page-break-before:always\"</b>" . htmlspecialchars(">Add a page break before this header</h1>"); ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <h4><u>Fields & Events</u></h4>
+                <?php if (REDCap::isLongitudinal()): ?>
+                    <div class="collapsible-container">
+                        <button class="collapsible">Events <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                        <div class="collapsible-content">
+                        <p><u>NOTE:</u> Events come preformatted for ease of use. Users will have to replace 'field' with the REDCap field they'd like to use.</p>
+                        <?php 
+                            $events = REDCap::getEventNames(TRUE);
+                            foreach ($events as $event)
+                            {
+                                print "<p><strong>$event</strong> -> {\$redcap['$event'][field]}</p>";
+                            }
+                        ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <div class="collapsible-container">
+                    <button class="collapsible">Click to view fields <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                    <div class="collapsible-content">
+                    <p>
+                        <?php if (REDCap::isLongitudinal() && $Proj->project['surveys_enabled']): ?>
+                            <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
+                            To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).</p>
+                            <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
+                        <?php elseif (REDCap::isLongitudinal()): ?>
+                            <u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
+                            To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).
+                        <?php elseif ($Proj->project['surveys_enabled']): ?> 
+                            <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use.</p>
+                            <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
+                        <?php else: ?>
+                            <u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use.
+                        <?php endif;?>
+                    </p>
+                    <?php
+                        $instruments = REDCap::getInstrumentNames();
+                        foreach ($instruments as $unique_name => $label)
+                        {
+                            print "<div class='collapsible-container'><button class='collapsible'>$label <span class='fas fa-caret-down'></span><span class='fas fa-caret-up'></span></button>";
+                            $fields = REDCap::getDataDictionary("array", FALSE, null, array($unique_name));
+                            print "<div class='collapsible-content'>";
+                            foreach ($fields as $index => $field)
+                            {
+                                if ($field["field_type"] !== "descriptive")
+                                {
+                                    print "<p><strong>$index</strong> -> {\$redcap['$index']}</p>";
+                                        
+                                    if (!empty($field["select_choices_or_calculations"]) && $field["field_type"] !== "calc")
+                                    {
+                                        $valuesAndLabels = explode("|", $field["select_choices_or_calculations"]);
+                                        if ($field["field_type"] === "slider")
+                                        {
+                                            $labels = $valuesAndLabels;
+                                        }
+                                        else
+                                        {
+                                            $labels = array();
+                                            foreach($valuesAndLabels as $pair)
+                                            {
+                                                array_push($labels, substr($pair, strpos($pair, ",")+1));
+                                            }
+                                        }
+
+                                        if (sizeof($labels) > 0)
+                                        {
+                                            print "<div style='padding-left:20px'><u>OPTIONS</u>: ";
+                                            foreach($labels as $label)
+                                            {
+                                                print "\"" . trim(strip_tags($label)) . "\", ";
+                                            }
+                                            print "</div>";
+                                        }
+                                    }
+                                }
+                            }
+                            print "<p><strong>{$unique_name}_complete</strong> -> {\$redcap['{$unique_name}_complete']}</p>";
+                            print "<div style='padding-left:20px'><u>OPTIONS</u>: \"Complete\", \"Incomplete\", \"Unverified\"</div>";
+                            print "</div></div>";
+                        }
+                        ?>
+                        <?php if ($Proj->project['surveys_enabled']): ?>
+                        <div class='collapsible-container'>
+                            <button class='collapsible'>Survey Completion Timestamps <span class='fas fa-caret-down'></span><span class='fas fa-caret-up'></span></button>
+                            <div class='collapsible-content'>
+                                <?php
+                                    foreach ($instruments as $unique_name => $label)
+                                    {
+                                        if (!empty($Proj->forms[$unique_name]['survey_id']))
+                                        {
+                                            print "<p><strong>$label</strong> -> {\$redcap['{$unique_name}_timestamp']}</p>";
+                                        }
+                                    }
+                                ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
                 <br/><br/>
                 <form>
                     <table class="table" style="width:100%;">
