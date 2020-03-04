@@ -183,7 +183,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 filebrowserUploadMethod: 'form',
                 fillEmptyBlocks: false,
                 extraAllowedContent: '*{*}',
-                font_names: 'Arial/Arial, Helvetica, sans-serif; Times New Roman/Times New Roman, Times, serif; Courier; DejaVu'
+                font_names: 'Arial/Arial, Helvetica, sans-serif; Times New Roman/Times New Roman, Times, serif; Courier; DejaVu; DejaVu Sans, sans-serif'
             });
         </script>
         <?php
@@ -1236,7 +1236,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         </strong>
                     </p>
                     <p>**The project id will be appended to the template name for identification purposes**</p>
-                    <p><strong style="color:red">**IMPORTANT**</strong> Any image uploaded to the plugin will be saved for future use by <strong>ALL</strong> users. <strong>Do not upload any identifying images.</strong></p>
+                    <p><strong style="color:red">**IMPORTANT**</strong></p>
+                    <ul>
+                        <li>Any image uploaded to the plugin will be saved for future use by <strong>ALL</strong> users. <strong>Do not upload any identifying images.</strong></li>
+                        <li>If you'd like to include HTML unicode characters in your template, you <strong>MUST</strong> use "DejaVu Sans, sans-serif" as your font</li>
+                    </ul>
                 </div>
                 <h4><u>Syntax</u></h4>
                 <div class="collapsible-container">
