@@ -646,7 +646,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * 
      * @since 3.0
      * @return Array An array containing any validation errors, and the template's body, header, and footer contents.
-     * @return Boolean If the template passed validation, then return TRUE.
      */
     public function saveTemplate()
     {
@@ -662,7 +661,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             $HtmlPage = new HtmlPage();
             $HtmlPage->PrintHeaderExt();
-            exit("<div class='yellow'>Nothing was in the editor, therefore, no file was saved</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
+            exit("<div class='yellow'>You shouldn't be seeing this page. You've likely resubmitted your form without any data</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
             $HtmlPage->PrintFooterExt();
         }
         // Template name cannot have director separator in it
@@ -879,7 +878,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             $HtmlPage = new HtmlPage();
             $HtmlPage->PrintHeaderExt();
-            print "<div class='yellow'>Nothing was in the editor, therefore, no file was downloaded</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>";
+            print "<div class='yellow'>You shouldn't be seeing this page. You've likely resubmitted your form without any data</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>";
             $HtmlPage->PrintFooterExt();
         }
     }
@@ -1027,7 +1026,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         
         if (empty($record))
         {
-            // OPTIONAL: Display the project header
             exit("<div class='red'>No record has been select. Please go back and select a record to fill the template.</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
         }
         
@@ -1122,7 +1120,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         </tbody>
                     </table>
                     <div class="row" style="margin-bottom:20px">
-                        <div class="col-md-2"><button id="download-pdf" type="submit" class="btn btn-primary">Download PDF</button></div>
+                        <div class="col-md-2"><button id="download-pdf" type="button" class="btn btn-primary">Download PDF</button></div>
                     </div>
                     <div class="collapsible-container">
                         <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
@@ -1152,6 +1150,20 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         </div>
         <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
         <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
+        <script>
+            $("#download-pdf").click(function () {
+                // Updates the textarea elements that CKEDITOR replaces
+                CKEDITOR.instances.editor.updateElement();
+                if ($("#editor").val() == "" || $("#filename").val() == "")
+                {
+                    alert("You need to enter a template name, AND something in the main editor to download.");
+                }
+                else
+                {
+                    $("form").submit();
+                }
+            });
+        </script>
         <?php 
             print "<script>CKEDITOR.dtd.\$removeEmpty['p'] = true;</script>";
             $this->initializeEditor("header-editor", 200);
@@ -1239,7 +1251,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     <p><strong style="color:red">**IMPORTANT**</strong></p>
                     <ul>
                         <li>Any image uploaded to the plugin will be saved for future use by <strong>ALL</strong> users. <strong>Do not upload any identifying images.</strong></li>
-                        <li>If you'd like to include HTML unicode characters in your template, you <strong>MUST</strong> use "DejaVu Sans, sans-serif" as your font</li>
+                        <li>
+                            If you'd like to include special characters in your template, you <strong>MUST</strong> use "DejaVu Sans, sans-serif" as your font. The module only supports characters from the Windows ANSI encoding.
+                        </li>
                     </ul>
                 </div>
                 <h4><u>Syntax</u></h4>
