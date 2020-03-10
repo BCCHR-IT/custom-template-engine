@@ -1099,7 +1099,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         </div>
                     <?php else: ?>
                         <div class="red" style="max-width: initial;">
-                            <p> This module can save reports to the File Repository,  upon download. This is currently <strong>disabled</strong>, but if you'd like to enable this contact your REDCap administrator.</p>
+                            <p>This module can save reports to the File Repository,  upon download. This is currently <strong>disabled</strong>, but if you'd like to enable this contact your REDCap administrator.</p>
                         </div>
                     <?php endif;?>
                 </div>
