@@ -1934,8 +1934,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      */
     public function generateIndexPage()
     {
-        $template = REDCap::getData("json", 1, null, null, null, TRUE, FALSE, TRUE, null, TRUE);
-
         $this->createModuleFolders();
 
         $rights = REDCap::getUserRights($this->userid);
@@ -1943,7 +1941,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $participant_options = array();
 
         $id_field = REDCap::getRecordIdField();
-        $data = json_decode(REDCap::getData("json", null, array($id_field), null, $rights[$user]["group_id"]), true);
+        $data = json_decode(REDCap::getData("json", null, array($id_field), null, $rights[$this->userid]["group_id"]), true);
 
         foreach($data as $record)
         {
