@@ -872,7 +872,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             }
 
             $dompdf->stream($filename);
-            REDCap::logEvent("Downloaded Report ", $filename , "" ,$_GET["record"]);
+            REDCap::logEvent("Downloaded Report", $filename , "" , $record);
         }
         else
         {
@@ -997,6 +997,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             header('Content-Disposition: attachment; filename="'.basename($zip_name).'"');
             header('Content-length: '.filesize($zip_name));
             readfile($zip_name);
+            REDCap::logEvent("Downloaded Reports ", $template_filename , "" , implode(", ", $records));
         }
         unlink($zip_name);
         exit;
@@ -1113,6 +1114,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     <div class="row">
                                         <div class="col-md-5">
                                             <input id="filename" name="filename" type="text" class="form-control" value="<?php print basename($template_filename, "_$this->pid.html") . " - $record";?>" required>
+                                            <input name="record" type="hidden" value="<?php print $record;?>">
                                         </div>
                                     </div>
                                 </td>
@@ -1922,6 +1924,58 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
+     * For each record in $records, generate a label that contains the record id and all secondary ids.
+     * 
+     * @param Array $records   Array or records.
+     * @since 3.0
+     */
+    function getDropdownOptions($filter = false)
+    {
+        $rights = REDCap::getUserRights($this->userid);
+        $id_field = REDCap::getRecordIdField();
+        $records = json_decode(REDCap::getData("json", null, array($id_field), null, $rights[$this->userid]["group_id"]), true);
+
+        if ($filter) 
+        {
+            $query = "SELECT distinct pk FROM redcap_log_event where description like '%Downloaded Report%' and pk is not null and project_id = " . $this->pid;
+            $result = $this->query($query);
+
+            while ($row = db_fetch_assoc($result)) {
+                $previously_printed .= $row["pk"] . ", ";
+            }
+
+            $previously_printed = explode(",", $previously_printed);
+            $previously_printed = array_map("trim", $previously_printed);
+
+            // Must apply array_unique in case record has been printed more than once
+            $previously_printed = array_unique($previously_printed);
+        }
+
+        foreach($records as $record)
+        {
+            $to_add = $record[$id_field];
+            if (!in_array($to_add, $previously_printed)) 
+            {
+                if (!in_array($to_add, array_keys($participant_options), true))
+                {
+                    $arm = REDCap::isLongitudinal() ? array_pop(explode("arm_", $record["redcap_event_name"])) : "1";
+                    $label = Records::getCustomRecordLabelsSecondaryFieldAllRecords($to_add, true, $arm, false, '');
+
+                    if (!empty($label))
+                    {
+                        $participant_options[$to_add] = "$to_add $label";
+                    }
+                    else
+                    {
+                        $participant_options[$to_add] = $to_add;
+                    }
+                }
+            }
+        }
+        return $participant_options;
+    } 
+
+    /**
      * Generate landing page of module, and initialize modules folders.
      * 
      * Retrieves records in project, and existing project templates from server. REDCap records will
@@ -1937,31 +1991,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $this->createModuleFolders();
 
         $rights = REDCap::getUserRights($this->userid);
-
-        $participant_options = array();
-
-        $id_field = REDCap::getRecordIdField();
-        $data = json_decode(REDCap::getData("json", null, array($id_field), null, $rights[$this->userid]["group_id"]), true);
-
-        foreach($data as $record)
-        {
-            $to_add = $record[$id_field];
-            if (!in_array($to_add, array_keys($participant_options), true))
-            {
-                $arm = REDCap::isLongitudinal() ? array_pop(explode("arm_", $record["redcap_event_name"])) : "1";
-                $label = Records::getCustomRecordLabelsSecondaryFieldAllRecords($to_add, true, $arm, false, '');
-
-                if (!empty($label))
-                {
-                    $participant_options[$to_add] = "$to_add $label";
-                }
-                else
-                {
-                    $participant_options[$to_add] = $to_add;
-                }
-            }
-        }
-
+        $participant_options = $this->getDropdownOptions($_GET["filter"]);
         $total = count($participant_options);
 
         $all_templates = array_diff(scandir($this->templates_dir), array("..", "."));
@@ -2049,6 +2079,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                         Choose up to 20 records
                                     </td>
                                     <td class="data">
+                                        <input id="applyFilter" type="checkbox" <?php print $_GET["filter"] == "1" ? checked : ""; ?>>
+                                        <label for="applyFilter">Filter records that've been previously printed</label>
                                         <?php if (sizeof($participant_options) > 0):?>
                                             <select id="participantIDs" name="participantID[]" class="form-control selectpicker" style="background-color:white" data-live-search="true" data-max-options="20" multiple required>
                                             <?php 
@@ -2061,7 +2093,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                             <p><i style="color:red">If you select more than 1 record, you are unable to preview the report before it downloads.</i></p>
                                             <p><i style="color:red">Large templates may take several seconds, when batch filling.</i></p>
                                         <?php else:?>
-                                            <span>No Existing Records</span>        
+                                            <p>No Existing Records</p>        
                                         <?php endif;?>
                                     </td>
                                 </tr>
@@ -2220,6 +2252,16 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             $("#fill-template-btn").text("Fill Template");
                         }
                     }, 1000)
+                }
+            });
+
+            $('#applyFilter').click(function () {
+                var url = '<?php print $this->getUrl("index.php");?>';
+                if($(this).prop('checked')) {
+                    location.replace(url + '&filter=1');
+                }
+                else {
+                    location.replace(url);
                 }
             });
         </script>
