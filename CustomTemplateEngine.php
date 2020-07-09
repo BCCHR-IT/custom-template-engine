@@ -2080,7 +2080,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     </td>
                                     <td class="data">
                                         <input id="applyFilter" type="checkbox" <?php print $_GET["filter"] == "1" ? checked : ""; ?>>
-                                        <label for="applyFilter">Filter records that've been previously printed</label>
+                                        <label for="applyFilter">Filter records previously processed</label>
                                         <?php if (sizeof($participant_options) > 0):?>
                                             <select id="participantIDs" name="participantID[]" class="form-control selectpicker" style="background-color:white" data-live-search="true" data-max-options="20" multiple required>
                                             <?php 
