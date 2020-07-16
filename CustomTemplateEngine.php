@@ -3,7 +3,7 @@
 namespace BCCHR\CustomTemplateEngine;
 
 /**
- * Require Template Engine Template class, 
+ * Require Template Engine Template class,
  * and autoload.php from Composer.
  */
 require_once "Template.php";
@@ -16,11 +16,11 @@ use Dompdf\Dompdf;
 use DOMDocument;
 use HtmlPage;
 
-class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule 
+class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 {
     /**
      * Class variables.
-     * 
+     *
      * @var String $templates_dir       Directory to store templates.
      * @var String $compiled_dir        Directory to store templates compiled by Smarty template engine.
      * @var String $img_dir             Directory to store images.
@@ -41,7 +41,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         parent::__construct();
         $this->userid = strtolower(USERID);
         /**
-         * External Module functions to get module settings. 
+         * External Module functions to get module settings.
          */
         $this->templates_dir = $this->getSystemSetting("templates-folder");
         $this->compiled_dir = $this->getSystemSetting("compiled-templates-folder");
@@ -69,10 +69,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Creates the templates, compiled templates, and images folders for the module, if they don't exist.
-     * 
-     * Creates the templates, compiled templates, and images folders for the module, if they don't exist. Exits on an error if any of the 
+     *
+     * Creates the templates, compiled templates, and images folders for the module, if they don't exist. Exits on an error if any of the
      * module folders haven't been configured, or if any of the locations aren't writable.
-     * 
+     *
      * @since 1.0
      * @access private
      */
@@ -126,10 +126,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Initializes a CKeditor with all the appropriate plugins.
-     * 
+     *
      * Injects Javascript to initialize the CKEditor in the given textarea element, alongside all its plugins,
      * adjusting its height according to the argument passed.
-     * 
+     *
      * @since 1.0
      * @access private
      * @param String $id    The id of the textarea element to replace with the editor.
@@ -160,7 +160,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 filebrowserUploadMethod: 'form',
                 fillEmptyBlocks: false,
                 extraAllowedContent: '*{*}',
-                font_names: 'Arial/Arial, Helvetica, sans-serif; Times New Roman/Times New Roman, Times, serif; Courier; DejaVu'
+                font_names: 'Arial/Arial, Helvetica, sans-serif; Times New Roman/Times New Roman, Times, serif; Courier; DejaVu; Firefly Sung'
+
             });
         </script>
         <?php
@@ -168,10 +169,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Checks the module permissions.
-     * 
+     *
      * Checks if the necessary directorys have been created, and whether the user has data export and report rights,
      * which are needed to access the module's functionality.
-     * 
+     *
      * @since 1.0
      * @access private
      */
@@ -193,7 +194,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
 
         $rights = REDCap::getUserRights($this->userid);
-        if ($rights[$this->userid]["data_export_tool"] === "0" || !$rights[$this->userid]["reports"]) 
+        if ($rights[$this->userid]["data_export_tool"] === "0" || !$rights[$this->userid]["reports"])
         {
             exit("<div class='red'>You don't have premission to view this page</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
         }
@@ -201,7 +202,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Include HTML to display instructions on Create Record, and Edit Record page.
-     * 
+     *
      * @since 2.6
      * @access private
      */
@@ -212,9 +213,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         <div class="container syntax-rule">
             <h4><u>Instructions</u></h4>
             <p>
-                Build your template in the WYSIWYG editor using the syntax guidelines below. Variables that you wish to pull must be contained in this template. 
+                Build your template in the WYSIWYG editor using the syntax guidelines below. Variables that you wish to pull must be contained in this template.
                 You may format the template however you wish, including using tables.
-                <strong style="color:red"> 
+                <strong style="color:red">
                     When accessing fields in a repeatable event or instrument, this module will automatically pull data from the latest instance.
                 </strong>
             </p>
@@ -458,8 +459,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         </table>
                         <p><u>Note:</u> Use parenthesis '(' and ')' to group expressions.</p>
                         <p>
-                            <u>On operator precedance:</u> 
-                            <strong>and</strong> takes precedance before <strong>or</strong>, therefore 
+                            <u>On operator precedance:</u>
+                            <strong>and</strong> takes precedance before <strong>or</strong>, therefore
                             <strong>"$redcap['enrollment_arm_1']['gender'] eq 'male' or $redcap['enrollment_arm_1']['gender'] eq 'female' and $redcap['enrollment_arm_1']['age'] gt '10'"</strong>
                             will parse <strong>"$redcap['enrollment_arm_1']['gender'] eq 'female' and $redcap['enrollment_arm_1']['age'] gt '10'"</strong> first. To control the order of precedence, use parenthesis.
                         </p>
@@ -648,7 +649,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <button class="collapsible">Events <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                 <div class="collapsible-content">
                 <p><u>NOTE:</u> Events come preformatted for ease of use. Users will have to replace 'field' with the REDCap field they'd like to use.</p>
-                <?php 
+                <?php
                     $events = REDCap::getEventNames(TRUE);
                     foreach ($events as $event)
                     {
@@ -669,7 +670,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <?php elseif (REDCap::isLongitudinal()): ?>
                     <u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
                     To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).
-                <?php elseif ($Proj->project['surveys_enabled']): ?> 
+                <?php elseif ($Proj->project['surveys_enabled']): ?>
                     <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use.</p>
                     <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
                 <?php else: ?>
@@ -688,7 +689,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         if ($field["field_type"] !== "descriptive")
                         {
                             print "<p><strong>$index</strong> -> {\$redcap['$index']}</p>";
-                                
+
                             if (!empty($field["select_choices_or_calculations"]) && $field["field_type"] !== "calc")
                             {
                                 $valuesAndLabels = explode("|", $field["select_choices_or_calculations"]);
@@ -746,7 +747,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     /**
      * Helper function that deletes a file from the File Repository, if REDCap data about it fails
      * to be inserted to the database.Stolen code from redcap version/FileRepository/index.php.
-     * 
+     *
      * @since 1.0
      * @access private
      */
@@ -769,11 +770,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Uploads images from file browser object to server.
-     * 
-     * Uploades images from file browser object to server, after performing 
+     *
+     * Uploades images from file browser object to server, after performing
      * validations. Error returned to user if upload failed. Upon success
      * log event in REDCap.
-     * 
+     *
      * @since 1.0
      */
     public function uploadImages()
@@ -800,7 +801,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 {
                     $tmp_name = $upload["tmp_name"];
                     $check = getimagesize($tmp_name);
-                    
+
                     if ($check !== false)
                     {
                         $name = pathinfo(basename($upload["name"]));
@@ -853,16 +854,16 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         <script type="text/javascript"><?php print "window.parent.CKEDITOR.tools.callFunction($func_num, '$url', \"$message\");"; ?></script>
         <body>
         </body>
-        </html> 
+        </html>
         <?php
     }
 
     /**
      * Generates HTMl to display all images uploaded to the server, that are specific to the project.
-     * 
+     *
      * Retrieve images for the current REDCap project and generate HTML to display, and Javascript
      * that will return the image url on click.
-     * 
+     *
      * @since 1.0
      */
     public function browseImages()
@@ -959,10 +960,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Deletes a template from the server.
-     * 
+     *
      * Template to delete is passed via HTTP POST. Method deletes
      * file from server, and logs event.
-     * 
+     *
      * @since 2.0
      * @return Boolean If template was deleted return TRUE, else return FALSE.
      */
@@ -982,11 +983,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Saves a template.
-     * 
+     *
      * Retrieves body, header, and footer contents of template passed via HTTP POST.
      * Performs validation on the template contents, and saves regardless. If there's
      * any validation errors then the template is saved on server as '<template name>_<pid> - INVALID.html'.
-     * 
+     *
      * @since 2.9.3
      * @return Array An array containing any validation errors, and the template's body, header, and footer contents.
      * @return Boolean If the template passed validation, then return TRUE.
@@ -1027,7 +1028,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $template_errors = $template->validateTemplate($data);
             $header_errors = $template->validateTemplate($header);
             $footer_errors = $template->validateTemplate($footer);
-               
+
             $doc = new DOMDocument();
             $doc->loadHTML("
                 <html>
@@ -1044,7 +1045,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
             // Creating a new template
             if ($action === "create")
-            {  
+            {
                 /**
                  * If template already exists, return error, if not save template.
                  */
@@ -1120,7 +1121,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             $currTemplateName = $filename;
                         }
                     }
-                    else 
+                    else
                     {
                         $other_errors[] = "<b>ERROR</b> Template already exists! Please choose another name";
                         $filename = $name;
@@ -1151,12 +1152,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             $errors["templateErrors"] = $template_errors;
         }
-        
+
         if (!empty($other_errors))
         {
             $errors["otherErrors"] = $other_errors;
         }
-        
+
         if (!empty($errors))
         {
             return array(
@@ -1177,14 +1178,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Outputs a PDF of a report to browser.
-     * 
+     *
      * Retrieves body, header, and footer contents of template passed via HTTP POST.
      * Formats the contents within the PDF, and uses DOMPDF to output PDF to browser.
      * If saving to the File Repository is allowed, then a copy of the PDF is saved there.
      * Upon successful download, log in REDCap Returns Warning if main content editor is empty.
-     * 
+     *
      * Code to save file to the File Repository was taken from redcap version/FileRepository/index.php.
-     * 
+     *
      * @see CustomTemplateEngine::deleteRepositoryFile() For deleting a file from the repository, if metadata failed to create.
      * @since 2.2
      */
@@ -1205,6 +1206,18 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <html>
                     <head>
                         <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
+                        <style>
+                          @font-face {
+                            font-family: 'Firefly Sung';
+                            font-style: normal;
+                            font-weight: normal;
+                            src: url(http://eclecticgeek.com/dompdf/fonts/cjk/fireflysung.ttf) format('truetype');
+                          }
+                          * {
+                            font-family: Firefly Sung, Arial, Helvetica, sans-serif, Times New Roman, Times, serif, Courier, DejaVu;
+                          }
+                        </style>
+
                     </head>
                     <body>
                         <header>$header</header>
@@ -1212,7 +1225,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         <main>$main</main>
                         <script type='text/php'>
                             // Add page number and timestamp to every page
-                            if (isset(\$pdf)) { 
+                            if (isset(\$pdf)) {
                                 \$pdf->page_script('
                                     \$font = \$fontMetrics->get_font(\"Arial, Helvetica, sans-serif\", \"normal\");
                                     \$size = 12;
@@ -1246,8 +1259,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             else
             {
                 $style = $doc->createElement("style", "body, body > table { font-size: 12px;} @page { margin: 50px 50px; }");
-            }   
-            
+            }
+
             $doc->appendChild($style);
 
             // Add page numbers to the footer of every page
@@ -1276,44 +1289,44 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 $dummy_file_name = preg_replace("/[^a-zA-Z-._0-9]/","_",$dummy_file_name);
                 $dummy_file_name = str_replace("__","_",$dummy_file_name);
                 $dummy_file_name = str_replace("__","_",$dummy_file_name);
-                
+
                 $file_extension = "pdf";
                 $stored_name = date('YmdHis') . "_pid" . $this->pid . "_" . generateRandomHash(6) . ".pdf";
 
                 $upload_success = file_put_contents(EDOC_PATH . $stored_name, $filled_template_pdf_content);
 
-                if ($upload_success !== FALSE) 
+                if ($upload_success !== FALSE)
                 {
                     $dummy_file_size = $upload_success;
                     $dummy_file_type = "application/pdf";
-                    
+
                     $file_repo_name = date("Y/m/d H:i:s");
 
                     $sql = "INSERT INTO redcap_docs (project_id,docs_date,docs_name,docs_size,docs_type,docs_comment,docs_rights)
                             VALUES ($this->pid,CURRENT_DATE,'$dummy_file_name.pdf','$dummy_file_size','$dummy_file_type',
                             \"$file_repo_name - $filename ($this->userid)\",NULL)";
-                                    
-                    if ($this->query($sql)) 
+
+                    if ($this->query($sql))
                     {
                         $docs_id = db_insert_id();
 
                         $sql = "INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date)
                                 VALUES('".$stored_name."','".$dummy_file_type."','".$dummy_file_name."','".$dummy_file_size."',
                                 '".$file_extension."','".$this->pid."','".date('Y-m-d H:i:s')."');";
-                                    
-                        if ($this->query($sql)) 
+
+                        if ($this->query($sql))
                         {
                             $doc_id = db_insert_id();
                             $sql = "INSERT INTO redcap_docs_to_edocs (docs_id,doc_id) VALUES ('".$docs_id."','".$doc_id."');";
-                                        
-                            if ($this->query($sql)) 
+
+                            if ($this->query($sql))
                             {
-                                if ($project_language == 'English') 
+                                if ($project_language == 'English')
                                 {
                                     // ENGLISH
                                     $context_msg_insert = "{$lang['docs_22']} {$lang['docs_08']}";
-                                } 
-                                else 
+                                }
+                                else
                                 {
                                     // NON-ENGLISH
                                     $context_msg_insert = ucfirst($lang['docs_22'])." {$lang['docs_08']}";
@@ -1323,15 +1336,15 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 REDCap::logEvent("Custom Template Engine - Uploaded document to file repository", "Successfully uploaded $filename");
                                 $context_msg = str_replace('{fetched}', '', $context_msg_insert);
                                 $database_success = TRUE;
-                            } 
-                            else 
+                            }
+                            else
                             {
                                 /* if this failed, we need to roll back redcap_edocs_metadata and redcap_docs */
                                 $this->query("DELETE FROM redcap_edocs_metadata WHERE doc_id='".$doc_id."';");
                                 $this->query("DELETE FROM redcap_docs WHERE docs_id='".$docs_id."';");
                                 $this->deleteRepositoryFile($stored_name);
                             }
-                        } 
+                        }
                         else
                         {
                             /* if we failed here, we need to roll back redcap_docs */
@@ -1339,18 +1352,18 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             $this->deleteRepositoryFile($stored_name);
                         }
                     }
-                    else 
+                    else
                     {
                         /* if we failed here, we need to delete the file */
                         $this->deleteRepositoryFile($stored_name);
-                    }            
+                    }
                 }
 
-                if ($database_success === FALSE) 
+                if ($database_success === FALSE)
                 {
                     $context_msg = "<b>{$lang['global_01']}{$lang['colon']} {$lang['docs_47']}</b><br>" . $lang['docs_65'] . ' ' . maxUploadSizeFileRespository().'MB'.$lang['period'];
-                                    
-                    if ($super_user) 
+
+                    if ($super_user)
                     {
                         $context_msg .= '<br><br>' . $lang['system_config_69'];
                     }
@@ -1361,8 +1374,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $HtmlPage->PrintFooterExt();
                 }
             }
-
-            $dompdf->stream($filename);
+            // How do we do this without duplicating?
+            $dompdf2 = new Dompdf();
+            $dompdf2->set_option("isHtml5ParserEnabled", true);
+            $dompdf2->set_option("isPhpEnabled", true);
+            $dompdf2->loadHtml($doc->saveHtml());
+            $dompdf2->setPaper("letter", "portrait");
+            $dompdf2->render();
+            $dompdf2->stream($filename);
             REDCap::logEvent("Downloaded Report ", $filename , "" ,$_GET["record"]);
         }
         else
@@ -1376,10 +1395,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Outputs a PDF of a REDcap instrument to browser.
-     * 
+     *
      * Retrieve POSTED record, instrument, and event (if longitudinal) and pass it to a REDcap
      * method that builds the PDF.
-     * 
+     *
      * @since 2.2.4
      */
     public function downloadInstrumentScale()
@@ -1406,47 +1425,47 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
-     * Fills a template with REDCap record data, and displays in 
+     * Fills a template with REDCap record data, and displays in
      * editors for customization, before download.
-     * 
+     *
      * Record id and template name passed via HTTP POST. Template variables are
      * replaced with record data, and returned in the editors rendered. User
      * can customize contents before downloading.
-     * 
+     *
      * @see Template::fillTemplate() For filling template with REDCap record data.
      * @see CustomReporBuilder::initializeEditor() For initializing editors on page.
      * @since 2.2.4
      */
     public function generateFillTemplatePage()
-    {   
+    {
         $rights = REDCap::getUserRights($this->userid);
-        if ($rights[$this->userid]["data_export_tool"] === "0") 
+        if ($rights[$this->userid]["data_export_tool"] === "0")
         {
             exit("<div class='red'>You don't have premission to view this page</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
         }
-        
+
         $record = $_POST["participantID"];
-        
+
         if (empty($record))
         {
             // OPTIONAL: Display the project header
             exit("<div class='red'>No record has been select. Please go back and select a record to fill the template.</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
         }
-        
+
         $template_filename = $_POST['template'];
         $template = new Template($this->templates_dir, $this->compiled_dir);
 
         try
         {
             $filled_template = $template->fillTemplate($template_filename, $record);
-        
+
             $doc = new DOMDocument();
             $doc->loadHTML($filled_template);
-        
+
             $header = $doc->getElementsByTagName("header")->item(0);
             $footer = $doc->getElementsByTagName("footer")->item(0);
             $main = $doc->getElementsByTagName("main")->item(0);
-        
+
             $filled_main = $doc->saveHTML($main);
             $filled_header = empty($header) ? "" : $doc->saveHTML($header);
             $filled_footer = empty($footer)? "" : $doc->saveHTML($footer);
@@ -1457,7 +1476,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
-        <div class="container"> 
+        <div class="container">
             <div class="jumbotron">
                 <div class="row">
                     <div class="col-md-10">
@@ -1565,7 +1584,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     <p><i>An instrument without any data will produce a blank PDF</i></p>
                                     <select id="attach-instrument" name="attach-instrument" class="form-control attach-select">
                                             <option value="">--Select Instrument--</option>
-                                            <?php 
+                                            <?php
                                                 $instruments = REDCap::getInstrumentNames();
                                                 foreach($instruments as $unique_name => $label)
                                                 {
@@ -1593,7 +1612,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         </div>
         <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
         <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
-        <?php 
+        <?php
             $events = REDCap::getEventNames(true);
             if ($events !== FALSE)
             {
@@ -1664,12 +1683,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Generates a page to edit existing templates, or to fix validation errors.
-     * 
-     * If the page is being generated as a result of validation errors, 
-     * then retrieve validation errors, and template contents from the Array given, and display errors at the top of the page. 
-     * Else retrieve template name passed via HTTP Posed, and return template contents are to user in 
+     *
+     * If the page is being generated as a result of validation errors,
+     * then retrieve validation errors, and template contents from the Array given, and display errors at the top of the page.
+     * Else retrieve template name passed via HTTP Posed, and return template contents are to user in
      * editors. Template validation is performed upon saving.
-     * 
+     *
      * @see CustomTemplateEngine::checkPermissions() For checking if the user has permissions to view the page.
      * @see CustomTemplateEngine::generateInstructions() For generating instructions on page.
      * @param Array $info   Array containing validation errors, and the template's contents.
@@ -1708,7 +1727,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
-        <div class="container"> 
+        <div class="container">
             <div class="jumbotron">
                 <div class="row">
                     <div class="col-md-10">
@@ -1795,7 +1814,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     </table>
                     <div class="collapsible-container">
                         <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                        <div class="collapsible-content"> 
+                        <div class="collapsible-content">
                             <p>Anything in the header will appear at the top of every page in the template. All syntax rules apply. <strong>If the header content is too big, it will overlap template data in the PDF.</strong></p>
                             <textarea cols="80" id="header-editor" name="header-editor" rows="10">
                                 <?php print $header_data; ?>
@@ -1829,18 +1848,18 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Generates a page to create a new template.
-     * 
+     *
      * @see CustomTemplateEngine::checkPermissions() For checking if the user has permissions to view the page.
      * @see CustomTemplateEngine::generateInstructions() For generating instructions on page.
      * @see CustomTemplateEngine::initializeEditor() For initializing editors on page.
-     * @since 1.0 
+     * @since 1.0
      */
     public function generateCreateTemplatePage()
     {
         $this->checkPermissions();
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
-        <div class="container"> 
+        <div class="container">
             <div class="jumbotron">
                 <div class="row">
                     <div class="col-md-10">
@@ -1872,7 +1891,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     </table>
                     <div class="collapsible-container">
                         <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
-                        <div class="collapsible-content"> 
+                        <div class="collapsible-content">
                             <p>Anything in the header will appear at the top of every page in the template. All syntax rules apply. <strong>If the header content is too big, it will overlap template data in the PDF.</strong></p>
                             <textarea cols="80" id="header-editor" name="header-editor" rows="10"></textarea>
                         </div>
@@ -1901,12 +1920,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Generate landing page of module, and initialize modules folders.
-     * 
+     *
      * Retrieves records in project, and existing project templates from server. REDCap records will
      * display with any secondary and custom labels. From the landing page, a user can fill, create,
-     * edit, or delete a template. Only valid templates are available to fill, but all templates can be 
+     * edit, or delete a template. Only valid templates are available to fill, but all templates can be
      * edited or deleted.
-     * 
+     *
      * @see CustomTemplateEngine::createModuleFolders() For initializing module folders.
      * @since 2.7
      */
@@ -1963,7 +1982,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
-        <div class="container"> 
+        <div class="container">
             <div class="jumbotron">
                 <?php
                     $created = $_GET["created"];
@@ -1984,15 +2003,15 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 ?>
                 <h3>Custom Template Engine</h3>
                 <hr>
-                <h4>This plugin allows you to create report templates and fill them with data from records in your REDCap project.</h4> 
+                <h4>This plugin allows you to create report templates and fill them with data from records in your REDCap project.</h4>
                 <br>
-                <?php if ($rights[$this->userid]["reports"]) :?> 
+                <?php if ($rights[$this->userid]["reports"]) :?>
                     <div class="container syntax-rule">
                         <a class="btn btn-link" href=<?php print $this->getUrl("CreateTemplate.php");?>>Create New Template</a> |
                         <?php if (sizeof($edit_templates) > 0):?>
-                            <button type="button" class="btn btn-link" data-toggle="modal" data-target="#exampleModalCenter">Edit Template</button> | 
+                            <button type="button" class="btn btn-link" data-toggle="modal" data-target="#exampleModalCenter">Edit Template</button> |
                         <?php else:?>
-                            <button type="button" class="btn btn-link" data-toggle="modal" data-target="#exampleModalCenter" disabled>Edit Template</button> | 
+                            <button type="button" class="btn btn-link" data-toggle="modal" data-target="#exampleModalCenter" disabled>Edit Template</button> |
                         <?php endif;?>
                         <?php if (sizeof($edit_templates) > 0):?>
                             <button type="button" class="btn btn-link" data-toggle="modal" data-target="#deleteTemplateModal">Delete Template</button>
@@ -2025,7 +2044,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                             <input id="participantIDs" class="form-control" style="width:initial;" required>
                                             <input name="participantID" id="participantID-value" type="hidden">
                                         <?php else:?>
-                                            <span>No Existing Records</span>        
+                                            <span>No Existing Records</span>
                                         <?php endif;?>
                                     </td>
                                 </tr>
@@ -2042,7 +2061,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                                 ?>
                                             </select>
                                         <?php else:?>
-                                            <span>No Existing Templates</span>        
+                                            <span>No Existing Templates</span>
                                         <?php endif;?>
                                     </td>
                                 </tr>
@@ -2076,7 +2095,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     {
                                         print "<option value=\"" . $template . "\">" . $template . "</option>";
                                     }
-                                ?>        
+                                ?>
                             </select>
                         </div>
                         <div class="modal-footer">
@@ -2104,7 +2123,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 {
                                     print "<option value=\"" . $template . "\">" . $template . "</option>";
                                 }
-                            ?>        
+                            ?>
                         </select>
                     </div>
                     <div class="modal-footer">
@@ -2138,7 +2157,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         </div>
         <script>
             var options = [
-                <?php 
+                <?php
                     foreach($participant_options as $id => $option)
                     {
                         print "{label: \"" . addslashes($option) ."\", id: '$id'},";
@@ -2176,11 +2195,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Function called by external module that checks whether the user has permissions to use the module.
-     * 
+     *
      * @param String $project_id    Project ID of current REDCap project.
      * @param String $link          Link that redirects to external module.
-     * @return NULL Return null if the user doesn't have permissions to use the module. 
-     * @return String Return link to module if the user has permissions to use it. 
+     * @return NULL Return null if the user doesn't have permissions to use the module.
+     * @return String Return link to module if the user has permissions to use it.
      * @since 1.0
      */
     public function redcap_module_link_check_display($project_id, $link)
