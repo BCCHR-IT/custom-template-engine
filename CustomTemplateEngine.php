@@ -1530,7 +1530,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 <div class="syntax-example">
                                     Example:
                                     <div>
-                                        <strong>{if in_array('Monday', $redcap['weekdays'])}</strong> The day of the week is {$redcap['weekdays']} <strong>{/if}</strong>
+                                        <strong>{if in_array('Monday', $redcap['weekdays'])}</strong> The day of the week is Monday <strong>{/if}</strong>
                                     </div>
                                     Output:
                                     <br/>
