@@ -1937,7 +1937,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
         if ($filter) 
         {
-            $query = "SELECT distinct pk FROM redcap_log_event where description = 'Downloaded Report' and pk is not null and project_id = " . $this->pid;
+            $log_event_table = method_exists('\REDCap', 'getLogEventTable') ? REDCap::getLogEventTable($this->pid) : "redcap_log_event";
+            $query = "SELECT distinct pk FROM $log_event_table where description = 'Downloaded Report' and pk is not null and project_id = " . $this->pid;
             $result = $this->query($query);
 
             while ($row = db_fetch_assoc($result)) {
