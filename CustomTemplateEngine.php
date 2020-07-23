@@ -1253,9 +1253,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     <p><strong style="color:red">**IMPORTANT**</strong></p>
                     <ul>
                         <li>Any image uploaded to the plugin will be saved for future use by <strong>ALL</strong> users. <strong>Do not upload any identifying images.</strong></li>
-                        <li>
-                            If you'd like to include special characters in your template, you <strong>MUST</strong> use "DejaVu Sans, sans-serif" as your font. The module only supports characters from the Windows ANSI encoding.
-                        </li>
                     </ul>
                 </div>
                 <h4><u>Syntax</u></h4>
@@ -1674,6 +1671,24 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     <div>
                                     <?php print htmlspecialchars("<h1 ") . "<b>style=\"page-break-before:always\"</b>" . htmlspecialchars(">Add a page break before this header</h1>"); ?>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="collapsible-container">
+                            <button class="collapsible">Add special characters in template. <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
+                            <div class="collapsible-content">
+                                <p>
+                                    <strong style="color:red">IMPORTANT:</strong> When using special characters you <b>MUST</b> use "DejaVu Sans, sans-serif" as your font. The module only supports characters from the Windows ANSI encoding.
+                                    See <a href="https://www.w3schools.com/charsets/ref_html_ansi.asp"><u>here</u></a> for a list of allowable characters. 
+                                </p>
+                                <u>Syntax:</u> In the Source view of the editor find the entity code for the character you want to use and paste it.</b>
+                                <br/><br/>
+                                <div class="syntax-example">
+                                    Example:
+                                    <p>In source view:</p>
+                                    <div>&amp;copy;</div>
+                                    <p>In editor:</p>
+                                    <div>&copy;</div>
                                 </div>
                             </div>
                         </div>
