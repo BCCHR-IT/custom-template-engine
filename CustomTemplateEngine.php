@@ -1953,19 +1953,44 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         if ($filter) 
         {
             $log_event_table = method_exists('\REDCap', 'getLogEventTable') ? REDCap::getLogEventTable($this->pid) : "redcap_log_event";
-            $query = "SELECT distinct pk FROM $log_event_table 
+
+            // In case records have been deleted, and a new record assigned the previous ID, such as for auto-numbering.
+            $query = "select pk, ts from redcap_log_event where event = 'DELETE' and project_id = " . $this->pid . " order by ts asc";
+            $result = $this->query($query);
+            while ($row = db_fetch_assoc($result)) {
+                $deleted[$row["pk"]] = $row["ts"];
+            }
+
+            $query = "SELECT pk, max(ts) as ts FROM redcap_log_event 
                         where (description = 'Downloaded Report' or description = 'Downloaded Reports')
                         and page = 'ExternalModules/index.php'
                         and pk is not null 
-                        and project_id = " . $this->pid;
+                        and project_id = " . $this->pid .
+                        " group by pk
+                        order by ts asc";
             $result = $this->query($query);
 
             while ($row = db_fetch_assoc($result)) {
-                $previously_printed .= $row["pk"] . ", ";
+                $pk = $row["pk"];
+                if (strpos($pk, ",") != FALSE) {
+                    $pk = explode(",", $pk);
+                    $pk =  array_map("trim", $pk);
+                    foreach($pk as $record) {
+                        $printed[$record] = $row["ts"];
+                    }
+                }
+                else
+                {
+                    $printed[$pk] = $row["ts"];
+                }
             }
 
-            $previously_printed = explode(",", $previously_printed);
-            $previously_printed = array_map("trim", $previously_printed);
+            foreach($printed as $record => $ts) {
+                if ($deleted[$record] && $deleted[$record] > $ts) { // Skip records that have ben deleted
+                    continue;
+                }
+                $previously_printed[] = $record;
+            }
 
             // Must apply array_unique in case record has been printed more than once
             $previously_printed = array_unique($previously_printed);
