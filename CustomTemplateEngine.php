@@ -1955,13 +1955,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $log_event_table = method_exists('\REDCap', 'getLogEventTable') ? REDCap::getLogEventTable($this->pid) : "redcap_log_event";
 
             // In case records have been deleted, and a new record assigned the previous ID, such as for auto-numbering.
-            $query = "select pk, ts from redcap_log_event where event = 'DELETE' and project_id = " . $this->pid . " order by ts asc";
+            $query = "select pk, ts from $log_event_table where event = 'DELETE' and project_id = " . $this->pid . " order by ts asc";
             $result = $this->query($query);
             while ($row = db_fetch_assoc($result)) {
                 $deleted[$row["pk"]] = $row["ts"];
             }
 
-            $query = "SELECT pk, max(ts) as ts FROM redcap_log_event 
+            $query = "SELECT pk, max(ts) as ts FROM $log_event_table 
                         where (description = 'Downloaded Report' or description = 'Downloaded Reports')
                         and page = 'ExternalModules/index.php'
                         and pk is not null 
