@@ -2087,8 +2087,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <hr>
                 <h4>This plugin allows you to create report templates and fill them with data from records in your REDCap project.</h4> 
                 <br>
-                <h6>For Further Information <a href="https://hub.bcchr.ca/pages/viewpage.action?pageId=63607198" style="font-size:inherit; font-family:inherit">Click Here to Go To the Hub Page</a></h6>
-                <br>
                 <?php if ($rights[$this->userid]["reports"]) :?> 
                     <div class="container syntax-rule">
                         <a class="btn btn-link" href=<?php print $this->getUrl("CreateTemplate.php");?>>Create New Template</a> |

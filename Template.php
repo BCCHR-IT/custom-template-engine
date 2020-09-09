@@ -5,7 +5,7 @@ namespace BCCHR\CustomTemplateEngine;
 /**
  * Require Smarty class.
  */
-require_once "vendor/smarty/smarty/libs/Smarty.class.php";
+require_once "vendor/autoload.php";
 
 use REDCap;
 use Smarty;
