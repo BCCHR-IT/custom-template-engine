@@ -40,3 +40,7 @@ Users must have access to data exports and reports in order to delete a template
 ## Filling and Downloading Template
 
 The module users the PHP template engine, Smarty, to fill in the templates with the apprpriate record data. Smarty will compile the template and store it in the previously configured compiled templates folder. The user is free to make edits to the template content before downloading. When the template is downloaded, if saving templates to the file repository has been configured, then the module will do so.
+
+##  Web Application Load Balancing
+
+WARNING:  This module is not currently able to support REDCap instances using load balancers due to the requirement to save templates to the file system.
