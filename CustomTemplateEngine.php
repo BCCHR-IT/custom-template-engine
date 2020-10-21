@@ -217,7 +217,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $rights = REDCap::getUserRights($this->userid);
         if ($rights[$this->userid]["data_export_tool"] === "0" || !$rights[$this->userid]["reports"]) 
         {
-            exit("<div class='red'>You don't have premission to view this page</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
+            exit("<div class='red'>You don't have permission to view this page</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
         }
     }
 
@@ -253,12 +253,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * 
      * @param String $filename         Name of file
      * @param String $file_contents    Contents of file
-     * @param STring $file_extension   File extension
+     * @param String $file_extension File extension
+     * @return bool always returns true
      * @see CustomTemplateEngine::deleteRepositoryFile() For deleting a file from the repository, if metadata failed to create.
      * @since 3.0
      */
     private function saveToFileRepository($filename, $file_contents, $file_extension)  
     {   
+        global $project_language;
         // Upload the compiled report to the File Repository
         $errors = array();
         $database_success = FALSE;
@@ -341,7 +343,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             $context_msg = "<b>{$lang['global_01']}{$lang['colon']} {$lang['docs_47']}</b><br>" . $lang['docs_65'] . ' ' . maxUploadSizeFileRespository().'MB'.$lang['period'];
                             
-            if ($super_user) 
+            if (SUPER_USER) 
             {
                 $context_msg .= '<br><br>' . $lang['system_config_69'];
             }
@@ -426,7 +428,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     /**
      * Uploads images from file browser object to server.
      * 
-     * Uploades images from file browser object to server, after performing 
+     * Uploads images from file browser object to server, after performing 
      * validations. Error returned to user if upload failed. Upon success
      * log event in REDCap.
      * 
