@@ -10,7 +10,6 @@ require_once "Template.php";
 
 use REDCap;
 use Project;
-use Records;
 use Dompdf\Dompdf;
 use DOMDocument;
 use HtmlPage;
@@ -1938,6 +1937,137 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
+     * Obtain custom record label & secondary unique field labels for ALL records.
+	 * Limit by array of record names. If provide $records parameter as a single record string, then return string (not array).
+	 * Return array with record name as key and label as value.
+	 * If $arm == 'all', then get labels for the first event in EVERY arm (assuming multiple arms),
+	 * and also return
+     * 
+     * Copied from the identical function in REDCap's Records class.
+     * 
+     * @since 3.1
+     */
+    private function getCustomRecordLabelsSecondaryFieldAllRecords($records=array(), $removeHtml=false, $arm=null, $boldSecondaryPkValue=false, $cssClass='crl')
+	{
+		global $secondary_pk, $custom_record_label, $Proj;
+		// Determine which arm to pull these values for
+		if ($arm == 'all' && $Proj->longitudinal && $Proj->multiple_arms) {
+			// If project has more than one arm, then get first event_id of each arm
+			$event_ids = array();
+			foreach (array_keys($Proj->events) as $this_arm) {
+				$event_ids[] = $Proj->getFirstEventIdArm($this_arm);
+			}
+		} else {
+			// Get arm
+			if ($arm === null) $arm = getArm();
+			// Get event_id of first event of the given arm
+			$event_ids = array($Proj->getFirstEventIdArm(is_numeric($arm) ? $arm : getArm()));
+		}
+		// Place all records/labels in array
+		$extra_record_labels = array();
+		// If $records is a string, then convert to array
+		$singleRecordName = null;
+		if (!is_array($records)) {
+			$singleRecordName = $records;
+			$records = array($records);
+		}
+		// Set flag to limit records
+		$limitRecords = !empty($records);
+		// Customize the Record ID pulldown menus using the SECONDARY_PK appended on end, if set.
+		if ($secondary_pk != '')
+		{
+			// Get validation type of secondary unique field
+			$val_type = $Proj->metadata[$secondary_pk]['element_validation_type'];
+			$convert_date_format = (substr($val_type, 0, 5) == 'date_' && (substr($val_type, -4) == '_mdy' || substr($val_type, -4) == '_mdy'));
+			// Set secondary PK field label
+			$secondary_pk_label = $Proj->metadata[$secondary_pk]['element_label'];
+			// PIPING: Obtain saved data for all piping receivers used in secondary PK label
+			if (strpos($secondary_pk_label, '[') !== false && strpos($secondary_pk_label, ']') !== false) {
+				// Get fields in the label
+				$secondary_pk_label_fields = array_keys(getBracketedFields($secondary_pk_label, true, true, true));
+				// If has at least one field piped in the label, then get all the data for these fields and insert one at a time below
+				if (!empty($secondary_pk_label_fields)) {
+					$piping_record_data = Records::getData('array', $records, $secondary_pk_label_fields, $event_ids);
+				}
+			}
+			// Get back-end data for the secondary PK field
+			$sql = "select record, event_id, value from redcap_data
+					where project_id = ".PROJECT_ID." and field_name = '$secondary_pk'
+					and event_id in (" . prep_implode($event_ids) . ")";
+			if ($limitRecords) {
+				$sql .= " and record in (" . prep_implode($records) . ")";
+			}
+			$q = db_query($sql);
+			while ($row = db_fetch_assoc($q))
+			{
+				// Set the label for this loop (label may be different if using piping in it)
+				if (isset($piping_record_data)) {
+					// Piping: pipe record data into label for each record
+					$this_secondary_pk_label = Piping::replaceVariablesInLabel($secondary_pk_label, $row['record'], $event_ids, 1, $piping_record_data);
+				} else {
+					// Static label for all records
+					$this_secondary_pk_label = $secondary_pk_label;
+				}
+				// If the secondary unique field is a date/time field in MDY or DMY format, then convert to that format
+				if ($convert_date_format) {
+					$row['value'] = DateTimeRC::datetimeConvert($row['value'], 'ymd', substr($val_type, -3));
+				}
+				// Set text value
+				$this_string = "(" . remBr($this_secondary_pk_label . " " .
+							   ($boldSecondaryPkValue ? "<b>" : "") .
+							   decode_filter_tags($row['value'])) .
+							   ($boldSecondaryPkValue ? "</b>" : "") .
+							   ")";
+				// Add HTML around string (unless specified otherwise)
+				$extra_record_labels[$Proj->eventInfo[$row['event_id']]['arm_num']][$row['record']] = ($removeHtml) ? $this_string : RCView::span(array('class'=>$cssClass), $this_string);
+			}
+			db_free_result($q);
+		}
+		// [Retrieval of ALL records] If Custom Record Label is specified (such as "[last_name], [first_name]"), then parse and display
+		// ONLY get data from FIRST EVENT
+		if (!empty($custom_record_label))
+		{
+			// Loop through each event (will only be one UNLESS we are attempting to get label for multiple arms)
+			$customRecordLabelsArm = array();
+			foreach ($event_ids as $this_event_id) {
+				$customRecordLabels = getCustomRecordLabels($custom_record_label, $this_event_id, ($singleRecordName ? $records[0]: null));
+				if (!is_array($customRecordLabels)) $customRecordLabels = array($records[0]=>$customRecordLabels);
+				$customRecordLabelsArm[$Proj->eventInfo[$this_event_id]['arm_num']] = $customRecordLabels;
+			}
+			foreach ($customRecordLabelsArm as $this_arm=>&$customRecordLabels)
+			{
+				foreach ($customRecordLabels as $this_record=>$this_custom_record_label)
+				{
+					// If limiting by records, ignore if not in $records array
+					if ($limitRecords && !in_array($this_record, $records)) continue;
+					// Set text value
+					$this_string = remBr(decode_filter_tags($this_custom_record_label));
+					// Add initial space OR add placeholder
+					if (isset($extra_record_labels[$this_arm][$this_record])) {
+						$extra_record_labels[$this_arm][$this_record] .= ' ';
+					} else {
+						$extra_record_labels[$this_arm][$this_record] = '';
+					}
+					// Add HTML around string (unless specified otherwise)
+					$extra_record_labels[$this_arm][$this_record] .= ($removeHtml) ? $this_string : RCView::span(array('class'=>$cssClass), $this_string);
+				}
+			}
+			unset($customRecordLabels);
+		}
+		// If we're not collecting multiple arms here, then remove arm key
+		if ($arm != 'all') {
+			$extra_record_labels = array_shift($extra_record_labels);
+		}
+		// Return string (single record only)
+		if ($singleRecordName != null) {
+			return (isset($extra_record_labels[$singleRecordName])) ? $extra_record_labels[$singleRecordName] : '';
+		} else {
+			// Return array
+			return $extra_record_labels;
+		}
+	}
+
+    /**
      * For each record in $records, generate a label that contains the record id and all secondary ids.
      * 
      * @param Array $records   Array or records.
@@ -1995,6 +2125,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $previously_printed = array_unique($previously_printed);
         }
 
+        $custom_labels = $this->getCustomRecordLabelsSecondaryFieldAllRecords(array_column($records, $id_field), true, "all", false, "");
+        //var_dump($custom_labels);
         foreach($records as $record)
         {
             $to_add = $record[$id_field];
@@ -2002,9 +2134,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             {
                 if (!in_array($to_add, array_keys($participant_options), true))
                 {
-                    $arm = REDCap::isLongitudinal() ? array_pop(explode("arm_", $record["redcap_event_name"])) : "1";
-                    $label = Records::getCustomRecordLabelsSecondaryFieldAllRecords($to_add, true, $arm, false, '');
-
+                    $arm_num = REDCap::isLongitudinal() ? array_pop(explode("arm_", $record["redcap_event_name"])) : "1";;
+                    $label = $custom_labels[$arm_num][$to_add]; 
                     if (!empty($label))
                     {
                         $participant_options[$to_add] = "$to_add $label";
@@ -2312,6 +2443,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Function called by external module that checks whether the user has permissions to use the module.
+     * User needs permissions to export data in order to use module.
      * 
      * @param String $project_id    Project ID of current REDCap project.
      * @param String $link          Link that redirects to external module.

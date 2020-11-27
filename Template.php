@@ -5,7 +5,7 @@ namespace BCCHR\CustomTemplateEngine;
 /**
  * Require Smarty class.
  */
-require_once "vendor/autoload.php";
+require_once "vendor/smarty/smarty/libs/Smarty.class.php";
 
 use REDCap;
 use Smarty;
@@ -49,15 +49,42 @@ class Template
     }
 
     /**
+     * Checks whether all the siblings that come before or after an html element are empty
+     *
+     * @access private
+     * @param DOMNode $elem                 Root element.
+     * @param String $whichSibling          Which sibling/direction to check. Can be either "previous" or "next". 
+     * @return Boolean                      True if the given element and all its siblings are empty, false otherwise.
+     */
+    private function areSiblingsEmpty($elem, $whichSibling)
+    {   
+        if ($elem == null)
+        {
+            return true;
+        }
+        else if ($whichSibling == "previous")
+        {
+            return $this->areSiblingsEmpty($elem->previousSibling, "previous") && empty($elem->nodeValue);
+        }
+        else 
+        {
+            return $this->areSiblingsEmpty($elem->nextSibling, "next") && empty($elem->nodeValue);
+        }
+    }
+
+    /**
      * Retrieves empty child nodes within given element.
      * 
      * @access private
-     * @param DOMNode $elem     Root element.
-     * @return Array            An array of all empty nodes.
+     * @see Template::areSiblingsEmpty()    For checking whether a table row is empty of data.
+     * @param DOMNode $elem                 Root element.
+     * @return Array                        An array of all empty nodes.
      */
     private function getEmptyNodes($elem)
     {
         $empty_elems = array();
+
+        $isEmptyOrWhitespace = ctype_space($elem->nodeValue) || str_replace(array(" ", "\xC2\xA0"), "", $elem->nodeValue) == "";
 
         if ($elem->hasChildNodes())
         {
@@ -70,23 +97,15 @@ class Template
         /**
          * Checks for special whitespace characters, and tags that don't contain children.
          */
-        else if ((ctype_space($elem->nodeValue) || str_replace(array(" ", "\xC2\xA0"), "", $elem->nodeValue) == "") && 
-                $elem->tagName != "img" && $elem->tagName != "body" && $elem->tagName != "hr" && $elem->tagName != "br")
+        else if ($isEmptyOrWhitespace && $elem->tagName != "img" && $elem->tagName != "body" && $elem->tagName != "hr" && $elem->tagName != "br")
         {
             /**
-             * Empty table data elements and headers may pad out other data in table. 
+             * Empty <td> and <th> elements may pad out other data in table. 
              * Make sure the entire row is empty, before removing.
              */
-            if ($elem->tagName == "td")
+            if ($elem->tagName == "td" || $elem->tagName == "th")
             {
-                if (empty($elem->previousSibling) && $elem->previousSibling->tagName != "td")
-                {
-                    $empty_elems[] = $elem;
-                }
-            }
-            else if ($elem->tagName == "th")
-            {
-                if (empty($elem->previousSibling) && $elem->previousSibling->tagName != "th")
+                if ($this->areSiblingsEmpty($elem->previousSibling, "previous") && $this->areSiblingsEmpty($elem->nextSibling, "next") && empty($elem->nodeValue))
                 {
                     $empty_elems[] = $elem;
                 }
@@ -1191,7 +1210,7 @@ class Template
                 {
                     $elem->parentNode->removeChild($elem);
                 }
-                $empty_elems = $this->getEmptyNodes($body);
+                $empty_elems = $this->getEmptyNodes($body); // There may be new empty nodes after the previous ones were removed.
             }
             $filled_template = $doc->saveHTML();
         }
