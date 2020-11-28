@@ -7,7 +7,6 @@ namespace BCCHR\CustomTemplateEngine;
  * and autoload.php from Composer.
  */
 require_once "Template.php";
-require_once "vendor/autoload.php";
 
 use REDCap;
 use Project;
