@@ -429,7 +429,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * validations. Error returned to user if upload failed. Upon success
      * log event in REDCap.
      * 
-     * @since 1.0
+     * @since 3.1
      */
     public function uploadImages()
     {
@@ -463,8 +463,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
                         if (move_uploaded_file($tmp_name, $this->img_dir . $filename))
                         {
-                            $url = $this->img_dir . $filename;
-                            REDCap::logEvent("Photo uploaded", $this->img_dir . $filename);
+                            $realpath = realpath($this->img_dir);
+                            $publicly_accessible_start_pos = strpos($realpath, "redcap");
+                            $path = substr($realpath, $publicly_accessible_start_pos);
+
+                            $url = "https://" . $_SERVER["SERVER_NAME"] . "/$path/" . $filename;
+                            REDCap::logEvent("Photo uploaded", $filename);
                         }
                         else
                         {
@@ -518,7 +522,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * Retrieve images for the current REDCap project and generate HTML to display, and Javascript
      * that will return the image url on click.
      * 
-     * @since 1.0
+     * @since 3.1
      */
     public function browseImages()
     {
@@ -566,10 +570,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $all_imgs = array();
                     foreach($proj_imgs as $img)
                     {
+                        $realpath = realpath($this->img_dir);
+                        $publicly_accessible_start_pos = strpos($realpath, "redcap");
+                        $path = substr($realpath, $publicly_accessible_start_pos);
+                        
                         array_push(
                             $all_imgs,
                             array(
-                                "url" => $this->img_dir . $img,
+                                "url" => "https://" . $_SERVER["SERVER_NAME"] . "/$path/" . $img,
                                 "name" => $img
                             )
                         );
@@ -848,6 +856,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $dompdf->set_option("isHtml5ParserEnabled", true);
             $dompdf->set_option("isPhpEnabled", true);
             $dompdf->loadHtml($contents);
+
+            $dompdf->set_option('isRemoteEnabled', TRUE);
 
             // Setup the paper size and orientation
             $dompdf->setPaper("letter", "portrait");
