@@ -947,6 +947,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         $dompdf->set_option("isPhpEnabled", true);
                         $dompdf->loadHtml($contents);
 
+                        $dompdf->set_option('isRemoteEnabled', TRUE);
+
                         // Setup the paper size and orientation
                         $dompdf->setPaper("letter", "portrait");
                         // Render the HTML as PDF
