@@ -220,6 +220,81 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
     }
 
+    /**
+     * Saves a file to a REDCap field in the project. Assumes the field is a file upload field. Returns false on failure, and true otherwise.
+     * Currently no compatible with repeating events.
+     */
+    private function saveFileToField($filename, $file_contents, $field_name, $record, $event_id)
+    {
+        // Save file to edocs tables in the REDCap database
+        $database_success = FALSE;
+        $upload_success = FALSE;
+
+        $dummy_file_name = $filename;
+        $dummy_file_name = preg_replace("/[^a-zA-Z-._0-9]/","_",$dummy_file_name);
+        $dummy_file_name = str_replace("__","_",$dummy_file_name);
+        $dummy_file_name = str_replace("__","_",$dummy_file_name);
+
+        $stored_name = date('YmdHis') . "_pid" . $this->pid . "_" . generateRandomHash(6) . ".pdf";
+
+        $upload_success = file_put_contents(EDOC_PATH . $stored_name, $file_contents);
+
+        if ($upload_success !== FALSE) 
+        {
+            $sql = "INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date)
+                        VALUES('".$stored_name."','".$dummy_file_type."','".$dummy_file_name."','".$dummy_file_size."',
+                        '".pdf."','".$this->pid."','".date('Y-m-d H:i:s')."');";
+                            
+            if ($this->query($sql)) 
+            {
+                $docs_id = db_insert_id();
+
+                # See if field has had a previous value. If so, update; if not, insert.
+                $sql = "SELECT value
+                FROM redcap_data
+                WHERE project_id = $project_id
+                    AND record = '$record'
+                    AND event_id = $event_id
+                    AND field_name = '$field_name' 
+                    AND instance is NULL";
+                
+                $result = $this->query($sql);
+
+                if (mysqli_num_rows($result) > 0) // row exists
+                {
+                    # Set the file as "deleted" in redcap_edocs_metadata table, but don't really delete the file or the table entry (unless the File Version History is enabled for the project)
+                    // if (!Files::fileUploadVersionHistoryEnabledProject($this->pid)) {
+                    //     $id = db_result($result, 0, 0);
+                    //     $sql = "UPDATE redcap_edocs_metadata SET delete_date = '" . NOW . "' WHERE doc_id = $id";
+                    //     $this->query($sql);
+                    // }
+
+                    $sql = "UPDATE redcap_data
+                            SET value = '$docs_id'
+                            WHERE project_id = $this->pid
+                                AND record = '".db_escape($record)."'
+                                AND event_id = $event_id
+                                AND field_name = '".db_escape($field_name)."'
+                                AND instance is NULL";
+
+                    $this->query($sql);
+                }
+                else // row did not exist
+                {
+                    // Add edoc_id to data table
+                    $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance)
+                            VALUES ($this->pid, $event_id, '".db_escape($record)."', '$field_name', '$docs_id', null)";
+                    
+                    $this->query($sql);
+                }
+            }
+        }
+
+        // Retrieve the new edoc id and associate it with the field in the redcap_data table in the database.
+
+        return false;
+    }
+
 
     /**
      * Helper function that deletes a file from the File Repository, if REDCap data about it fails
@@ -881,6 +956,18 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
             $dompdf->stream($filename);
             REDCap::logEvent("Downloaded Report", $filename , "" , $record);
+
+            // Save report to a field
+            $field_name = $_POST["save-report-to-field-val"];
+            if (!empty($field_name))
+            {
+                $record_id_field = REDCap::getRecordIdField();
+                $event_data = json_decode(REDCap::getData($this->pid, "json", $record, array($record_id_field, $field_name)), true);
+                $event_name = $event_data[0]["redcap_event_name"];
+                $event_id = REDCap::getEventIdFromUniqueEvent($event_name);
+
+                $this->saveFileToField($filename, $filled_template_pdf_content, $field_name, $record, $event_id);
+            }
         }
         else
         {
@@ -1011,7 +1098,28 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
         unlink($zip_name);
         exit;
-    }   
+    }  
+
+    /**
+     * Get all fields in the project of type file.
+     * 
+     * @since 3.1
+     */
+    private function getAllFileFields()
+    {
+        $file_fields = array();
+        $data_dictionary = REDCap::getDataDictionary("array");
+
+        foreach ($data_dictionary as $field_name => $field_attributes)
+        {
+            if ($field_attributes["field_type"] == "file")
+            {
+                $file_fields[] = $field_name;
+            }
+        }
+
+        return $file_fields;
+    }
 
     /**
      * Fills a template with REDCap record data, and displays in 
@@ -1125,6 +1233,25 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                         <div class="col-md-5">
                                             <input id="filename" name="filename" type="text" class="form-control" value="<?php print basename($template_filename, "_$this->pid.html") . " - $record";?>" required>
                                             <input name="record" type="hidden" value="<?php print $record;?>">
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="width:25%;">Save Report to A Field <strong style="color:black">(Optional)</strong><br><br>This will save the report to a field in the record you chose.</td>
+                                <td class="data">
+                                    <div class="row">
+                                        <div class="col-md-5">
+                                            <select id="save-report-to-field-dropdown" name="save-report-to-field-val" class="form-control selectpicker">
+                                                <option value="">-No Value Selected-</option>
+                                                <?php
+                                                $file_fields = $this->getAllFileFields();
+                                                foreach($file_fields as $field)
+                                                {
+                                                    print "<option value='$field'>$field</option>";
+                                                } 
+                                                ?>
+                                            </select>
                                         </div>
                                     </div>
                                 </td>
