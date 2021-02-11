@@ -230,7 +230,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $database_success = FALSE;
         $upload_success = FALSE;
 
-        $dummy_file_name = $filename;
+        $dummy_file_name = $filename . ".pdf";
         $dummy_file_name = preg_replace("/[^a-zA-Z-._0-9]/","_",$dummy_file_name);
         $dummy_file_name = str_replace("__","_",$dummy_file_name);
         $dummy_file_name = str_replace("__","_",$dummy_file_name);
@@ -241,9 +241,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
         if ($upload_success !== FALSE) 
         {
-            $sql = "INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date)
-                        VALUES('".$stored_name."','".$dummy_file_type."','".$dummy_file_name."','".$dummy_file_size."',
-                        '".pdf."','".$this->pid."','".date('Y-m-d H:i:s')."');";
+            $dummy_file_size = $upload_success;
+
+            $sql = "INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date) 
+                    VALUES ('$stored_name','application/pdf','$dummy_file_name','$dummy_file_size','pdf','$this->pid','" . date('Y-m-d H:i:s') . "')";
                             
             if ($this->query($sql)) 
             {
@@ -252,9 +253,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 # See if field has had a previous value. If so, update; if not, insert.
                 $sql = "SELECT value
                 FROM redcap_data
-                WHERE project_id = $project_id
+                WHERE project_id = '$project_id'
                     AND record = '$record'
-                    AND event_id = $event_id
+                    AND event_id = '$event_id'
                     AND field_name = '$field_name' 
                     AND instance is NULL";
                 
@@ -263,34 +264,37 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 if (mysqli_num_rows($result) > 0) // row exists
                 {
                     # Set the file as "deleted" in redcap_edocs_metadata table, but don't really delete the file or the table entry (unless the File Version History is enabled for the project)
-                    // if (!Files::fileUploadVersionHistoryEnabledProject($this->pid)) {
-                    //     $id = db_result($result, 0, 0);
-                    //     $sql = "UPDATE redcap_edocs_metadata SET delete_date = '" . NOW . "' WHERE doc_id = $id";
-                    //     $this->query($sql);
-                    // }
+                    $Proj = new Project();
+                    if (!(($GLOBALS['file_upload_versioning_global_enabled'] != '') && $Proj->project['file_upload_versioning_enabled'] == '1')) {
+                        $id = db_result($result, 0, 0);
+                        $sql = "UPDATE redcap_edocs_metadata SET delete_date = '" . NOW . "' WHERE doc_id = $id";
+                        $this->query($sql);
+                    }
 
                     $sql = "UPDATE redcap_data
                             SET value = '$docs_id'
                             WHERE project_id = $this->pid
-                                AND record = '".db_escape($record)."'
+                                AND record = '$record'
                                 AND event_id = $event_id
-                                AND field_name = '".db_escape($field_name)."'
+                                AND field_name = '$field_name'
                                 AND instance is NULL";
-
-                    $this->query($sql);
                 }
                 else // row did not exist
                 {
+                    // Save it to the latest repeatable instance, otherwise null
+                    $instance = NULL;
+
                     // Add edoc_id to data table
                     $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance)
-                            VALUES ($this->pid, $event_id, '".db_escape($record)."', '$field_name', '$docs_id', null)";
-                    
-                    $this->query($sql);
+                            VALUES ($this->pid, $event_id, '$record', '$field_name', '$docs_id', $instance)";
+                }
+
+                if ($this->query($sql))
+                {
+                    return true;
                 }
             }
         }
-
-        // Retrieve the new edoc id and associate it with the field in the redcap_data table in the database.
 
         return false;
     }
@@ -955,18 +959,50 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             }
 
             $dompdf->stream($filename);
-            REDCap::logEvent("Downloaded Report", $filename , "" , $record);
+            REDCap::logEvent("Custom Template Engine - Downloaded Report", $filename , "" , $record);
 
             // Save report to a field
+            $event_name = $_POST["save-report-to-event-val"];
             $field_name = $_POST["save-report-to-field-val"];
+
             if (!empty($field_name))
             {
-                $record_id_field = REDCap::getRecordIdField();
-                $event_data = json_decode(REDCap::getData($this->pid, "json", $record, array($record_id_field, $field_name)), true);
-                $event_name = $event_data[0]["redcap_event_name"];
-                $event_id = REDCap::getEventIdFromUniqueEvent($event_name);
+                if (!empty($event_name))
+                {
+                    $event_id = REDCap::getEventIdFromUniqueEvent($event_name);
+                }
+                else 
+                {
+                    // SQL to retrieve the first event ID of the first event in the project.
+                    $sql = "SELECT event_id FROM redcap_events_metadata 
+                            join redcap_events_arms on
+                            redcap_events_metadata.arm_id = redcap_events_arms.arm_id
+                            where redcap_events_arms.project_id = $this->pid
+                            order by event_id asc
+                            limit 1";
 
-                $this->saveFileToField($filename, $filled_template_pdf_content, $field_name, $record, $event_id);
+                    $result = $this->query($sql);
+                    if ($result)
+                    {
+                        while($row = $result->fetch_assoc()){
+                            $event_id = $row["event_id"];
+                        }
+                    }
+                    else 
+                    {
+                        REDCap::logEvent("Custom Template Engine - Trouble retrieving first event ID for saving report to a record field, for a classic project.", "", "", $record);
+                        return;
+                    }
+                }
+                
+                if (!$this->saveFileToField($filename, $filled_template_pdf_content, $field_name, $record, $event_id))
+                {
+                    REDCap::logEvent("Custom Template Engine - Failed to Save Report to Field!", "Field name: $field_name", "", $record);
+                }
+                else
+                {
+                    REDCap::logEvent("Custom Template Engine - Saved Report to Field!", "Sved '$filename' to $field_name", "" , $record);
+                }
             }
         }
         else
@@ -1242,8 +1278,20 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 <td class="data">
                                     <div class="row">
                                         <div class="col-md-5">
+                                            <?php if (REDCap::isLongitudinal()) :?>
+                                            <select id="save-report-to-event-dropdown" name="save-report-to-event-val" class="form-control selectpicker">
+                                                <option value="">-Select an event-</option>
+                                                <?php
+                                                $events = REDCap::getEventNames(true, true);
+                                                foreach($events as $event)
+                                                {
+                                                    print "<option value='$event'>$event</option>";
+                                                } 
+                                                ?>
+                                            </select>
+                                            <?php endif; ?>
                                             <select id="save-report-to-field-dropdown" name="save-report-to-field-val" class="form-control selectpicker">
-                                                <option value="">-No Value Selected-</option>
+                                                <option value="">-Select a field-</option>
                                                 <?php
                                                 $file_fields = $this->getAllFileFields();
                                                 foreach($file_fields as $field)
