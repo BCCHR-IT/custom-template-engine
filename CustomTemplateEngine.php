@@ -249,23 +249,50 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             if ($this->query($sql)) 
             {
                 $docs_id = db_insert_id();
+                
+                // Always save report to the latest repeatable instance, otherwise null
+                $record_data = REDCap::getData("json", $record, null, null, null, TRUE, FALSE, TRUE, null, TRUE);
+                $json = json_decode($record_data, true);
 
-                # See if field has had a previous value. If so, update; if not, insert.
+                foreach($json as $index => $event_data)
+                {
+                    $redcap_repeat_instance = $event_data["redcap_repeat_instance"];
+                    if (isset($redcap_repeat_instance) && empty($redcap_repeat_instance))
+                    {
+                        $instance = 1;
+                    }
+                    else if (isset($redcap_repeat_instance) && !empty($redcap_repeat_instance))
+                    { 
+                        $instance = $redcap_repeat_instance;
+                    }
+                }
+
+                // See if field has had a previous value. If so, update; if not, insert.
                 $sql = "SELECT value
-                FROM redcap_data
-                WHERE project_id = '$project_id'
-                    AND record = '$record'
-                    AND event_id = '$event_id'
-                    AND field_name = '$field_name' 
-                    AND instance is NULL";
+                        FROM redcap_data
+                        WHERE project_id = '$this->pid'
+                            AND record = '$record'
+                            AND event_id = '$event_id'
+                            AND field_name = '$field_name'";
+
+                if (!isset($instance))
+                {
+                    $sql .= " AND instance is NULL";
+                }
+                else
+                {
+                    $sql .= " AND instance = '$instance'";
+                }
                 
                 $result = $this->query($sql);
 
                 if (mysqli_num_rows($result) > 0) // row exists
                 {
-                    # Set the file as "deleted" in redcap_edocs_metadata table, but don't really delete the file or the table entry (unless the File Version History is enabled for the project)
+                    // Set the file as "deleted" in redcap_edocs_metadata table, but don't really delete the file or the table entry (unless the File Version History is enabled for the project)
                     $Proj = new Project();
-                    if (!(($GLOBALS['file_upload_versioning_global_enabled'] != '') && $Proj->project['file_upload_versioning_enabled'] == '1')) {
+
+                    if ($GLOBALS['file_upload_versioning_global_enabled'] == '' && $Proj->project['file_upload_versioning_enabled'] != '1')
+                    {
                         $id = db_result($result, 0, 0);
                         $sql = "UPDATE redcap_edocs_metadata SET delete_date = '" . NOW . "' WHERE doc_id = $id";
                         $this->query($sql);
@@ -276,17 +303,30 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             WHERE project_id = $this->pid
                                 AND record = '$record'
                                 AND event_id = $event_id
-                                AND field_name = '$field_name'
-                                AND instance is NULL";
+                                AND field_name = '$field_name'";
+
+                    if (!isset($instance))
+                    {
+                        $sql .= " AND instance is NULL";
+                    }
+                    else
+                    {
+                        $sql .= " AND instance = '$instance'";
+                    }
                 }
                 else // row did not exist
                 {
-                    // Save it to the latest repeatable instance, otherwise null
-                    $instance = NULL;
-
-                    // Add edoc_id to data table
-                    $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance)
+                    // Add an entry in redcap_data that contains the edoc ID
+                    if (!isset($instance))
+                    {
+                        $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance)
+                            VALUES ($this->pid, $event_id, '$record', '$field_name', '$docs_id', null)";
+                    }
+                    else
+                    {
+                        $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance)
                             VALUES ($this->pid, $event_id, '$record', '$field_name', '$docs_id', $instance)";
+                    }
                 }
 
                 if ($this->query($sql))
@@ -1001,7 +1041,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 }
                 else
                 {
-                    REDCap::logEvent("Custom Template Engine - Saved Report to Field!", "Sved '$filename' to $field_name", "" , $record);
+                    REDCap::logEvent("Custom Template Engine - Saved Report to Field!", "Saved '$filename' to $field_name", "" , $record);
                 }
             }
         }
