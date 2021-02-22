@@ -32,6 +32,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     private $img_dir;
     private $pid;
     private $userid;
+    private $Proj;
 
     /**
      * Initialize class variables.
@@ -48,6 +49,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $this->temp_dir = $this->getSystemSetting("temp-folder");
         $this->img_dir = $this->getSystemSetting("img-folder");
         $this->pid = $this->getProjectId();
+        $this->Proj = new Project();
 
         /**
          * Checks and adds trailing directory separator
@@ -221,11 +223,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
-     * Retrieves the latest repeatable instance for a record. Returns null, if repeatable instruments/events are not enabled.
-     * 
-     * TODO: How to return correct instance for a non-repeatable field on the same event as a repeatable instrument.
+     * Retrieves the latest repeatable instance for a record on a specified event.
      */
-    private function getLatestInstance($record, $event_id)
+    private function getLatestRecordInstance($record, $event_id = null)
     {
         $record_data = REDCap::getData("json", $record, null, $event_id, null, TRUE, FALSE, TRUE, null, TRUE);
         $json = json_decode($record_data, true);
@@ -238,7 +238,55 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 $instance = $redcap_repeat_instance == 1 ? null : $redcap_repeat_instance; // First instance is represented by null in db
             }
         }
+
         return $instance;
+    }
+
+    /**
+     * Retrieves the latest repeatable instance for a record, if [event_id][field_name] is on a repeatable instrument/event, else return null.
+     */
+    private function getLatestRepeatableInstance($record, $event_id, $field_name)
+    {
+        /**
+         * Check if field is on a repeatable form. If yes, then return latest instance, else return null.
+         */
+        if($this->Proj->hasRepeatingFormsEvents())
+        {
+            $repeating_events = $this->Proj->getRepeatingFormsEvents();
+
+            $instruments = $repeating_events[$event_id];
+            if ($instruments === "WHOLE") // repeat whole event
+            {
+                $sql = "select form_name from redcap_events_repeat where event_id = $event_id";
+                $result = $this->query($sql);
+                if(mysqli_num_rows($result) > 0)
+                {
+                    while ($row = mysqli_fetch_assoc($result))
+                    {
+                        $instrument = $row["form_name"];
+                        $fields = REDCap::getFieldNames($instrument); // Get fields in repeatable instrument
+
+                        if (in_array($field_name, $fields)) // Check if field is part of repeatable instrument
+                        {
+                            return $this->getLatestRecordInstance($record, $event_id);
+                        }
+                    }
+                }
+            }
+            else if (is_array($instruments)) // repeate instruments on event
+            {
+                foreach($instruments as $instrument => $custom_repeat_label) // iterate through instruments on repeatable event
+                {
+                    $fields = REDCap::getFieldNames($instrument); // Get fields in repeatable instrument
+                    if (in_array($field_name, $fields)) // Check if field is part of repeatable instrument
+                    {
+                        return $this->getLatestRecordInstance($record, $event_id);
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -247,8 +295,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      */
     private function saveFileToField($filename, $file_contents, $field_name, $record, $event_id)
     {
-        $Proj = new Project();
-
         // Save file to edocs tables in the REDCap database
         $database_success = FALSE;
         $upload_success = FALSE;
@@ -274,7 +320,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 $docs_id = db_insert_id();
                 
                 // Always save report to the latest repeatable instance, otherwise null
-                $instance = $this->getLatestInstance($record, $event_id);
+                $instance = $this->getLatestRepeatableInstance($record, $event_id, $field_name);
 
                 // See if field has had a previous value. If so, update; if not, insert.
                 $sql = "SELECT value
@@ -295,10 +341,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 
                 $result = $this->query($sql);
 
-                if (mysqli_num_rows($result) > 0) // row exists
+                if ($result && mysqli_num_rows($result) > 0) // row exists
                 {
                     // Set the file as "deleted" in redcap_edocs_metadata table, but don't really delete the file or the table entry (unless the File Version History is enabled for the project)
-                    if ($GLOBALS['file_upload_versioning_global_enabled'] == '' && $Proj->project['file_upload_versioning_enabled'] != '1')
+                    if ($GLOBALS['file_upload_versioning_global_enabled'] == '' && $this->Proj->project['file_upload_versioning_enabled'] != '1')
                     {
                         while ($row = mysqli_fetch_assoc($result)) {
                             $id = $row["value"];
@@ -322,7 +368,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 {
                     // If this is a longitudinal project and this file is being added to an event without data,
                     // then add a row for the record ID field too (so it doesn't get orphaned).
-                    if ($Proj->longitudinal) 
+                    if ($this->Proj->longitudinal) 
                     {
                         $sql = "SELECT 1
                                 FROM redcap_data
@@ -337,7 +383,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
                         if (mysqli_num_rows($result) == 0) 
                         {
-                            $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES ($this->pid, $event_id, '$record', '{$Proj->table_pk}', '$record', " . ($instance > 1 ? "'$instance'" : "null") . ")";
+                            $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES ($this->pid, $event_id, '$record', '{$this->Proj->table_pk}', '$record', " . ($instance > 1 ? "'$instance'" : "null") . ")";
                             $this->query($sql);
                         }
                     }
@@ -1464,7 +1510,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             $action = "create";
         }
-        $Proj = new Project();
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
         <div class="container"> 
@@ -1970,14 +2015,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     <button class="collapsible">Click to view fields <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                     <div class="collapsible-content">
                     <p>
-                        <?php if (REDCap::isLongitudinal() && $Proj->project['surveys_enabled']): ?>
+                        <?php if (REDCap::isLongitudinal() && $this->Proj->project['surveys_enabled']): ?>
                             <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
                             To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).</p>
                             <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
                         <?php elseif (REDCap::isLongitudinal()): ?>
                             <u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
                             To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).
-                        <?php elseif ($Proj->project['surveys_enabled']): ?> 
+                        <?php elseif ($this->Proj->project['surveys_enabled']): ?> 
                             <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use.</p>
                             <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
                         <?php else: ?>
@@ -2030,14 +2075,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             print "</div></div>";
                         }
                         ?>
-                        <?php if ($Proj->project['surveys_enabled']): ?>
+                        <?php if ($this->Proj->project['surveys_enabled']): ?>
                         <div class='collapsible-container'>
                             <button class='collapsible'>Survey Completion Timestamps <span class='fas fa-caret-down'></span><span class='fas fa-caret-up'></span></button>
                             <div class='collapsible-content'>
                                 <?php
                                     foreach ($instruments as $unique_name => $label)
                                     {
-                                        if (!empty($Proj->forms[$unique_name]['survey_id']))
+                                        if (!empty($this->Proj->forms[$unique_name]['survey_id']))
                                         {
                                             print "<p><strong>$label</strong> -> {\$redcap['{$unique_name}_timestamp']}</p>";
                                         }
