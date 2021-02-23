@@ -49,7 +49,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $this->temp_dir = $this->getSystemSetting("temp-folder");
         $this->img_dir = $this->getSystemSetting("img-folder");
         $this->pid = $this->getProjectId();
-        $this->Proj = new Project();
+
+        if (!empty($this->pid))
+            $this->Proj = new Project($this->pid);
 
         /**
          * Checks and adds trailing directory separator
