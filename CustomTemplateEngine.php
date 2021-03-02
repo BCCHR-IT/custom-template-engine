@@ -1390,7 +1390,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             <tr>
                                 <td style="width:25%;">
                                     <p>Save report to A Field <strong style="color:black">(Optional)</strong></p>
-                                    <p>This will save the report to a field in the record you chose. For repeating events/instruments it will be saved to the <b>latest instance</b>.</p>
+                                    <p>
+                                        This will save the report to a field in the record you chose. For repeating events/instruments it will be saved to the <b>latest instance</b>. 
+                                        For longitudinal projects, if no event is chosen then the report is saved to the first event.
+                                    </p>
                                     <p><b>WARNING:</b> This will override any previous documents saved to the field.</p>
                                 </td>
                                 <td class="data">
