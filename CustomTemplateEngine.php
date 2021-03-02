@@ -226,6 +226,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Retrieves the latest repeatable instance for a record on a specified event.
+     * 
+     * @since 3.1
      */
     private function getLatestRecordInstance($record, $event_id = null)
     {
@@ -246,6 +248,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * Retrieves the latest repeatable instance for a record, if [event_id][field_name] is on a repeatable instrument/event, else return null.
+     * 
+     * @since 3.1
      */
     private function getLatestRepeatableInstance($record, $event_id, $field_name)
     {
@@ -292,10 +296,32 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
+     * Checks that the field exists on the given event
+     * 
+     * @since 3.1
+     */
+    public function checkFieldInEvent($field_name, $event_id)
+    {
+        $sql = "SELECT 1 from redcap_metadata
+                join redcap_events_forms 
+                on redcap_metadata.form_name = redcap_events_forms.form_name
+                where redcap_events_forms.event_id = '$event_id' and redcap_metadata.field_name = '$field_name'";
+
+        $result = $this->query($sql);
+        
+        if ($result)
+        {
+            return mysqli_num_rows($result) > 0;
+        }
+
+        return false;
+    }
+    
+    /**
      * Saves a file to a REDCap field in the project. Assumes the field is a file upload field. Returns false on failure, and true otherwise.
      * Currently no compatible with repeating events.
      */
-    private function saveFileToField($filename, $file_contents, $field_name, $record, $event_id)
+    public function saveFileToField($filename, $file_contents, $field_name, $record, $event_id)
     {
         // Save file to edocs tables in the REDCap database
         $database_success = FALSE;
@@ -421,7 +447,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
         return false;
     }
-
 
     /**
      * Helper function that deletes a file from the File Repository, if REDCap data about it fails
@@ -1029,6 +1054,31 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
+     * Use DOMPDF to format the PDF contents, and return it.
+     * 
+     * @since 3.1
+     */
+    public function creatPDF($dompdf_obj, $header, $footer, $main)
+    {
+        $contents = $this->formatPDFContents($header, $footer, $main);
+
+        // Add page numbers to the footer of every page
+        $dompdf_obj->set_option("isHtml5ParserEnabled", true);
+        $dompdf_obj->set_option("isPhpEnabled", true);
+        $dompdf_obj->loadHtml($contents);
+
+        $dompdf_obj->set_option('isRemoteEnabled', TRUE);
+
+        // Setup the paper size and orientation
+        $dompdf_obj->setPaper("letter", "portrait");
+
+        // Render the HTML as PDF
+        $dompdf_obj->render();
+
+        return $dompdf_obj->output();
+    }
+
+    /**
      * Outputs a PDF of a report to browser.
      * 
      * Retrieves body, header, and footer contents of template passed via HTTP POST.
@@ -1051,27 +1101,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
         if (isset($main) && !empty($main))
         {
-            $contents = $this->formatPDFContents($header, $footer, $main);
-
-            // Add page numbers to the footer of every page
             $dompdf = new Dompdf();
-            $dompdf->set_option("isHtml5ParserEnabled", true);
-            $dompdf->set_option("isPhpEnabled", true);
-            $dompdf->loadHtml($contents);
-
-            $dompdf->set_option('isRemoteEnabled', TRUE);
-
-            // Setup the paper size and orientation
-            $dompdf->setPaper("letter", "portrait");
-
-            // Render the HTML as PDF
-            $dompdf->render();
-
-            $filled_template_pdf_content = $dompdf->output();
+            $pdf_content = $this->creatPDF($dompdf, $header, $footer, $main);
 
             if (!$this->getProjectSetting("save-report-to-repo"))
             {
-                $saved = $this->saveToFileRepository($filename, $filled_template_pdf_content, "pdf");
+                $saved = $this->saveToFileRepository($filename, $pdf_content, "pdf");
                 if ($saved !== true)
                 {
                     $HtmlPage = new HtmlPage();
@@ -1083,46 +1118,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
             $dompdf->stream($filename);
             REDCap::logEvent("Custom Template Engine - Downloaded Report", $filename , "" , $record);
-
-            // Save report to a field
-            $event_name = $_POST["save-report-to-event-val"];
-            $field_name = $_POST["save-report-to-field-val"];
-
-            if (!empty($field_name))
-            {
-                if (!empty($event_name))
-                {
-                    $event_id = REDCap::getEventIdFromUniqueEvent($event_name);
-                }
-                else 
-                {
-                    // SQL to retrieve the first event ID of the first event in the project.
-                    $sql = "SELECT event_id FROM redcap_events_metadata 
-                            join redcap_events_arms on
-                            redcap_events_metadata.arm_id = redcap_events_arms.arm_id
-                            where redcap_events_arms.project_id = $this->pid
-                            order by event_id asc
-                            limit 1";
-
-                    $result = $this->query($sql);
-                    if ($result)
-                    {
-                        while($row = $result->fetch_assoc()){
-                            $event_id = $row["event_id"];
-                        }
-                    }
-                    else 
-                    {
-                        REDCap::logEvent("Custom Template Engine - Trouble retrieving first event ID for saving report to a record field, for a classic project.", "", "", $record);
-                        return;
-                    }
-                }
-                
-                if (!$this->saveFileToField($filename, $filled_template_pdf_content, $field_name, $record, $event_id))
-                {
-                    REDCap::logEvent("Custom Template Engine - Failed to Save Report to Field!", "Field name: $field_name", "", $record);
-                }
-            }
         }
         else
         {
@@ -1393,7 +1388,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 </td>
                             </tr>
                             <tr>
-                                <td style="width:25%;">Save Report to A Field <strong style="color:black">(Optional)</strong><br><br>This will save the report to a field in the record you chose.</td>
+                                <td style="width:25%;">
+                                    <p>Save report to A Field <strong style="color:black">(Optional)</strong></p>
+                                    <p>This will save the report to a field in the record you chose. For repeating events/instruments it will be saved to the <b>latest instance</b>.</p>
+                                    <p><b>WARNING:</b> This will override any previous documents saved to the field.</p>
+                                </td>
                                 <td class="data">
                                     <div class="row">
                                         <div class="col-md-5">
@@ -1419,6 +1418,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                                 } 
                                                 ?>
                                             </select>
+                                            <button id="save-report-btn" type="button" class="btn btn-primary" style="margin-top:25px">Save Report</button>
                                         </div>
                                     </div>
                                 </td>
@@ -1426,7 +1426,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         </tbody>
                     </table>
                     <div class="row" style="margin-bottom:20px">
-                        <div class="col-md-2"><button id="download-pdf" type="button" class="btn btn-primary">Download PDF</button></div>
+                        <div class="col-md-2"><button id="download-pdf-btn" type="button" class="btn btn-primary">Download PDF</button></div>
                     </div>
                     <div class="collapsible-container">
                         <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
@@ -1457,7 +1457,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
         <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
         <script>
-            $("#download-pdf").click(function () {
+            // JS to download PDF
+            $("#download-pdf-btn").click(function () {
                 // Updates the textarea elements that CKEDITOR replaces
                 CKEDITOR.instances.editor.updateElement();
                 if ($("#editor").val() == "" || $("#filename").val() == "")
@@ -1468,6 +1469,27 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 {
                     $("form").submit();
                 }
+            });
+
+            // JS to save report to field
+            $("#save-report-btn").click(function () {
+                $("#save-report-status-msg").remove(); // Remove previous sucess/failure message
+                $.ajax({
+                        url: "<?php print $this->getUrl("SaveFileToField.php"); ?>",
+                        method: "POST",
+                        data: $('form').serialize(),
+                        success: function(data) {
+                            var json = JSON.parse(data);
+                            if (json.success)
+                            {
+                                $("#save-report-btn").after("<p id='save-report-status-msg' style='color:green'>Report was successfully saved!</p>");
+                            }
+                            else
+                            {
+                                $("#save-report-btn").after("<p id='save-report-status-msg' style='color:red'>Failed to save report to field! " + json.error + "</p>");
+                            }
+                        }
+                });
             });
         </script>
         <?php 
