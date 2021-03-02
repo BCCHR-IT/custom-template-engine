@@ -33,11 +33,11 @@ if (isset($main) && !empty($main))
             $sql = "SELECT event_id FROM redcap_events_metadata 
                     join redcap_events_arms on
                     redcap_events_metadata.arm_id = redcap_events_arms.arm_id
-                    where redcap_events_arms.project_id = " . $module->framework->getProjectId() . " 
+                    where redcap_events_arms.project_id = " . $customTemplateEngine->getProjectId() . " 
                     order by event_id asc
                     limit 1";
 
-            $result = $module->framework->query($sql);
+            $result = $customTemplateEngine->query($sql);
 
             if (!$result)
             {
