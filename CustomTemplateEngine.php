@@ -2590,7 +2590,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                                 }
                                             ?>
                                             </select>
-                                            <p><i style="color:red">If you select more than 1 record, you are unable to preview the report before it downloads.</i></p>
+                                            <p><i style="color:red">If you select more than 1 record, you are unable to preview the report before it downloads, and are unable to save it to a record field.</i></p>
                                             <p><i style="color:red">Large templates may take several seconds, when batch filling.</i></p>
                                         <?php else:?>
                                             <p>No Existing Records</p>        
