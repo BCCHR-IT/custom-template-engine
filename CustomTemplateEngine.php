@@ -1264,7 +1264,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             if ($field_attributes["field_type"] == "file")
             {
-                $file_fields[] = $field_name;
+                $field_label = $field_attributes["field_label"];
+                $file_fields[$field_name] = "$field_name ($field_label)";
             }
         }
 
@@ -1415,9 +1416,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                                 <option value="">-Select a field-</option>
                                                 <?php
                                                 $file_fields = $this->getAllFileFields();
-                                                foreach($file_fields as $field)
+                                                foreach($file_fields as $field => $label)
                                                 {
-                                                    print "<option value='$field'>$field</option>";
+                                                    print "<option value='$field'>$label</option>";
                                                 } 
                                                 ?>
                                             </select>
