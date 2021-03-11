@@ -2170,8 +2170,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $this->createModuleFolders();
 
         $rights = REDCap::getUserRights($this->userid);
-        $participant_options = $this->getDropdownOptions($_GET["filter"]);
-        $total = count($participant_options);
+        
+        //  Disable expensive getDropdownOptions if manual input for records has been set in system settings
+        if(!$this->isManualInput) {
+            $participant_options = $this->getDropdownOptions($_GET["filter"]);
+            $total = count($participant_options);
+        }
 
         $all_templates = array_diff(scandir($this->templates_dir), array("..", "."));
         $edit_templates = array();
@@ -2241,11 +2245,70 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     </div>
                 <?php endif; ?>
                 <br/>
-                <div class="container syntax-rule">                                    
+                <div class="container syntax-rule">
                     <p><i>Select the record(s) and template you wish to fill. Only valid templates will be accessible. Invalid templates must be edited before they can run.</i></p>
                     <form id="fill-template-form" action="<?php print $this->getUrl("FillTemplate.php");?>" method="post">
+                    <?php if($this->isManualInput): ?>
                         <table class="table" style="width:100%;">
                             <tbody>
+                                <tr>
+                                    <td style="width:25%;">
+                                        <p>Enter a comma-separated or return-separated list of record ids</p>
+                                        <p><i style="color:red">If you enter more than one record, you are unable to preview the report before it downloads.</i></p>
+                                        <p><i style="color:red">Large templates may take several seconds, when batch filling.</i></p>                                                                            
+                                    </td>
+                                    <td class="data">
+                                        <div class="form-group">
+                                            <div class="input-group">
+                                                <textarea <?= $hasArms ? "disabled" : "" ?> class="form-control list-input-step"  rows="10" aria-label="With textarea"></textarea>
+                                                <div class="input-group-append">
+                                                    <button 
+                                                        class="btn btn-outline-secondary" 
+                                                        type="button"                                    
+                                                        id="btn-validate-input"
+                                                        disabled>
+                                                        <span id="btn-validate-text">Validate</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <small id="validateHelpBlock" class="form-text text-muted">
+                                                Please <b>validate</b> your custom list input before <b>Fill template</b> is enabled.
+                                            </small>
+                                        </div>
+                                        <select id="participantIDs" name="participantID[]" style="visibility:hidden;" multiple >
+
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="width:25%;">Choose Template</td>
+                                    <td class="data">
+                                        <?php if (sizeof($valid_templates) > 0):?>
+                                            <select name="template" class="form-control">
+                                                <?php
+                                                    foreach($valid_templates as $template)
+                                                    {
+                                                        print "<option value=\"" . $template . "\">" . $template . "</option>";
+                                                    }
+                                                ?>
+                                            </select>
+                                        <?php else:?>
+                                            <span>No Existing Templates</span>        
+                                        <?php endif;?>
+                                    </td>
+                                </tr>                                
+                            </tbody>
+                        </table>
+                        <input type="hidden" name="download_token_value" id="download_token_value_id"/>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <button id="fill-template-btn" type="submit" class="btn btn-primary">Fill Template</button>
+                                <span><i style="color:red"> **At least one record and one template must exist</i></span>
+                            </div>
+                            <div id="progressBar" class="col"></div>
+                        </div>                        
+                    <?php else : ?>                            
+                        <table class="table" style="width:100%;">
+                            <tbody>                                
                                 <tr>
                                     <td colspan="2">
                                         <b>Total records: <?php print $total; ?></b>
@@ -2305,6 +2368,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             <?php endif;?>
                             <div id="progressBar" class="col"></div>
                         </div>
+                    <?php endif; ?>
                     </form>
                 </div>
             </div>
@@ -2388,6 +2452,30 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             </div>
         </div>
         <script>
+            var btn_validate_input = $('#btn-validate-input');
+
+            $('.list-input-step').on('input', () => {
+                btn_validate_input.prop("disabled", false);
+            })        
+
+            btn_validate_input.on("click", fetchInputs);
+
+            function fetchInputs() {
+                var list = $('.list-input-step').val();
+                var items = $.map(list.split(/\n|,/), $.trim).filter(Boolean);
+
+                $("#participantIDs").find('option').remove();
+
+                $.each(items, function(key, value) {
+
+                    var o = new Option(key, value, true, true);
+                    /// jquerify the DOM object 'o' so we can use the html method
+                    $(o).html(key);
+                    $("#participantIDs").append(o);
+                })
+                $("#participantIDs").trigger("change");
+            }
+
             $("#toDelete").text($("#deleteTemplateDropdown").val());
             $("#templateToDelete").val($("#deleteTemplateDropdown").val());
             $("#deleteTemplateDropdown").change(function() {
