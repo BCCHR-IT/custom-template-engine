@@ -55,7 +55,13 @@
             "type": "text",
             "repeatable": false,
             "super-users-only": true
-        }   
+        },
+        {
+            "key": "manual-input-record-list",
+            "name": "Switch to manual input of record(s).<br> This can significantly improve module page loading time.",
+            "type": "checkbox",
+            "super-users-only": true
+        }
     ],
     "project-settings": [
         {

@@ -32,6 +32,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     private $img_dir;
     private $pid;
     private $userid;
+    private $isManualInput;
 
     /**
      * Initialize class variables.
@@ -48,6 +49,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $this->temp_dir = $this->getSystemSetting("temp-folder");
         $this->img_dir = $this->getSystemSetting("img-folder");
         $this->pid = $this->getProjectId();
+        $this->isManualInput = $this->getSystemSetting("manual-input-record-list");
 
         /**
          * Checks and adds trailing directory separator
@@ -2239,7 +2241,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     </div>
                 <?php endif; ?>
                 <br/>
-                <div class="container syntax-rule">
+                <div class="container syntax-rule">                                    
                     <p><i>Select the record(s) and template you wish to fill. Only valid templates will be accessible. Invalid templates must be edited before they can run.</i></p>
                     <form id="fill-template-form" action="<?php print $this->getUrl("FillTemplate.php");?>" method="post">
                         <table class="table" style="width:100%;">
