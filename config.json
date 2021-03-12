@@ -50,7 +50,7 @@
         },
         {
             "key": "img-folder",
-            "name": "Images Folder. Will be created if it doesn't exist. **Must be a publically acccessible folder given as a path relative to your REDCap external modules folder i.e '../../images'**",
+            "name": "Images Folder. Will be created if it doesn't exist. **Must be a publically acccessible folder that can be given as either a full path, or relative path to your REDCap external modules folder i.e '../../images'**",
             "required": true,
             "type": "text",
             "repeatable": false,

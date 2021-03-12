@@ -32,6 +32,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     private $img_dir;
     private $pid;
     private $userid;
+    private $Proj;
 
     /**
      * Initialize class variables.
@@ -48,6 +49,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $this->temp_dir = $this->getSystemSetting("temp-folder");
         $this->img_dir = $this->getSystemSetting("img-folder");
         $this->pid = $this->getProjectId();
+
+        if (!empty($this->pid))
+            $this->Proj = new Project($this->pid);
 
         /**
          * Checks and adds trailing directory separator
@@ -220,6 +224,229 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
     }
 
+    /**
+     * Retrieves the latest repeatable instance for a record on a specified event.
+     * 
+     * @since 3.1
+     */
+    private function getLatestRecordInstance($record, $event_id = null)
+    {
+        $record_data = REDCap::getData("json", $record, null, $event_id, null, TRUE, FALSE, TRUE, null, TRUE);
+        $json = json_decode($record_data, true);
+
+        foreach($json as $index => $event_data)
+        {
+            $redcap_repeat_instance = $event_data["redcap_repeat_instance"];
+            if (isset($redcap_repeat_instance) && !empty($redcap_repeat_instance))
+            { 
+                $instance = $redcap_repeat_instance == 1 ? null : $redcap_repeat_instance; // First instance is represented by null in db
+            }
+        }
+
+        return $instance;
+    }
+
+    /**
+     * Retrieves the latest repeatable instance for a record, if [event_id][field_name] is on a repeatable instrument/event, else return null.
+     * 
+     * @since 3.1
+     */
+    private function getLatestRepeatableInstance($record, $event_id, $field_name)
+    {
+        /**
+         * Check if field is on a repeatable form. If yes, then return latest instance, else return null.
+         */
+        if($this->Proj->hasRepeatingFormsEvents())
+        {
+            $repeating_events = $this->Proj->getRepeatingFormsEvents();
+
+            $instruments = $repeating_events[$event_id];
+            if ($instruments === "WHOLE") // repeat whole event
+            {
+                $sql = "select form_name from redcap_events_repeat where event_id = $event_id";
+                $result = $this->query($sql);
+                if(mysqli_num_rows($result) > 0)
+                {
+                    while ($row = mysqli_fetch_assoc($result))
+                    {
+                        $instrument = $row["form_name"];
+                        $fields = REDCap::getFieldNames($instrument); // Get fields in repeatable instrument
+
+                        if (in_array($field_name, $fields)) // Check if field is part of repeatable instrument
+                        {
+                            return $this->getLatestRecordInstance($record, $event_id);
+                        }
+                    }
+                }
+            }
+            else if (is_array($instruments)) // repeate instruments on event
+            {
+                foreach($instruments as $instrument => $custom_repeat_label) // iterate through instruments on repeatable event
+                {
+                    $fields = REDCap::getFieldNames($instrument); // Get fields in repeatable instrument
+                    if (in_array($field_name, $fields)) // Check if field is part of repeatable instrument
+                    {
+                        return $this->getLatestRecordInstance($record, $event_id);
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Checks that the field exists on the given event
+     * 
+     * @since 3.1
+     */
+    public function checkFieldInEvent($field_name, $event_id)
+    {
+        $sql = "SELECT 1 from redcap_metadata
+                join redcap_events_forms 
+                on redcap_metadata.form_name = redcap_events_forms.form_name
+                where redcap_events_forms.event_id = '$event_id' and redcap_metadata.field_name = '$field_name'";
+
+        $result = $this->query($sql);
+        
+        if ($result)
+        {
+            return mysqli_num_rows($result) > 0;
+        }
+
+        return false;
+    }
+    
+    /**
+     * Saves a file to a REDCap field in the project. Assumes the field is a file upload field. Returns false on failure, and true otherwise.
+     * Currently no compatible with repeating events.
+     */
+    public function saveFileToField($filename, $file_contents, $field_name, $record, $event_id)
+    {
+        // Save file to edocs tables in the REDCap database
+        $database_success = FALSE;
+        $upload_success = FALSE;
+
+        $dummy_file_name = $filename . ".pdf";
+        $dummy_file_name = preg_replace("/[^a-zA-Z-._0-9]/","_",$dummy_file_name);
+        $dummy_file_name = str_replace("__","_",$dummy_file_name);
+        $dummy_file_name = str_replace("__","_",$dummy_file_name);
+
+        $stored_name = date('YmdHis') . "_pid" . $this->pid . "_" . generateRandomHash(6) . ".pdf";
+
+        $upload_success = file_put_contents(EDOC_PATH . $stored_name, $file_contents);
+
+        if ($upload_success !== FALSE) 
+        {
+            $dummy_file_size = $upload_success;
+
+            $sql = "INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date) 
+                    VALUES ('$stored_name','application/pdf','$dummy_file_name','$dummy_file_size','pdf','$this->pid','" . date('Y-m-d H:i:s') . "')";
+                            
+            if ($this->query($sql)) 
+            {
+                $docs_id = db_insert_id();
+                
+                // Always save report to the latest repeatable instance, otherwise null
+                $instance = $this->getLatestRepeatableInstance($record, $event_id, $field_name);
+
+                // See if field has had a previous value. If so, update; if not, insert.
+                $sql = "SELECT value
+                        FROM redcap_data
+                        WHERE project_id = '$this->pid'
+                            AND record = '$record'
+                            AND event_id = '$event_id'
+                            AND field_name = '$field_name'";
+
+                if (!isset($instance))
+                {
+                    $sql .= " AND instance is NULL";
+                }
+                else
+                {
+                    $sql .= " AND instance = '$instance'";
+                }
+                
+                $result = $this->query($sql);
+
+                if ($result && mysqli_num_rows($result) > 0) // row exists
+                {
+                    // Set the file as "deleted" in redcap_edocs_metadata table, but don't really delete the file or the table entry (unless the File Version History is enabled for the project)
+                    if ($GLOBALS['file_upload_versioning_global_enabled'] == '' && $this->Proj->project['file_upload_versioning_enabled'] != '1')
+                    {
+                        while ($row = mysqli_fetch_assoc($result)) {
+                            $id = $row["value"];
+                        }
+                        $sql = "UPDATE redcap_edocs_metadata SET delete_date = '" . NOW . "' WHERE doc_id = $id";
+                        $this->query($sql);
+                    }
+
+                    $sql = "UPDATE redcap_data SET value = '$docs_id' WHERE project_id = $this->pid AND record = '$record' AND event_id = $event_id AND field_name = '$field_name'";
+
+                    if (!isset($instance))
+                    {
+                        $sql .= " AND instance is NULL";
+                    }
+                    else
+                    {
+                        $sql .= " AND instance = '$instance'";
+                    }
+                }
+                else // row did not exist
+                {
+                    // If this is a longitudinal project and this file is being added to an event without data,
+                    // then add a row for the record ID field too (so it doesn't get orphaned).
+                    if ($this->Proj->longitudinal) 
+                    {
+                        $sql = "SELECT 1
+                                FROM redcap_data
+                                WHERE project_id = $this->pid
+                                    AND record = '$record'
+                                    AND event_id = $event_id";
+
+                        $sql .= $instance > 1 ? " AND instance = '$instance'" : " AND instance is NULL";
+                        $sql .= " LIMIT 1";
+
+                        $result = $this->query($sql);
+
+                        if (mysqli_num_rows($result) == 0) 
+                        {
+                            $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES ($this->pid, $event_id, '$record', '{$this->Proj->table_pk}', '$record', " . ($instance > 1 ? "'$instance'" : "null") . ")";
+                            $this->query($sql);
+                        }
+                    }
+        
+                    // Add an entry in redcap_data that contains the edoc ID
+                    if (!isset($instance))
+                    {
+                        $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES ($this->pid, $event_id, '$record', '$field_name', '$docs_id', null)";
+                    }
+                    else
+                    {
+                        $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES ($this->pid, $event_id, '$record', '$field_name', '$docs_id', $instance)";
+                    }
+                }
+
+                if ($this->query($sql))
+                {
+                    // Logging event as DOC_UPLOAD allows file history to be built.
+                    $redcap_log_event_table = method_exists('\REDCap', 'getLogEventTable') ? REDCap::getLogEventTable($this->pid) : "redcap_log_event";
+                    $current_timestamp = date("YmdHis");
+                    $ip = $_SERVER["REMOTE_ADDR"];
+                    $description = isset($instance) ? "[instance = $instance],\n$field_name = ''$docs_id''" : "$field_name = ''$docs_id''";
+
+                    $log_sql = "INSERT INTO $redcap_log_event_table (ts, user, ip, page, project_id, event, object_type, sql_log, pk, event_id, data_values, description) 
+                                VALUES ('$current_timestamp', '$this->userid', '$ip', 'ExternalModules/index.php', '$this->pid', 'DOC_UPLOAD', 'redcap_data', '" . str_replace("'", "''", $sql) . "', '$record', '$event_id', '$description', 'Upload Document')";
+
+                    $this->query($log_sql);
+
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 
     /**
      * Helper function that deletes a file from the File Repository, if REDCap data about it fails
@@ -431,7 +658,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * validations. Error returned to user if upload failed. Upon success
      * log event in REDCap.
      * 
-     * @since 1.0
+     * @since 3.1
      */
     public function uploadImages()
     {
@@ -465,8 +692,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
                         if (move_uploaded_file($tmp_name, $this->img_dir . $filename))
                         {
-                            $url = $this->img_dir . $filename;
-                            REDCap::logEvent("Photo uploaded", $this->img_dir . $filename);
+                            $realpath = realpath($this->img_dir);
+                            $publicly_accessible_start_pos = strpos($realpath, "redcap");
+                            $path = substr($realpath, $publicly_accessible_start_pos);
+
+                            $url = "https://" . $_SERVER["SERVER_NAME"] . "/$path/" . $filename;
+                            REDCap::logEvent("Photo uploaded", $filename);
                         }
                         else
                         {
@@ -520,7 +751,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * Retrieve images for the current REDCap project and generate HTML to display, and Javascript
      * that will return the image url on click.
      * 
-     * @since 1.0
+     * @since 3.1
      */
     public function browseImages()
     {
@@ -568,10 +799,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $all_imgs = array();
                     foreach($proj_imgs as $img)
                     {
+                        $realpath = realpath($this->img_dir);
+                        $publicly_accessible_start_pos = strpos($realpath, "redcap");
+                        $path = substr($realpath, $publicly_accessible_start_pos);
+                        
                         array_push(
                             $all_imgs,
                             array(
-                                "url" => $this->img_dir . $img,
+                                "url" => "https://" . $_SERVER["SERVER_NAME"] . "/$path/" . $img,
                                 "name" => $img
                             )
                         );
@@ -821,6 +1056,31 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
+     * Use DOMPDF to format the PDF contents, and return it.
+     * 
+     * @since 3.1
+     */
+    public function creatPDF($dompdf_obj, $header, $footer, $main)
+    {
+        $contents = $this->formatPDFContents($header, $footer, $main);
+
+        // Add page numbers to the footer of every page
+        $dompdf_obj->set_option("isHtml5ParserEnabled", true);
+        $dompdf_obj->set_option("isPhpEnabled", true);
+        $dompdf_obj->loadHtml($contents);
+
+        $dompdf_obj->set_option('isRemoteEnabled', TRUE);
+
+        // Setup the paper size and orientation
+        $dompdf_obj->setPaper("letter", "portrait");
+
+        // Render the HTML as PDF
+        $dompdf_obj->render();
+
+        return $dompdf_obj->output();
+    }
+
+    /**
      * Outputs a PDF of a report to browser.
      * 
      * Retrieves body, header, and footer contents of template passed via HTTP POST.
@@ -843,25 +1103,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
         if (isset($main) && !empty($main))
         {
-            $contents = $this->formatPDFContents($header, $footer, $main);
-
-            // Add page numbers to the footer of every page
             $dompdf = new Dompdf();
-            $dompdf->set_option("isHtml5ParserEnabled", true);
-            $dompdf->set_option("isPhpEnabled", true);
-            $dompdf->loadHtml($contents);
-
-            // Setup the paper size and orientation
-            $dompdf->setPaper("letter", "portrait");
-
-            // Render the HTML as PDF
-            $dompdf->render();
-
-            $filled_template_pdf_content = $dompdf->output();
+            $pdf_content = $this->creatPDF($dompdf, $header, $footer, $main);
 
             if (!$this->getProjectSetting("save-report-to-repo"))
             {
-                $saved = $this->saveToFileRepository($filename, $filled_template_pdf_content, "pdf");
+                $saved = $this->saveToFileRepository($filename, $pdf_content, "pdf");
                 if ($saved !== true)
                 {
                     $HtmlPage = new HtmlPage();
@@ -872,7 +1119,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             }
 
             $dompdf->stream($filename);
-            REDCap::logEvent("Downloaded Report", $filename , "" , $record);
+            REDCap::logEvent("Custom Template Engine - Downloaded Report", $filename , "" , $record);
         }
         else
         {
@@ -939,6 +1186,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         $dompdf->set_option("isPhpEnabled", true);
                         $dompdf->loadHtml($contents);
 
+                        $dompdf->set_option('isRemoteEnabled', TRUE);
+
                         // Setup the paper size and orientation
                         $dompdf->setPaper("letter", "portrait");
                         // Render the HTML as PDF
@@ -1001,7 +1250,29 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
         unlink($zip_name);
         exit;
-    }   
+    }  
+
+    /**
+     * Get all fields in the project of type file.
+     * 
+     * @since 3.1
+     */
+    private function getAllFileFields()
+    {
+        $file_fields = array();
+        $data_dictionary = REDCap::getDataDictionary("array");
+
+        foreach ($data_dictionary as $field_name => $field_attributes)
+        {
+            if ($field_attributes["field_type"] == "file")
+            {
+                $field_label = $field_attributes["field_label"];
+                $file_fields[$field_name] = "$field_name ($field_label)";
+            }
+        }
+
+        return $file_fields;
+    }
 
     /**
      * Fills a template with REDCap record data, and displays in 
@@ -1119,10 +1390,49 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     </div>
                                 </td>
                             </tr>
+                            <tr>
+                                <td style="width:25%;">
+                                    <p>Save report to A Field <strong style="color:black">(Optional)</strong></p>
+                                    <p>
+                                        This will save the report to a field in the record you chose. For repeating events/instruments it will be saved to the <b>latest instance</b>. 
+                                        For longitudinal projects, if no event is chosen then the report is saved to the first event.
+                                    </p>
+                                    <p><b>WARNING:</b> This will override any previous documents saved to the field.</p>
+                                </td>
+                                <td class="data">
+                                    <div class="row">
+                                        <div class="col-md-5">
+                                            <?php if (REDCap::isLongitudinal()) :?>
+                                            <select id="save-report-to-event-dropdown" name="save-report-to-event-val" class="form-control selectpicker">
+                                                <option value="">-Select an event-</option>
+                                                <?php
+                                                $events = REDCap::getEventNames(true, true);
+                                                foreach($events as $event)
+                                                {
+                                                    print "<option value='$event'>$event</option>";
+                                                } 
+                                                ?>
+                                            </select>
+                                            <?php endif; ?>
+                                            <select id="save-report-to-field-dropdown" name="save-report-to-field-val" class="form-control selectpicker">
+                                                <option value="">-Select a field-</option>
+                                                <?php
+                                                $file_fields = $this->getAllFileFields();
+                                                foreach($file_fields as $field => $label)
+                                                {
+                                                    print "<option value='$field'>$label</option>";
+                                                } 
+                                                ?>
+                                            </select>
+                                            <button id="save-report-btn" type="button" class="btn btn-primary" style="margin-top:25px">Save Report</button>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                     <div class="row" style="margin-bottom:20px">
-                        <div class="col-md-2"><button id="download-pdf" type="button" class="btn btn-primary">Download PDF</button></div>
+                        <div class="col-md-2"><button id="download-pdf-btn" type="button" class="btn btn-primary">Download PDF</button></div>
                     </div>
                     <div class="collapsible-container">
                         <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
@@ -1153,7 +1463,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
         <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
         <script>
-            $("#download-pdf").click(function () {
+            // JS to download PDF
+            $("#download-pdf-btn").click(function () {
                 // Updates the textarea elements that CKEDITOR replaces
                 CKEDITOR.instances.editor.updateElement();
                 if ($("#editor").val() == "" || $("#filename").val() == "")
@@ -1164,6 +1475,27 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 {
                     $("form").submit();
                 }
+            });
+
+            // JS to save report to field
+            $("#save-report-btn").click(function () {
+                $("#save-report-status-msg").remove(); // Remove previous sucess/failure message
+                $.ajax({
+                        url: "<?php print $this->getUrl("SaveFileToField.php"); ?>",
+                        method: "POST",
+                        data: $('form').serialize(),
+                        success: function(data) {
+                            var json = JSON.parse(data);
+                            if (json.success)
+                            {
+                                $("#save-report-btn").after("<p id='save-report-status-msg' style='color:green'>Report was successfully saved!</p>");
+                            }
+                            else
+                            {
+                                $("#save-report-btn").after("<p id='save-report-status-msg' style='color:red'>Failed to save report to field! " + json.error + "</p>");
+                            }
+                        }
+                });
             });
         </script>
         <?php 
@@ -1208,7 +1540,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             $action = "create";
         }
-        $Proj = new Project();
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
         <div class="container"> 
@@ -1714,14 +2045,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     <button class="collapsible">Click to view fields <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                     <div class="collapsible-content">
                     <p>
-                        <?php if (REDCap::isLongitudinal() && $Proj->project['surveys_enabled']): ?>
+                        <?php if (REDCap::isLongitudinal() && $this->Proj->project['surveys_enabled']): ?>
                             <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
                             To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).</p>
                             <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
                         <?php elseif (REDCap::isLongitudinal()): ?>
                             <u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
                             To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).
-                        <?php elseif ($Proj->project['surveys_enabled']): ?> 
+                        <?php elseif ($this->Proj->project['surveys_enabled']): ?> 
                             <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use.</p>
                             <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
                         <?php else: ?>
@@ -1774,14 +2105,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             print "</div></div>";
                         }
                         ?>
-                        <?php if ($Proj->project['surveys_enabled']): ?>
+                        <?php if ($this->Proj->project['surveys_enabled']): ?>
                         <div class='collapsible-container'>
                             <button class='collapsible'>Survey Completion Timestamps <span class='fas fa-caret-down'></span><span class='fas fa-caret-up'></span></button>
                             <div class='collapsible-content'>
                                 <?php
                                     foreach ($instruments as $unique_name => $label)
                                     {
-                                        if (!empty($Proj->forms[$unique_name]['survey_id']))
+                                        if (!empty($this->Proj->forms[$unique_name]['survey_id']))
                                         {
                                             print "<p><strong>$label</strong> -> {\$redcap['{$unique_name}_timestamp']}</p>";
                                         }
@@ -2265,7 +2596,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                                 }
                                             ?>
                                             </select>
-                                            <p><i style="color:red">If you select more than 1 record, you are unable to preview the report before it downloads.</i></p>
+                                            <p><i style="color:red">If you select more than 1 record, you are unable to preview the report before it downloads, and are unable to save it to a record field.</i></p>
                                             <p><i style="color:red">Large templates may take several seconds, when batch filling.</i></p>
                                         <?php else:?>
                                             <p>No Existing Records</p>        
