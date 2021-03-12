@@ -126,7 +126,8 @@
             "dist": {
                 "type": "zip",
                 "url": "https://github.com/egorlaw/ckeditor_codemirror/archive/1.0.5.zip",
-                "reference": "8f219b9b64f7ae431733f2107dc13b79e946b634"
+                "reference": "8f219b9b64f7ae431733f2107dc13b79e946b634",
+                "shasum": null
             },
             "type": "drupal-library",
             "notification-url": "https://packagist.org/downloads/",
@@ -328,15 +329,6 @@
             "keywords": [
                 "templating"
             ],
-<<<<<<< HEAD
-            "support": {
-                "forum": "http://www.smarty.net/forums/",
-                "irc": "irc://irc.freenode.org/smarty",
-                "issues": "https://github.com/smarty-php/smarty/issues",
-                "source": "https://github.com/smarty-php/smarty/tree/v3.1.39"
-            },
-=======
->>>>>>> developer
             "time": "2021-02-17T21:57:51+00:00"
         }
     ],
@@ -350,6 +342,5 @@
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": [],
-    "platform-dev": [],
-    "plugin-api-version": "2.0.0"
+    "platform-dev": []
 }
