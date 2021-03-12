@@ -222,6 +222,35 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
     }
 
+    public function checkIfRecordsExist() {
+
+        global $Project, $returnFormat;
+
+        $records = $_POST["records"];
+
+        # Taken and edited from API > record > delete.php:delRecords()
+        // First check if all records submitted exist
+        $existingRecords = \Records::getData('array', $records, $Project->table_pk);
+       
+        //  Return json response
+        $body = json_encode($records);
+        $status = 200;
+
+        // Return error if some records don't exist
+        if (count($existingRecords) != count($records)) {
+
+            $status = 400;
+            $body = json_encode("One or more of the supplied records do not exist. Not existing record IDs:" . " " . implode(", ", array_diff($records, array_keys($existingRecords))));
+        }
+
+        // Headers
+        header('Content-type: application/json; charset=utf-8');        
+		$statusHeader = 'HTTP/1.1 ' . $status . ' ' . \RestUtility::getStatusCodeMessage($status);
+		header($statusHeader);
+
+        echo $body;
+    }
+
 
     /**
      * Helper function that deletes a file from the File Repository, if REDCap data about it fails
@@ -2202,6 +2231,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         <script src="https://cdn.jsdelivr.net/npm/js-cookie@2/src/js.cookie.min.js"></script>
         <!-- Module CSS -->
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
+        <!-- Manual Input Record -->
+        <script>
+            var BCCHR_CTE = {};
+            BCCHR_CTE.validateInputUrl = "<?= $this->getUrl("validateInput.php") ?>";
+
+        </script>
         <div class="container"> 
             <div class="jumbotron">
                 <?php
@@ -2246,11 +2281,28 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <?php endif; ?>
                 <br/>
                 <div class="container syntax-rule">
-                    <p><i>Select the record(s) and template you wish to fill. Only valid templates will be accessible. Invalid templates must be edited before they can run.</i></p>
+                    <p><i>Define the record(s) and template you wish to fill.</i></p>
                     <form id="fill-template-form" action="<?php print $this->getUrl("FillTemplate.php");?>" method="post">
                     <?php if($this->isManualInput): ?>
+                        <?php if (sizeof($valid_templates) > 0):?>
                         <table class="table" style="width:100%;">
                             <tbody>
+                                <tr>
+                                    <td style="width:25%;">
+                                        <p>Choose Template</p>
+                                        <p><i style="color:red">Only valid templates will be accessible. Invalid templates must be edited before they can run.</p>
+                                    </td>
+                                    <td class="data">
+                                        <select name="template" class="form-control">
+                                            <?php
+                                                foreach($valid_templates as $template)
+                                                {
+                                                    print "<option value=\"" . $template . "\">" . $template . "</option>";
+                                                }
+                                            ?>
+                                        </select>
+                                    </td>
+                                </tr>
                                 <tr>
                                     <td style="width:25%;">
                                         <p>Enter a comma-separated or return-separated list of record ids</p>
@@ -2275,37 +2327,32 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                                 Please <b>validate</b> your custom list input before <b>Fill template</b> is enabled.
                                             </small>
                                         </div>
+                                        <div id="input-validation-loading" style="border-color:#bee5eb!important;display:none;" class="alert alert-info" role="alert">                                            
+                                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                            Validation is processing. Please wait..
+                                        </div>                                        
+                                        <div id="input-validation-error" style="border-color:#f5c6cb!important;display:none;" class="alert alert-danger" role="alert">                                            
+                                        </div>
+                                        <div id="input-validation-success" style="border-color:#c3e6cb!important;display:none;" class="alert alert-success" role="alert">
+                                            Validation was successful. You can proceed to Fill Template.
+                                        </div>                                         
                                         <select id="participantIDs" name="participantID[]" style="visibility:hidden;" multiple >
-
                                     </td>
                                 </tr>
-                                <tr>
-                                    <td style="width:25%;">Choose Template</td>
-                                    <td class="data">
-                                        <?php if (sizeof($valid_templates) > 0):?>
-                                            <select name="template" class="form-control">
-                                                <?php
-                                                    foreach($valid_templates as $template)
-                                                    {
-                                                        print "<option value=\"" . $template . "\">" . $template . "</option>";
-                                                    }
-                                                ?>
-                                            </select>
-                                        <?php else:?>
-                                            <span>No Existing Templates</span>        
-                                        <?php endif;?>
-                                    </td>
-                                </tr>                                
                             </tbody>
                         </table>
                         <input type="hidden" name="download_token_value" id="download_token_value_id"/>
                         <div class="row">
                             <div class="col-md-6">
-                                <button id="fill-template-btn" type="submit" class="btn btn-primary">Fill Template</button>
-                                <span><i style="color:red"> **At least one record and one template must exist</i></span>
+                                <button id="fill-template-btn" type="submit" class="btn btn-primary" disabled>Fill Template</button>
                             </div>
                             <div id="progressBar" class="col"></div>
-                        </div>                        
+                        </div>
+                        <?php else:?>
+                            <div style="border-color:#f5c6cb!important;" class="alert alert-danger" role="alert">                                            
+                                <span>No Existing Templates. Please create a new template.</span> 
+                            </div>                        
+                        <?php endif;?>                        
                     <?php else : ?>                            
                         <table class="table" style="width:100%;">
                             <tbody>                                
@@ -2453,27 +2500,68 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         </div>
         <script>
             var btn_validate_input = $('#btn-validate-input');
+            btn_validate_input.on("click", fetchInputs);
 
             $('.list-input-step').on('input', () => {
                 btn_validate_input.prop("disabled", false);
-            })        
+            })
 
-            btn_validate_input.on("click", fetchInputs);
+
+            // Only Unique Array
+            function onlyUnique(value, index, self) {
+                return self.indexOf(value) === index;
+            }
 
             function fetchInputs() {
                 var list = $('.list-input-step').val();
                 var items = $.map(list.split(/\n|,/), $.trim).filter(Boolean);
+                var participantIDs = $("#participantIDs");
 
-                $("#participantIDs").find('option').remove();
-
-                $.each(items, function(key, value) {
+                participantIDs.find('option').remove();
+                $.each(items.filter(onlyUnique), function(key, value) {
 
                     var o = new Option(key, value, true, true);
-                    /// jquerify the DOM object 'o' so we can use the html method
                     $(o).html(key);
-                    $("#participantIDs").append(o);
+                    participantIDs.append(o);
                 })
-                $("#participantIDs").trigger("change");
+
+                validateInputs(participantIDs.val());
+
+            }
+
+            function validateInputs(records) {
+
+                btn_validate_input.prop("disabled", true);
+                $(".input-group textarea").prop("disabled", true);
+                $("#fill-template-btn").prop("disabled", true);
+
+                $("#input-validation-error").hide();
+                $("#input-validation-success").hide();
+                $("#input-validation-loading").show();
+
+                // Send ajax request to validate record list
+                $.ajax({
+                    method: 'POST',
+                    url: BCCHR_CTE.validateInputUrl,
+                    dataType: 'json',
+                    data: {
+                        records: records,
+                    },
+                    success: function(data) {
+                        $("#participantIDs").trigger("change");
+                        $("#input-validation-success").fadeIn();
+                        $("#fill-template-btn").prop("disabled", false);
+                    },
+                    error: function(error) {
+                        $("#input-validation-error").html(error.responseText).fadeIn();
+                        $("#fill-template-btn").prop("disabled", true);
+                    },
+                    complete: function(){
+                        $("#input-validation-loading").hide();
+                        btn_validate_input.prop("disabled", false);
+                        $(".input-group textarea").prop("disabled", false);
+                    }
+                });
             }
 
             $("#toDelete").text($("#deleteTemplateDropdown").val());
