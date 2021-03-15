@@ -697,7 +697,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             $path = substr($realpath, $publicly_accessible_start_pos);
 
                             $url = "https://" . $_SERVER["SERVER_NAME"] . "/$path/" . $filename;
-                            REDCap::logEvent("Photo uploaded", $filename);
+                            REDCap::logEvent("Custom Template Engine - Photo uploaded", $filename);
                         }
                         else
                         {
@@ -863,7 +863,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $templateToDelete = $_POST["templateToDelete"];
         if (unlink($this->templates_dir . $templateToDelete))
         {
-            REDCap::logEvent("Deleted template", $templateToDelete);
+            REDCap::logEvent("Custom Template Engine - Deleted template", $templateToDelete);
             return TRUE;
         }
         else
@@ -955,7 +955,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                          */
                         $action = "edit";
                         $currTemplateName = $filename;
-                        REDCap::logEvent("Template created", $filename);
+                        REDCap::logEvent("Custom Template Engine - Template created", $filename);
                     }
                 }
                 else
@@ -983,7 +983,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         }
                         else
                         {
-                            REDCap::logEvent("Template edited", $currTemplateName);
+                            REDCap::logEvent("Custom Template Engine - Template edited", $currTemplateName);
                             if ((!empty($template_errors) || !empty($header_errors) || !empty($footer_errors)) && strpos($currTemplateName, " - INVALID") === FALSE)
                             {
                                 $filename = strpos($currTemplateName, " - INVALID") !== FALSE ? $currTemplateName : str_replace(".html", " - INVALID.html", $currTemplateName);
@@ -1007,7 +1007,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         {
                             $filename = !empty($template_errors) || !empty($header_errors) || !empty($footer_errors) ? "{$name}_$this->pid - INVALID.html" : "{$name}_$this->pid.html";
                             rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
-                            REDCap::logEvent("Template edited", "Renamed template from '$currTemplateName' to '$filename'");
+                            REDCap::logEvent("Custom Template Engine - Template edited", "Renamed template from '$currTemplateName' to '$filename'");
                             $currTemplateName = $filename;
                         }
                     }
@@ -1246,7 +1246,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             header('Content-Disposition: attachment; filename="'.basename($zip_name).'"');
             header('Content-length: '.filesize($zip_name));
             readfile($zip_name);
-            REDCap::logEvent("Downloaded Reports ", $template_filename , "" , implode(", ", $records));
+            REDCap::logEvent("Custom Template Engine - Downloaded Reports ", $template_filename , "" , implode(", ", $records));
         }
         unlink($zip_name);
         exit;
@@ -2424,7 +2424,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             }
 
             $query = "SELECT pk, max(ts) as ts FROM $log_event_table 
-                        where (description = 'Downloaded Report' or description = 'Downloaded Reports')
+                        where (description = 'Downloaded Report' or description = 'Downloaded Reports' or description = 'Custom Template Engine - Downloaded Report')
                         and page = 'ExternalModules/index.php'
                         and pk is not null 
                         and project_id = " . $this->pid .
