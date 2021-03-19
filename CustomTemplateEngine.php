@@ -2424,7 +2424,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             }
 
             $query = "SELECT pk, max(ts) as ts FROM $log_event_table 
-                        where (description = 'Downloaded Report' or description = 'Downloaded Reports' or description = 'Custom Template Engine - Downloaded Report')
+                        where (description = 'Downloaded Report' or description = 'Downloaded Reports' or description = 'Custom Template Engine - Downloaded Reports')
                         and page = 'ExternalModules/index.php'
                         and pk is not null 
                         and project_id = " . $this->pid .
