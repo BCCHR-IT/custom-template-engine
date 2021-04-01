@@ -66,10 +66,8 @@ class Template
         {
             return $this->areSiblingsEmpty($elem->previousSibling, "previous") && empty($elem->nodeValue);
         }
-        else 
-        {
-            return $this->areSiblingsEmpty($elem->nextSibling, "next") && empty($elem->nodeValue);
-        }
+
+        return $this->areSiblingsEmpty($elem->nextSibling, "next") && empty($elem->nodeValue);
     }
 
     /**
@@ -208,7 +206,7 @@ class Template
                     {
                         $event_fields_and_vals[$field_name] = $this->de_identified_replacement;
                     }
-                    else if($this->dictionary[$field_name]["field_type"] === "notes")
+                    else if ($this->dictionary[$field_name]["field_type"] === "notes")
                     {
                         $event_fields_and_vals[$field_name] = str_replace("\r\n", "<br/>", htmlentities($value));
                     }
@@ -1079,10 +1077,11 @@ class Template
             {
                 $data = array();
                 $event = $events[$event_data["redcap_event_name"]];
-                if ($event_data["redcap_repeat_instance"] != "")
+
+                if (!empty($event_data["redcap_repeat_instance"]))
                 {
                     // Repeatable instrument
-                    if ($event_data["redcap_repeat_instrument"] != null && !in_array($event_data["redcap_repeat_instrument"], $repeatable_instruments_parsed)) 
+                    if (!empty($event_data["redcap_repeat_instrument"]) && !in_array($event_data["redcap_repeat_instrument"], $repeatable_instruments_parsed)) 
                     {
                         // Get latest instance of repeatable instrument.
                         // Retrieve all repeatable instances of event. 
@@ -1158,10 +1157,10 @@ class Template
             foreach($json as $index => $event_data)
             {
                 // Repeatable instrument
-                if ($event_data["redcap_repeat_instance"] != "")
+                if (!empty($event_data["redcap_repeat_instance"]))
                 {
                     // Repeatable instrument
-                    if ($event_data["redcap_repeat_instrument"] != null && !in_array($event_data["redcap_repeat_instrument"], $repeatable_instruments_parsed)) 
+                    if (!empty($event_data["redcap_repeat_instrument"]) && !in_array($event_data["redcap_repeat_instrument"], $repeatable_instruments_parsed)) 
                     {
                         // Get latest instance of repeatable instrument.
                         // Retrieve all repeatable instances of event. 
