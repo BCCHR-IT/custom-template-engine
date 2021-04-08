@@ -32,6 +32,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     private $img_dir;
     private $pid;
     private $userid;
+    private $Proj;
 
     /**
      * Initialize class variables.
@@ -48,6 +49,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $this->temp_dir = $this->getSystemSetting("temp-folder");
         $this->img_dir = $this->getSystemSetting("img-folder");
         $this->pid = $this->getProjectId();
+
+        if (!empty($this->pid))
+            $this->Proj = new Project($this->pid);
 
         /**
          * Checks and adds trailing directory separator
@@ -216,10 +220,234 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $rights = REDCap::getUserRights($this->userid);
         if ($rights[$this->userid]["data_export_tool"] === "0" || !$rights[$this->userid]["reports"]) 
         {
-            exit("<div class='red'>You don't have premission to view this page</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
+            exit("<div class='red'>You don't have permission to view this page</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
         }
     }
 
+    /**
+     * Retrieves the latest repeatable instance for a record on a specified event.
+     * 
+     * @since 3.1
+     */
+    private function getLatestRecordInstance($record, $event_id = null)
+    {
+        $record_data = REDCap::getData("json", $record, null, $event_id, null, TRUE, FALSE, TRUE, null, TRUE);
+        $json = json_decode($record_data, true);
+
+        foreach($json as $index => $event_data)
+        {
+            $redcap_repeat_instance = $event_data["redcap_repeat_instance"];
+            if (isset($redcap_repeat_instance) && !empty($redcap_repeat_instance))
+            { 
+                $instance = $redcap_repeat_instance == 1 ? null : $redcap_repeat_instance; // First instance is represented by null in db
+            }
+        }
+
+        return $instance;
+    }
+
+    /**
+     * Retrieves the latest repeatable instance for a record, if [event_id][field_name] is on a repeatable instrument/event, else return null.
+     * 
+     * @since 3.1
+     */
+    private function getLatestRepeatableInstance($record, $event_id, $field_name)
+    {
+        /**
+         * Check if field is on a repeatable form. If yes, then return latest instance, else return null.
+         */
+        if($this->Proj->hasRepeatingFormsEvents())
+        {
+            $repeating_events = $this->Proj->getRepeatingFormsEvents();
+
+            $instruments = $repeating_events[$event_id];
+            if ($instruments === "WHOLE") // repeat whole event
+            {
+                $sql = "select form_name from redcap_events_repeat where event_id = $event_id";
+                $result = $this->query($sql);
+                if(mysqli_num_rows($result) > 0)
+                {
+                    while ($row = mysqli_fetch_assoc($result))
+                    {
+                        $instrument = $row["form_name"];
+                        $fields = REDCap::getFieldNames($instrument); // Get fields in repeatable instrument
+
+                        if (in_array($field_name, $fields)) // Check if field is part of repeatable instrument
+                        {
+                            return $this->getLatestRecordInstance($record, $event_id);
+                        }
+                    }
+                }
+            }
+            else if (is_array($instruments)) // repeate instruments on event
+            {
+                foreach($instruments as $instrument => $custom_repeat_label) // iterate through instruments on repeatable event
+                {
+                    $fields = REDCap::getFieldNames($instrument); // Get fields in repeatable instrument
+                    if (in_array($field_name, $fields)) // Check if field is part of repeatable instrument
+                    {
+                        return $this->getLatestRecordInstance($record, $event_id);
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Checks that the field exists on the given event
+     * 
+     * @since 3.1
+     */
+    public function checkFieldInEvent($field_name, $event_id)
+    {
+        $sql = "SELECT 1 from redcap_metadata
+                join redcap_events_forms 
+                on redcap_metadata.form_name = redcap_events_forms.form_name
+                where redcap_events_forms.event_id = '$event_id' and redcap_metadata.field_name = '$field_name'";
+
+        $result = $this->query($sql);
+        
+        if ($result)
+        {
+            return mysqli_num_rows($result) > 0;
+        }
+
+        return false;
+    }
+    
+    /**
+     * Saves a file to a REDCap field in the project. Assumes the field is a file upload field. Returns false on failure, and true otherwise.
+     * Currently no compatible with repeating events.
+     */
+    public function saveFileToField($filename, $file_contents, $field_name, $record, $event_id, $instance=null, $dataEntryForm=false)
+    {
+        // Save file to edocs tables in the REDCap database
+        $database_success = FALSE;
+        $upload_success = FALSE;
+        $docs_id = 0;
+
+        $dummy_file_name = $filename . ".pdf";
+        $dummy_file_name = preg_replace("/[^a-zA-Z-._0-9]/","_",$dummy_file_name);
+        $dummy_file_name = str_replace("__","_",$dummy_file_name);
+        $dummy_file_name = str_replace("__","_",$dummy_file_name);
+
+        $stored_name = date('YmdHis') . "_pid" . $this->pid . "_" . generateRandomHash(6) . ".pdf";
+
+        $upload_success = file_put_contents(EDOC_PATH . $stored_name, $file_contents);
+
+        if ($upload_success !== FALSE) 
+        {
+            $dummy_file_size = $upload_success;
+
+            $sql = "INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date) 
+                    VALUES ('$stored_name','application/pdf','$dummy_file_name','$dummy_file_size','pdf','$this->pid','" . date('Y-m-d H:i:s') . "')";
+                            
+            if ($this->query($sql)) 
+            {
+                $docs_id = db_insert_id();
+                
+                // Always save report from plugin page to the latest repeatable instance, otherwise null
+                $instance = (is_null($instance)) ? $this->getLatestRepeatableInstance($record, $event_id, $field_name) : $instance;
+
+                // See if field has had a previous value. If so, update; if not, insert.
+                $sql = "SELECT value
+                        FROM redcap_data
+                        WHERE project_id = '$this->pid'
+                            AND record = '$record'
+                            AND event_id = '$event_id'
+                            AND field_name = '$field_name'";
+
+                if (!isset($instance))
+                {
+                    $sql .= " AND instance is NULL";
+                }
+                else
+                {
+                    $sql .= " AND instance = '$instance'";
+                }
+                
+                $result = $this->query($sql);
+
+                if ($result && mysqli_num_rows($result) > 0) // row exists
+                {
+                    // Set the file as "deleted" in redcap_edocs_metadata table, but don't really delete the file or the table entry (unless the File Version History is enabled for the project)
+                    if ($GLOBALS['file_upload_versioning_global_enabled'] == '' && $this->Proj->project['file_upload_versioning_enabled'] != '1')
+                    {
+                        while ($row = mysqli_fetch_assoc($result)) {
+                            $id = $row["value"];
+                        }
+                        $sql = "UPDATE redcap_edocs_metadata SET delete_date = '" . NOW . "' WHERE doc_id = $id";
+                        $this->query($sql);
+                    }
+
+                    $sql = "UPDATE redcap_data SET value = '$docs_id' WHERE project_id = $this->pid AND record = '$record' AND event_id = $event_id AND field_name = '$field_name'";
+
+                    if (!isset($instance))
+                    {
+                        $sql .= " AND instance is NULL";
+                    }
+                    else
+                    {
+                        $sql .= " AND instance = '$instance'";
+                    }
+                }
+                else // row did not exist
+                {
+                    // If this is a longitudinal project and this file is being added to an event without data,
+                    // then add a row for the record ID field too (so it doesn't get orphaned).
+                    if ($this->Proj->longitudinal) 
+                    {
+                        $sql = "SELECT 1
+                                FROM redcap_data
+                                WHERE project_id = $this->pid
+                                    AND record = '$record'
+                                    AND event_id = $event_id";
+
+                        $sql .= $instance > 1 ? " AND instance = '$instance'" : " AND instance is NULL";
+                        $sql .= " LIMIT 1";
+
+                        $result = $this->query($sql);
+
+                        if (mysqli_num_rows($result) == 0) 
+                        {
+                            $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES ($this->pid, $event_id, '$record', '{$this->Proj->table_pk}', '$record', " . ($instance > 1 ? "'$instance'" : "null") . ")";
+                            $this->query($sql);
+                        }
+                    }
+        
+                    // Add an entry in redcap_data that contains the edoc ID
+                    if (!isset($instance))
+                    {
+                        $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES ($this->pid, $event_id, '$record', '$field_name', '$docs_id', null)";
+                    }
+                    else
+                    {
+                        $sql = "INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES ($this->pid, $event_id, '$record', '$field_name', '$docs_id', $instance)";
+                    }
+                }
+
+                $q = $this->query($sql);
+                if ($q && !$dataEntryForm) // when uploading on data entry form logging only happens when form gets saved (and if it's not saved then neither is the file upload)
+                {
+                    // Logging event as DOC_UPLOAD allows file history to be built.
+                    $redcap_log_event_table = method_exists('\REDCap', 'getLogEventTable') ? REDCap::getLogEventTable($this->pid) : "redcap_log_event";
+                    $current_timestamp = date("YmdHis");
+                    $ip = $_SERVER["REMOTE_ADDR"];
+                    $description = isset($instance) ? "[instance = $instance],\n$field_name = ''$docs_id''" : "$field_name = ''$docs_id''";
+
+                    $log_sql = "INSERT INTO $redcap_log_event_table (ts, user, ip, page, project_id, event, object_type, sql_log, pk, event_id, data_values, description) 
+                                VALUES ('$current_timestamp', '$this->userid', '$ip', 'ExternalModules/index.php', '$this->pid', 'DOC_UPLOAD', 'redcap_data', '" . str_replace("'", "''", $sql) . "', '$record', '$event_id', '$description', 'Upload Document')";
+
+                    $this->query($log_sql);
+
+                }
+            }
+        }
+
+        return $docs_id; // 0 if could not upload file
+    }
 
     /**
      * Helper function that deletes a file from the File Repository, if REDCap data about it fails
@@ -252,12 +480,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * 
      * @param String $filename         Name of file
      * @param String $file_contents    Contents of file
-     * @param STring $file_extension   File extension
+     * @param String $file_extension File extension
+     * @return bool always returns true
      * @see CustomTemplateEngine::deleteRepositoryFile() For deleting a file from the repository, if metadata failed to create.
      * @since 3.0
      */
     private function saveToFileRepository($filename, $file_contents, $file_extension)  
     {   
+        global $project_language;
         // Upload the compiled report to the File Repository
         $errors = array();
         $database_success = FALSE;
@@ -340,7 +570,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             $context_msg = "<b>{$lang['global_01']}{$lang['colon']} {$lang['docs_47']}</b><br>" . $lang['docs_65'] . ' ' . maxUploadSizeFileRespository().'MB'.$lang['period'];
                             
-            if ($super_user) 
+            if (SUPER_USER) 
             {
                 $context_msg .= '<br><br>' . $lang['system_config_69'];
             }
@@ -425,7 +655,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     /**
      * Uploads images from file browser object to server.
      * 
-     * Uploades images from file browser object to server, after performing 
+     * Uploads images from file browser object to server, after performing 
      * validations. Error returned to user if upload failed. Upon success
      * log event in REDCap.
      * 
@@ -468,7 +698,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             $path = substr($realpath, $publicly_accessible_start_pos);
 
                             $url = "https://" . $_SERVER["SERVER_NAME"] . "/$path/" . $filename;
-                            REDCap::logEvent("Photo uploaded", $filename);
+                            REDCap::logEvent("Custom Template Engine - Photo uploaded", $filename);
                         }
                         else
                         {
@@ -634,7 +864,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $templateToDelete = $_POST["templateToDelete"];
         if (unlink($this->templates_dir . $templateToDelete))
         {
-            REDCap::logEvent("Deleted template", $templateToDelete);
+            REDCap::logEvent("Custom Template Engine - Deleted template", $templateToDelete);
             return TRUE;
         }
         else
@@ -726,7 +956,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                          */
                         $action = "edit";
                         $currTemplateName = $filename;
-                        REDCap::logEvent("Template created", $filename);
+                        REDCap::logEvent("Custom Template Engine - Template created", $filename);
                     }
                 }
                 else
@@ -754,7 +984,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         }
                         else
                         {
-                            REDCap::logEvent("Template edited", $currTemplateName);
+                            REDCap::logEvent("Custom Template Engine - Template edited", $currTemplateName);
                             if ((!empty($template_errors) || !empty($header_errors) || !empty($footer_errors)) && strpos($currTemplateName, " - INVALID") === FALSE)
                             {
                                 $filename = strpos($currTemplateName, " - INVALID") !== FALSE ? $currTemplateName : str_replace(".html", " - INVALID.html", $currTemplateName);
@@ -778,7 +1008,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         {
                             $filename = !empty($template_errors) || !empty($header_errors) || !empty($footer_errors) ? "{$name}_$this->pid - INVALID.html" : "{$name}_$this->pid.html";
                             rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
-                            REDCap::logEvent("Template edited", "Renamed template from '$currTemplateName' to '$filename'");
+                            REDCap::logEvent("Custom Template Engine - Template edited", "Renamed template from '$currTemplateName' to '$filename'");
                             $currTemplateName = $filename;
                         }
                     }
@@ -827,6 +1057,32 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
+     * Use DOMPDF to format the PDF contents, and return it.
+     * 
+     * @since 3.1
+     */
+    public function creatPDF($dompdf_obj, $header, $footer, $main, $fileortemplate)
+    {
+        $contents = $this->formatPDFContents($header, $footer, $main);
+
+        // Add page numbers to the footer of every page
+        $dompdf_obj->set_option("isHtml5ParserEnabled", true);
+        $dompdf_obj->set_option("isPhpEnabled", true);
+        $dompdf_obj->loadHtml($contents);
+
+        $dompdf_obj->set_option('isRemoteEnabled', TRUE);
+
+        // Setup the paper size and orientation
+        list($paperSize, $paperOrientation) = $this->getPaperSettings($fileortemplate);
+        $dompdf_obj->setPaper($paperSize, $paperOrientation);
+
+        // Render the HTML as PDF
+        $dompdf_obj->render();
+
+        return $dompdf_obj->output();
+    }
+
+    /**
      * Outputs a PDF of a report to browser.
      * 
      * Retrieves body, header, and footer contents of template passed via HTTP POST.
@@ -849,27 +1105,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
         if (isset($main) && !empty($main))
         {
-            $contents = $this->formatPDFContents($header, $footer, $main);
-
-            // Add page numbers to the footer of every page
             $dompdf = new Dompdf();
-            $dompdf->set_option("isHtml5ParserEnabled", true);
-            $dompdf->set_option("isPhpEnabled", true);
-            $dompdf->loadHtml($contents);
-
-            $dompdf->set_option('isRemoteEnabled', TRUE);
-
-            // Setup the paper size and orientation
-            $dompdf->setPaper("letter", "portrait");
-
-            // Render the HTML as PDF
-            $dompdf->render();
-
-            $filled_template_pdf_content = $dompdf->output();
+            $pdf_content = $this->creatPDF($dompdf, $header, $footer, $main, $filename);
 
             if (!$this->getProjectSetting("save-report-to-repo"))
             {
-                $saved = $this->saveToFileRepository($filename, $filled_template_pdf_content, "pdf");
+                $saved = $this->saveToFileRepository($filename, $pdf_content, "pdf");
                 if ($saved !== true)
                 {
                     $HtmlPage = new HtmlPage();
@@ -880,7 +1121,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             }
 
             $dompdf->stream($filename);
-            REDCap::logEvent("Downloaded Report", $filename , "" , $record);
+            REDCap::logEvent("Custom Template Engine - Downloaded Report", $filename , "" , $record);
         }
         else
         {
@@ -937,30 +1178,15 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $header = empty($header) ? "" : $doc->saveHTML($header);
                     $footer = empty($footer)? "" : $doc->saveHTML($footer);
                     $main = $doc->saveHTML($main);
-                
-                    $contents = $this->formatPDFContents($header, $footer, $main);
+                    
+                    $dompdf = new Dompdf();
+                    $filled_template_pdf_content = $this->creatPDF($dompdf, $filled_header, $filled_footer, $filled_main, $template_filename);
 
-                    if (!empty($contents))
+                    if ($z->addFromString("reports/$filename.pdf", $filled_template_pdf_content) !== true)
                     {
-                        $dompdf = new Dompdf();
-                        $dompdf->set_option("isHtml5ParserEnabled", true);
-                        $dompdf->set_option("isPhpEnabled", true);
-                        $dompdf->loadHtml($contents);
-
-                        $dompdf->set_option('isRemoteEnabled', TRUE);
-
-                        // Setup the paper size and orientation
-                        $dompdf->setPaper("letter", "portrait");
-                        // Render the HTML as PDF
-                        $dompdf->render();
-                        $filled_template_pdf_content = $dompdf->output();
-
                         // Add PDF to ZIP
-                        if ($z->addFromString("reports/$filename.pdf", $filled_template_pdf_content) !== true)
-                        {
-                            $errors[] = "<p>ERROR</p> Could not add $filename to the ZIP";
-                            break;
-                        }
+                        $errors[] = "<p>ERROR</p> Could not add $filename to the ZIP";
+                        break;
                     }
                 }
 
@@ -1007,11 +1233,33 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             header('Content-Disposition: attachment; filename="'.basename($zip_name).'"');
             header('Content-length: '.filesize($zip_name));
             readfile($zip_name);
-            REDCap::logEvent("Downloaded Reports ", $template_filename , "" , implode(", ", $records));
+            REDCap::logEvent("Custom Template Engine - Downloaded Reports ", $template_filename , "" , implode(", ", $records));
         }
         unlink($zip_name);
         exit;
-    }   
+    }  
+
+    /**
+     * Get all fields in the project of type file.
+     * 
+     * @since 3.1
+     */
+    private function getAllFileFields()
+    {
+        $file_fields = array();
+        $data_dictionary = REDCap::getDataDictionary("array");
+
+        foreach ($data_dictionary as $field_name => $field_attributes)
+        {
+            if ($field_attributes["field_type"] == "file")
+            {
+                $field_label = $field_attributes["field_label"];
+                $file_fields[$field_name] = "$field_name ($field_label)";
+            }
+        }
+
+        return $file_fields;
+    }
 
     /**
      * Fills a template with REDCap record data, and displays in 
@@ -1129,10 +1377,49 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     </div>
                                 </td>
                             </tr>
+                            <tr>
+                                <td style="width:25%;">
+                                    <p>Save report to A Field <strong style="color:black">(Optional)</strong></p>
+                                    <p>
+                                        This will save the report to a field in the record you chose. For repeating events/instruments it will be saved to the <b>latest instance</b>. 
+                                        For longitudinal projects, if no event is chosen then the report is saved to the first event.
+                                    </p>
+                                    <p><b>WARNING:</b> This will override any previous documents saved to the field.</p>
+                                </td>
+                                <td class="data">
+                                    <div class="row">
+                                        <div class="col-md-5">
+                                            <?php if (REDCap::isLongitudinal()) :?>
+                                            <select id="save-report-to-event-dropdown" name="save-report-to-event-val" class="form-control selectpicker">
+                                                <option value="">-Select an event-</option>
+                                                <?php
+                                                $events = REDCap::getEventNames(true, true);
+                                                foreach($events as $event)
+                                                {
+                                                    print "<option value='$event'>$event</option>";
+                                                } 
+                                                ?>
+                                            </select>
+                                            <?php endif; ?>
+                                            <select id="save-report-to-field-dropdown" name="save-report-to-field-val" class="form-control selectpicker">
+                                                <option value="">-Select a field-</option>
+                                                <?php
+                                                $file_fields = $this->getAllFileFields();
+                                                foreach($file_fields as $field => $label)
+                                                {
+                                                    print "<option value='$field'>$label</option>";
+                                                } 
+                                                ?>
+                                            </select>
+                                            <button id="save-report-btn" type="button" class="btn btn-primary" style="margin-top:25px">Save Report</button>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                     <div class="row" style="margin-bottom:20px">
-                        <div class="col-md-2"><button id="download-pdf" type="button" class="btn btn-primary">Download PDF</button></div>
+                        <div class="col-md-2"><button id="download-pdf-btn" type="button" class="btn btn-primary">Download PDF</button></div>
                     </div>
                     <div class="collapsible-container">
                         <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
@@ -1163,7 +1450,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         <script src="<?php print $this->getUrl("vendor/ckeditor/ckeditor/ckeditor.js"); ?>"></script>
         <script src="<?php print $this->getUrl("scripts.js"); ?>"></script>
         <script>
-            $("#download-pdf").click(function () {
+            // JS to download PDF
+            $("#download-pdf-btn").click(function () {
                 // Updates the textarea elements that CKEDITOR replaces
                 CKEDITOR.instances.editor.updateElement();
                 if ($("#editor").val() == "" || $("#filename").val() == "")
@@ -1174,6 +1462,27 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 {
                     $("form").submit();
                 }
+            });
+
+            // JS to save report to field
+            $("#save-report-btn").click(function () {
+                $("#save-report-status-msg").remove(); // Remove previous sucess/failure message
+                $.ajax({
+                        url: "<?php print $this->getUrl("SaveFileToField.php"); ?>",
+                        method: "POST",
+                        data: $('form').serialize(),
+                        success: function(data) {
+                            var json = JSON.parse(data);
+                            if (json.success)
+                            {
+                                $("#save-report-btn").after("<p id='save-report-status-msg' style='color:green'>Report was successfully saved!</p>");
+                            }
+                            else
+                            {
+                                $("#save-report-btn").after("<p id='save-report-status-msg' style='color:red'>Failed to save report to field! " + json.error + "</p>");
+                            }
+                        }
+                });
             });
         </script>
         <?php 
@@ -1218,7 +1527,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             $action = "create";
         }
-        $Proj = new Project();
         ?>
         <link rel="stylesheet" href="<?php print $this->getUrl("app.css"); ?>" type="text/css">
         <div class="container"> 
@@ -1724,14 +2032,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     <button class="collapsible">Click to view fields <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                     <div class="collapsible-content">
                     <p>
-                        <?php if (REDCap::isLongitudinal() && $Proj->project['surveys_enabled']): ?>
+                        <?php if (REDCap::isLongitudinal() && $this->Proj->project['surveys_enabled']): ?>
                             <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
                             To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).</p>
                             <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
                         <?php elseif (REDCap::isLongitudinal()): ?>
                             <u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use. For Longitudinal projects, this sytnax will default to the first event in a record's arm.
                             To access other events please append their name before the field (<i>See adding events for longitdinal projects, under syntax rules</i>).
-                        <?php elseif ($Proj->project['surveys_enabled']): ?> 
+                        <?php elseif ($this->Proj->project['surveys_enabled']): ?> 
                             <p><u>NOTE:</u> Fields are sorted by their instruments, and are preformatted for ease of use.</p>
                             <p>Survey completion timestamps can be pulled, and proper formatting for enabled forms are at the bottom.</p>
                         <?php else: ?>
@@ -1784,14 +2092,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             print "</div></div>";
                         }
                         ?>
-                        <?php if ($Proj->project['surveys_enabled']): ?>
+                        <?php if ($this->Proj->project['surveys_enabled']): ?>
                         <div class='collapsible-container'>
                             <button class='collapsible'>Survey Completion Timestamps <span class='fas fa-caret-down'></span><span class='fas fa-caret-up'></span></button>
                             <div class='collapsible-content'>
                                 <?php
                                     foreach ($instruments as $unique_name => $label)
                                     {
-                                        if (!empty($Proj->forms[$unique_name]['survey_id']))
+                                        if (!empty($this->Proj->forms[$unique_name]['survey_id']))
                                         {
                                             print "<p><strong>$label</strong> -> {\$redcap['{$unique_name}_timestamp']}</p>";
                                         }
@@ -2103,7 +2411,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             }
 
             $query = "SELECT pk, max(ts) as ts FROM $log_event_table 
-                        where (description = 'Downloaded Report' or description = 'Downloaded Reports')
+                        where (description = 'Downloaded Report' or description = 'Downloaded Reports' or description = 'Custom Template Engine - Downloaded Reports')
                         and page = 'ExternalModules/index.php'
                         and pk is not null 
                         and project_id = " . $this->pid .
@@ -2275,7 +2583,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                                 }
                                             ?>
                                             </select>
-                                            <p><i style="color:red">If you select more than 1 record, you are unable to preview the report before it downloads.</i></p>
+                                            <p><i style="color:red">If you select more than 1 record, you are unable to preview the report before it downloads, and are unable to save it to a record field.</i></p>
                                             <p><i style="color:red">Large templates may take several seconds, when batch filling.</i></p>
                                         <?php else:?>
                                             <p>No Existing Records</p>        
@@ -2474,5 +2782,202 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             return $link;
         }
+    }
+
+    /**
+     * getPaperSettings($name) 
+     * Look for module project setting with name corresponding to the tempalte or file name provided
+     * @param String $name Name of template or pdf document file name
+     * @return Array Array with two elements: 1. paper size e.g. "Letter", "A4"; 2: paper orientation "Portrait" or "Landscape""
+     */
+    protected function getPaperSettings($name) 
+    {
+        $paperSize = "letter";
+        $paperOrientation = "portrait";
+
+        $templateSettings = $this->getSubSettings('template-options');
+
+        foreach ($templateSettings as $settings) {
+            // look for a template with name occurring within the file name of what's being generated 
+            // (pretty horrid - will catch "MyTemplate" before "MyTemplate_New" - need better way of recording template names perhaps recording to project settings on create/save/delete and auto-generate template name for files system storage?)
+            if (strpos($name, $settings['template-name']) !== false) {
+                $paperSize = (empty($settings['option-paper-size'])) ? $paperSize : $settings['option-paper-size'];
+                $paperOrientation = ($settings['option-paper-orientation']) ? "landscape" : $paperOrientation;
+                break;
+            }
+        }
+
+        return array($paperSize, $paperOrientation);
+    }
+
+    public function redcap_data_entry_form_top($project_id, $record, $instrument, $event_id, $group_id, $repeat_instance) 
+    {
+        global $Proj, $lang;
+
+        // is there a file upload field on this form?
+        $ff = false;
+        foreach (array_keys($Proj->forms[$instrument]['fields']) as $f) {
+            if ($Proj->metadata[$f]['element_type'] === 'file') {
+                $ff = true;
+                break;
+            }
+        }
+        if (!$ff) return; // no file upload field -> return
+
+        // any valid templates?
+        $all_templates = array_diff(scandir($this->templates_dir), array("..", "."));
+        $valid_templates = array();
+        $suffix = "_$this->pid.html";
+        foreach($all_templates as $template) {
+            if (strpos($template, $suffix) !== FALSE) {
+                array_push($valid_templates, rtrim($template, $suffix));
+            }
+        }
+
+        if (count($valid_templates) === 0) return; // no templates -> return
+
+        // make a select list of templates to include in the file upload dialog form for each field
+        $templateSelect = '<select class="upload-source-select form-control form-control-sm"><option value="0">Choose file</option>';
+        $n = 0;
+        foreach($valid_templates as $template) {
+            $n++;
+            $templateSelect .= "<option value=\"$n\">$template</option>";
+        }
+        $templateSelect .= '</select>';
+        $uploadDialogContent = '<div class="upload-source my-2 d-none"><div class="font-weight-bold"><i class="fas fa-cube mr-1"></i>Custom Template Engine</div><div>Choose a file or generate from a template '.$templateSelect.'</div><button class="upload-source-btn btn btn-primaryrc mt-2" style="font-size:14px;display:none;"><i class="fas fa-upload mr-1"></i>Fill template and upload</button></div>';
+        echo $uploadDialogContent;
+
+        $fillAndSaveUrl = $this->getUrl('FillAndSave.php');
+        $fillAndSaveUrl .= "&id=".urlencode($record)."&event_id=$event_id&instrument=$instrument&instance=$repeat_instance";
+
+        ?>
+        <script type="text/javascript">
+            $(document).ready(function(){
+                $('body').on('dialogopen', function(){
+                    if(event.target.className=="fileuploadlink") {
+                        var content = $('div.upload-source').clone();
+
+                        $(content).find('button.upload-source-btn').on('click', function(e){
+                            var templateName = $('#form_file_upload').find('select.upload-source-select').find(":selected").text();
+                            e.preventDefault();
+                            $('#form_file_upload').find('div.upload-source').hide();
+                            $('#f1_upload_process').show();
+                            $(this).prop('disabled, true');
+
+                            $.ajax({
+                                url: '<?=$fillAndSaveUrl?>',
+                                type: 'POST',
+                                dataType: 'json',
+                                data: { 
+                                    template_name: templateName,
+                                    field_name: $('#field_name').val()
+                                },
+                                success: function(data) {
+                                    console.log(data);
+                                    window.parent.dataEntryFormValuesChanged = true;
+                                    window.parent.window.stopUpload(data.result,data.field_name,data.doc_id,data.save_filename,data.record,data.doc_size,data.event_id,data.file_download_page,data.file_delete_page,data.doc_id_hash,data.instance);
+                                    if (data.inlineActionTag) {
+                                        window.parent.window.$(function(){ window.parent.window.initInlineImages(data.field_name) });
+                                    }
+                                },
+                                error: function(data) {
+                                    window.parent.window.stopUpload(0,'',0,'','','','','','','','');
+                                    
+                                }
+                            });
+
+                            return false;
+                        });
+
+                        $(content).find('select.upload-source-select').on('change', function() {
+                            var selIdx = $(this).val();
+                            var selName = $(this).find(":selected").text();
+                            if (selIdx==0) {
+                                // choose a file
+                                $('#f1_upload_form').show();
+                                $('#form_file_upload').find('button.upload-source-btn').hide();
+                            } else { 
+                                $('#f1_upload_form').hide();
+                                $('#form_file_upload').find('button.upload-source-btn').show();
+                            }
+                        });
+                        $(content).insertAfter('#this_upload_field').removeClass('d-none');
+                    }
+                });
+            });
+        </script>
+        <?php
+    }
+
+    /**
+     * fillAndSave
+     * Takes $_POST from file upload field dialog, generates PDF of specified template for current record and uploads it to the field/event.
+     */
+    public function fillAndSave() {
+        global $project_id, $Proj;
+        $record = rawurldecode(urldecode($_REQUEST['id']));
+        $event_id = $_REQUEST['event_id'];
+        $instance = $_REQUEST['instance'];
+        $field_name = explode('-', $_REQUEST['field_name'])[0];
+        $template_name = $_REQUEST['template_name'];
+
+        $save_filename = $template_name.'_'.$record.'_'.date('Y-m-d_His').'.pdf';
+        $template_filename = $template_name.'_'.$project_id.'.html';
+        $template = new Template($this->templates_dir, $this->compiled_dir);
+        $filled_template = $template->fillTemplate($template_filename, $record);
+
+        $doc = new DOMDocument();
+        $doc->loadHTML($filled_template);
+    
+        $header = $doc->getElementsByTagName("header")->item(0);
+        $footer = $doc->getElementsByTagName("footer")->item(0);
+        $main = $doc->getElementsByTagName("main")->item(0);
+
+        $filled_main = $doc->saveHTML($main);
+        $filled_header = empty($header) ? "" : $doc->saveHTML($header);
+        $filled_footer = empty($footer)? "" : $doc->saveHTML($footer);
+
+        $dompdf = new Dompdf();
+        $pdf_content = $this->creatPDF($dompdf, $filled_header, $filled_footer, $filled_main, $template);
+    
+        $doc_size = strlen($pdf_content);
+        $doc_id = $this->saveFileToField($save_filename, $pdf_content, $field_name, $record, $event_id, $instance, true);
+        if ($doc_id) {
+            $result = 1;
+        } else {
+            $msg = "Failed to generate PDF and save to field. <br>Template=$template_name; Record=$record; Field=$field_name ";
+            \REDCap::logEvent("Custom Template Engine - Generate and Save Failed!", $msg);
+            $result = 0;
+        }
+
+        
+        // return response for uplad as per DataEntry/file_upload.php
+        // SURVEYS: Use the surveys/index.php page as a pass through for certain files (file uploads/downloads, etc.)
+        if (isset($_GET['s']) && !empty($_GET['s']))
+        {
+            $file_download_page = APP_PATH_SURVEY . "index.php?pid=$project_id&__passthru=".urlencode("DataEntry/file_download.php");
+            $file_delete_page   = APP_PATH_SURVEY . "index.php?pid=$project_id&__passthru=".urlencode("DataEntry/file_delete.php");
+        }
+        else
+        {
+            $file_download_page = APP_PATH_WEBROOT . "DataEntry/file_download.php?pid=$project_id";
+            $file_delete_page   = APP_PATH_WEBROOT . "DataEntry/file_delete.php?pid=$project_id&page=" . $_GET['instrument'];
+        }
+
+        $return = array(
+            'result' => $result,
+            'field_name' => $field_name,
+            'doc_id' => $doc_id,
+            'save_filename' => $save_filename,
+            'record' => js_escape($record),
+            'doc_size' => " (" . round_up($doc_size/1024/1024) . " MB)",
+            'event_id' => $event_id,
+            'file_download_page' => $file_download_page,
+            'file_delete_page' => $file_delete_page,
+            'doc_id_hash' => \Files::docIdHash($doc_id),
+            'instance' => $instance,
+            'inlineActionTag' => (strpos($Proj->metadata[$field_name]['misc'], '@INLINE') !== false)
+        );
+        return $return;
     }
 }
