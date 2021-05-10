@@ -51,7 +51,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $this->pid = $this->getProjectId();
 
         if (!empty($this->pid))
+        {
             $this->Proj = new Project($this->pid);
+        }
 
         /**
          * Checks and adds trailing directory separator
@@ -220,7 +222,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $rights = REDCap::getUserRights($this->userid);
         if ($rights[$this->userid]["data_export_tool"] === "0" || !$rights[$this->userid]["reports"]) 
         {
-            exit("<div class='red'>You don't have premission to view this page</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
+            exit("<div class='red'>You don't have permission to view this page</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
         }
     }
 
@@ -308,7 +310,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $query->add("SELECT 1 from redcap_metadata
                     join redcap_events_forms 
                     on redcap_metadata.form_name = redcap_events_forms.form_name
-                    where redcap_events_forms.event_id = '?' and redcap_metadata.field_name = '?'", [$event_id, $field_name]);
+                    where redcap_events_forms.event_id = ? and redcap_metadata.field_name = ?", [$event_id, $field_name]);
 
         $result = $query->execute();
         
@@ -345,7 +347,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
             $query = $this->framework->createQuery();
             $query->add("INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date) 
-                        VALUES ('$stored_name','application/pdf','?','?','pdf','?','?')", [$dummy_file_name, $dummy_file_size, $this->pid], date('Y-m-d H:i:s'));
+                        VALUES ('$stored_name','application/pdf',?,?,'pdf',?,?)", [$dummy_file_name, $dummy_file_size, $this->pid, date('Y-m-d H:i:s')]);
     
             if ($query->execute()) 
             {
@@ -357,7 +359,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 // See if field has had a previous value. If so, update; if not, insert.
                 $query = $this->framework->createQuery();
                 $query->add("SELECT value FROM redcap_data
-                            WHERE project_id = '?' AND record = '?' AND event_id = '?' AND field_name = '?'", [$this->pid, $record, $event_id, $field_name]);
+                            WHERE project_id = ? AND record = ? AND event_id = ? AND field_name = ?", [$this->pid, $record, $event_id, $field_name]);
 
                 if (!isset($instance))
                 {
@@ -365,7 +367,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 }
                 else
                 {
-                    $query->add("AND instance = '?'", [$instance]);
+                    $query->add("AND instance = ?", [$instance]);
                 }
                 
                 $result = $query->execute();
@@ -380,12 +382,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         }
 
                         $query = $this->framework->createQuery();
-                        $query->add("UPDATE redcap_edocs_metadata SET delete_date = '?' WHERE doc_id = ?", [NOW, $id]);
+                        $query->add("UPDATE redcap_edocs_metadata SET delete_date = ? WHERE doc_id = ?", [NOW, $id]);
                         $query->execute();
                     }
 
                     $query = $this->framework->createQuery();
-                    $query->add("UPDATE redcap_data SET value = '?' WHERE project_id = ? AND record = '?' AND event_id = ? AND field_name = '?'", [$docs_id, $this->pid, $record, $event_id, $field_name]);
+                    $query->add("UPDATE redcap_data SET value = ? WHERE project_id = ? AND record = ? AND event_id = ? AND field_name = ?", [$docs_id, $this->pid, $record, $event_id, $field_name]);
 
                     if (!isset($instance))
                     {
@@ -393,7 +395,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     }
                     else
                     {
-                        $query->add("AND instance = '?'", [$instance]);
+                        $query->add("AND instance = ?", [$instance]);
                     }
                 }
                 else // row did not exist
@@ -403,11 +405,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     if ($this->Proj->longitudinal) 
                     {
                         $query = $this->framework->createQuery();
-                        $query->add("SELECT 1 FROM redcap_data WHERE project_id = '?' AND record = '?' AND event_id = '?'", [$this->pid, $record, $event_id]);
+                        $query->add("SELECT 1 FROM redcap_data WHERE project_id = ? AND record = ? AND event_id = ?", [$this->pid, $record, $event_id]);
 
                         if ($instance > 1)
                         {
-                            $query->add("AND instance = '?'", [$instance]);
+                            $query->add("AND instance = ?", [$instance]);
                         }
                         else
                         {
@@ -420,9 +422,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
                         if ($result && $result->num_rows == 0) 
                         {
+                            $instance = $instance > 1 ? $instance : "NULL";
                             $query = $this->framework->createQuery();
-                            $query->add("INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES (?, ?, '?', '?', '?', '?')",
-                                        [$this->pid, $event_id, $record, $this->Proj->table_pk, $record], ($instance > 1 ? $instance : "NULL"));
+                            $query->add("INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES (?, ?, ?, ?, ?, ?)",
+                                        [$this->pid, $event_id, $record, $this->Proj->table_pk, $record, $instance]);
                             $query->execute();
                         }
                     }
@@ -431,12 +434,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $query = $this->framework->createQuery();
                     if (!isset($instance))
                     {
-                        $query->add("INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES (?, ?, '?', '?', '?', null)",
+                        $query->add("INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES (?, ?, ?, ?, ?, ?)",
                                     [$this->pid, $event_id, $record, $field_name, $docs_id, null]);
                     }
                     else
                     {
-                        $query->add("INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES (?, ?, '?', '?', '?', ?)",
+                        $query->add("INSERT INTO redcap_data (project_id, event_id, record, field_name, value, instance) VALUES (?, ?, ?, ?, ?, ?)",
                                     [$this->pid, $event_id, $record, $field_name, $docs_id, $instance]);
                     }
                 }
@@ -447,11 +450,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $redcap_log_event_table = method_exists('\REDCap', 'getLogEventTable') ? REDCap::getLogEventTable($this->pid) : "redcap_log_event";
                     $current_timestamp = date("YmdHis");
                     $ip = $_SERVER["REMOTE_ADDR"];
-                    $description = isset($instance) ? "[instance = $instance],\n$field_name = ''$docs_id''" : "$field_name = ''$docs_id''";
+                    $description = isset($instance) ? "[instance = $instance],\n$field_name = '$docs_id'" : "$field_name = '$docs_id'";
+                    $sql = str_replace("'", "''", $sql);
 
                     $query = $this->framework->createQuery();
-                    $query->add("INSERT INTO ? (ts, user, ip, page, project_id, event, object_type, sql_log, pk, event_id, data_values, description) VALUES ('?', '?', '?', 'ExternalModules/index.php', '?', 'DOC_UPLOAD', 'redcap_data', '?', '?', '?', '?', 'Upload Document')",
-                                [$redcap_log_event_table, $current_timestamp, $this->userid, $ip, $this->pid, str_replace("'", "''", $sql), $record, $event_id, $description]);
+                    $query->add("INSERT INTO $redcap_log_event_table (ts, user, ip, page, project_id, event, object_type, sql_log, pk, event_id, data_values, description) VALUES (?, ?, ?, 'ExternalModules/index.php', ?, 'DOC_UPLOAD', 'redcap_data', ?, ?, ?, ?, 'Upload Document')",
+                                [$current_timestamp, $this->userid, $ip, $this->pid, $sql, $record, $event_id, $description]);
                     $query->execute();
 
                     return true;
@@ -493,12 +497,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * 
      * @param String $filename         Name of file
      * @param String $file_contents    Contents of file
-     * @param STring $file_extension   File extension
+     * @param String $file_extension File extension
+     * @return bool always returns true
      * @see CustomTemplateEngine::deleteRepositoryFile() For deleting a file from the repository, if metadata failed to create.
      * @since 3.0
      */
     private function saveToFileRepository($filename, $file_contents, $file_extension)  
     {   
+        global $project_language;
         // Upload the compiled report to the File Repository
         $errors = array();
         $database_success = FALSE;
@@ -521,7 +527,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $file_repo_name = date("Y/m/d H:i:s");
 
             $query = $this->framework->createQuery();
-            $query->add("INSERT INTO redcap_docs (project_id,docs_date,docs_name,docs_size,docs_type,docs_comment,docs_rights) VALUES (?, CURRENT_DATE,'?.?','?','?', \"? - ? (?)\", NULL)",
+            $query->add("INSERT INTO redcap_docs (project_id,docs_date,docs_name,docs_size,docs_type,docs_comment,docs_rights) VALUES (?, CURRENT_DATE,'?.?',?,?, \"? - ? (?)\", NULL)",
                         [$this->pid, $dummy_file_name, $file_extension, $dummy_file_size, $dummy_file_type, $file_repo_name, $filename, $this->userid]);
                             
             if ($query->execute()) 
@@ -529,7 +535,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 $docs_id = db_insert_id();
 
                 $query = $this->framework->createQuery();
-                $query->add("INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date) VALUES('?','?','?','?','?','?','?');",
+                $query->add("INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date) VALUES(?,?,?,?,?,?,?);",
                             [$stored_name, $dummy_file_type, $dummy_file_name, $dummy_file_size, $file_extension, $this->pid, date('Y-m-d H:i:s')]);
                             
                 if ($query->execute()) 
@@ -537,7 +543,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $doc_id = db_insert_id();
 
                     $query = $this->framework->createQuery();
-                    $query->add("INSERT INTO redcap_docs_to_edocs (docs_id,doc_id) VALUES ('?','?')", [$docs_id, $docs_id]);
+                    $query->add("INSERT INTO redcap_docs_to_edocs (docs_id,doc_id) VALUES (?,?)", [$docs_id, $docs_id]);
                                 
                     if ($query->execute()) 
                     {
@@ -561,11 +567,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     {
                         /* if this failed, we need to roll back redcap_edocs_metadata and redcap_docs */
                         $query = $this->framework->createQuery();
-                        $query->add("DELETE FROM redcap_edocs_metadata WHERE doc_id='?'", [$doc_id]);
+                        $query->add("DELETE FROM redcap_edocs_metadata WHERE doc_id=?", [$doc_id]);
                         $query->execute();
 
                         $query = $this->framework->createQuery();
-                        $query->add("DELETE FROM redcap_docs WHERE docs_id='?'", [$docs_id]);
+                        $query->add("DELETE FROM redcap_docs WHERE docs_id=?", [$docs_id]);
                         $query->execute();
 
                         $this->deleteRepositoryFile($stored_name);
@@ -575,7 +581,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 {
                     /* if we failed here, we need to roll back redcap_docs */
                     $query = $this->framework->createQuery();
-                    $query->add("DELETE FROM redcap_docs WHERE docs_id='?'", [$docs_id]);
+                    $query->add("DELETE FROM redcap_docs WHERE docs_id=?", [$docs_id]);
                     $query->execute();
                     
                     $this->deleteRepositoryFile($stored_name);
@@ -592,7 +598,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             $context_msg = "<b>{$lang['global_01']}{$lang['colon']} {$lang['docs_47']}</b><br>" . $lang['docs_65'] . ' ' . maxUploadSizeFileRespository().'MB'.$lang['period'];
                             
-            if ($super_user) 
+            if (SUPER_USER) 
             {
                 $context_msg .= '<br><br>' . $lang['system_config_69'];
             }
@@ -677,7 +683,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     /**
      * Uploads images from file browser object to server.
      * 
-     * Uploades images from file browser object to server, after performing 
+     * Uploads images from file browser object to server, after performing 
      * validations. Error returned to user if upload failed. Upon success
      * log event in REDCap.
      * 
@@ -720,7 +726,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             $path = substr($realpath, $publicly_accessible_start_pos);
 
                             $url = "https://" . $_SERVER["SERVER_NAME"] . "/$path/" . $filename;
-                            REDCap::logEvent("Photo uploaded", $filename);
+                            REDCap::logEvent("Custom Template Engine - Photo uploaded", $filename);
                         }
                         else
                         {
@@ -886,7 +892,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $templateToDelete = $_POST["templateToDelete"];
         if (unlink($this->templates_dir . $templateToDelete))
         {
-            REDCap::logEvent("Deleted template", $templateToDelete);
+            REDCap::logEvent("Custom Template Engine - Deleted template", $templateToDelete);
             return TRUE;
         }
         else
@@ -978,7 +984,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                          */
                         $action = "edit";
                         $currTemplateName = $filename;
-                        REDCap::logEvent("Template created", $filename);
+                        REDCap::logEvent("Custom Template Engine - Template created", $filename);
                     }
                 }
                 else
@@ -1006,7 +1012,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         }
                         else
                         {
-                            REDCap::logEvent("Template edited", $currTemplateName);
+                            REDCap::logEvent("Custom Template Engine - Template edited", $currTemplateName);
                             if ((!empty($template_errors) || !empty($header_errors) || !empty($footer_errors)) && strpos($currTemplateName, " - INVALID") === FALSE)
                             {
                                 $filename = strpos($currTemplateName, " - INVALID") !== FALSE ? $currTemplateName : str_replace(".html", " - INVALID.html", $currTemplateName);
@@ -1030,7 +1036,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         {
                             $filename = !empty($template_errors) || !empty($header_errors) || !empty($footer_errors) ? "{$name}_$this->pid - INVALID.html" : "{$name}_$this->pid.html";
                             rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
-                            REDCap::logEvent("Template edited", "Renamed template from '$currTemplateName' to '$filename'");
+                            REDCap::logEvent("Custom Template Engine - Template edited", "Renamed template from '$currTemplateName' to '$filename'");
                             $currTemplateName = $filename;
                         }
                     }
@@ -1269,7 +1275,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             header('Content-Disposition: attachment; filename="'.basename($zip_name).'"');
             header('Content-length: '.filesize($zip_name));
             readfile($zip_name);
-            REDCap::logEvent("Downloaded Reports ", $template_filename , "" , implode(", ", $records));
+            REDCap::logEvent("Custom Template Engine - Downloaded Reports ", $template_filename , "" , implode(", ", $records));
         }
         unlink($zip_name);
         exit;
@@ -1508,14 +1514,22 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         method: "POST",
                         data: $('form').serialize(),
                         success: function(data) {
-                            var json = JSON.parse(data);
-                            if (json.success)
+                            try 
                             {
-                                $("#save-report-btn").after("<p id='save-report-status-msg' style='color:green'>Report was successfully saved!</p>");
+                                var json = JSON.parse(data);
+                                if (json.success)
+                                {
+                                    $("#save-report-btn").after("<p id='save-report-status-msg' style='color:green'>Report was successfully saved!</p>");
+                                }
+                                else
+                                {
+                                    $("#save-report-btn").after("<p id='save-report-status-msg' style='color:red'>Failed to save report to field! " + json.error + "</p>");
+                                }
                             }
-                            else
+                            catch(e)
                             {
-                                $("#save-report-btn").after("<p id='save-report-status-msg' style='color:red'>Failed to save report to field! " + json.error + "</p>");
+                                console.log(e.message);
+                                console.log(data);
                             }
                         }
                 });
@@ -2348,7 +2362,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 			}
             // Get back-end data for the secondary PK field
             $query = $this->framework->createQuery();
-            $query->add("select record, event_id, value from redcap_data where project_id = ? and field_name = '?'", [$this->pid, $secondary_pk]);
+            $query->add("select record, event_id, value from redcap_data where project_id = ? and field_name = ?", [$this->pid, $secondary_pk]);
             $query->add("and")->addInClause("event_id", $event_ids);
 
 			if ($limitRecords) {
@@ -2442,7 +2456,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
             // In case records have been deleted, and a new record assigned the previous ID, such as for auto-numbering.
             $query = $this->framework->createQuery();
-            $query->add("select pk, ts from ? where event = 'DELETE' and project_id = ? order by ts asc", [$log_event_table, $this->pid]);
+            $query->add("select pk, ts from $log_event_table where event = 'DELETE' and project_id = ? order by ts asc", [$this->pid]);
             $result = $query->execute();
 
             while ($row = $result->fetch_assoc()) {
@@ -2450,7 +2464,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             }
 
             $query = $this->framework->createQuery();
-            $query->add("SELECT pk, max(ts) as ts FROM ? where (description = 'Downloaded Report' or description = 'Downloaded Reports') and page = 'ExternalModules/index.php' and pk is not null and project_id = ? group by pk order by ts asc", [$log_event_table, $this->pid]);
+            $query->add("SELECT pk, max(ts) as ts FROM $log_event_table where (description = 'Custom Template Engine - Downloaded Report' or description = 'Custom Template Engine - Downloaded Reports' or description = 'Downloaded Report' or description = 'Downloaded Reports') and page = 'ExternalModules/index.php' and pk is not null and project_id = ? group by pk order by ts asc", [$this->pid]);
             $result = $query->execute();
 
             while ($row = $result->fetch_assoc()) {
@@ -2480,7 +2494,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
 
         $custom_labels = $this->getCustomRecordLabelsSecondaryFieldAllRecords(array_column($records, $id_field), true, "all", false, "");
-        //var_dump($custom_labels);
         foreach($records as $record)
         {
             $to_add = $record[$id_field];
