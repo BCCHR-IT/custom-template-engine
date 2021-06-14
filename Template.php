@@ -197,12 +197,13 @@ class Template
                     * Remove all tagged Identifier Fields: Only identifiers removed.
                     * 
                     */
-                    if (($rights[$user]["data_export_tool"] === "2" && 
+                    if ((($rights[$user]["data_export_tool"] === "2" && 
                             ($this->dictionary[$field_name]["field_type"] === "notes" ||
                             ($this->dictionary[$field_name]["field_type"] === "text" && (in_array($this->dictionary[$field_name]["text_validation_type_or_show_slider_number"], $this->date_formats) ||
-                                                                                    empty($this->dictionary[$field_name]["text_validation_type_or_show_slider_number"]))))
-                        ) ||
-                        (($rights[$user]["data_export_tool"] === "2" || $rights[$user]["data_export_tool"] === "3") && $this->dictionary[$field_name]["identifier"] === "y"))
+                                                                                    empty($this->dictionary[$field_name]["text_validation_type_or_show_slider_number"]))))) 
+                        ||
+                        (($rights[$user]["data_export_tool"] === "2" || $rights[$user]["data_export_tool"] === "3") && $this->dictionary[$field_name]["identifier"] === "y")) &&
+                        !empty($value))
                     {
                         $event_fields_and_vals[$field_name] = $this->de_identified_replacement;
                     }
