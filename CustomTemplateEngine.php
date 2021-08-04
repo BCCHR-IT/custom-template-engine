@@ -1495,7 +1495,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             // JS to download PDF
             $("#download-pdf-btn").click(function () {
                 // Updates the textarea elements that CKEDITOR replaces
-                CKEDITOR.instances.editor.updateElement();
+                for (instance in CKEDITOR.instances)
+                    CKEDITOR.instances[instance].updateElement();
+
                 if ($("#editor").val() == "" || $("#filename").val() == "")
                 {
                     alert("You need to enter a template name, AND something in the main editor to download.");
@@ -1508,7 +1510,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
             // JS to save report to field
             $("#save-report-btn").click(function () {
-                $("#save-report-status-msg").remove(); // Remove previous sucess/failure message
+                // Remove previous sucess/failure message
+                $("#save-report-status-msg").remove();
+
+                // Updates the textarea elements that CKEDITOR replaces
+                for (instance in CKEDITOR.instances)
+                    CKEDITOR.instances[instance].updateElement();
+
                 $.ajax({
                         url: "<?php print $this->getUrl("SaveFileToField.php"); ?>",
                         method: "POST",
