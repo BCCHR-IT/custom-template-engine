@@ -58,7 +58,7 @@ if (isset($main) && !empty($main))
     // If longitudinal, check that field exists on chosen event.
     if (REDCap::isLongitudinal() && !$customTemplateEngine->checkFieldInEvent($field_name, $event_id))
     {
-        print json_encode(array("error" => "$field_name is not a valid field on $event_name"));
+        print json_encode(array("error" => "$field_name is not a valid field on " . (empty($event_name) ? "the first event" : $event_name)));
         return;
     }
 

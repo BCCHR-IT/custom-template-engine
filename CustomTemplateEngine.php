@@ -504,7 +504,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      */
     private function saveToFileRepository($filename, $file_contents, $file_extension)  
     {   
-        global $project_language;
         // Upload the compiled report to the File Repository
         $errors = array();
         $database_success = FALSE;
@@ -527,36 +526,27 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $file_repo_name = date("Y/m/d H:i:s");
 
             $query = $this->framework->createQuery();
-            $query->add("INSERT INTO redcap_docs (project_id,docs_date,docs_name,docs_size,docs_type,docs_comment,docs_rights) VALUES (?, CURRENT_DATE,'?.?',?,?, \"? - ? (?)\", NULL)",
-                        [$this->pid, $dummy_file_name, $file_extension, $dummy_file_size, $dummy_file_type, $file_repo_name, $filename, $this->userid]);
+            $query->add("INSERT INTO redcap_docs (project_id,docs_date,docs_name,docs_size,docs_type,docs_comment,docs_rights) VALUES (?, CURRENT_DATE, ?, ?, ?, ?, NULL)",
+                        [$this->pid, "$dummy_file_name.$file_extension", $dummy_file_size, $dummy_file_type, "$file_repo_name - $filename ($this->userid)"]);
                             
             if ($query->execute()) 
             {
                 $docs_id = db_insert_id();
 
                 $query = $this->framework->createQuery();
-                $query->add("INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date) VALUES(?,?,?,?,?,?,?);",
-                            [$stored_name, $dummy_file_type, $dummy_file_name, $dummy_file_size, $file_extension, $this->pid, date('Y-m-d H:i:s')]);
+                $query->add("INSERT INTO redcap_edocs_metadata (stored_name,mime_type,doc_name,doc_size,file_extension,project_id,stored_date) VALUES(?,?,?,?,?,?,?)",
+                            [$stored_name, $dummy_file_type, "$dummy_file_name.$file_extension", $dummy_file_size, $file_extension, $this->pid, date('Y-m-d H:i:s')]);
                             
                 if ($query->execute()) 
                 {
                     $doc_id = db_insert_id();
 
                     $query = $this->framework->createQuery();
-                    $query->add("INSERT INTO redcap_docs_to_edocs (docs_id,doc_id) VALUES (?,?)", [$docs_id, $docs_id]);
+                    $query->add("INSERT INTO redcap_docs_to_edocs (docs_id,doc_id) VALUES (?,?)", [$docs_id, $doc_id]);
                                 
                     if ($query->execute()) 
                     {
-                        if ($project_language == 'English') 
-                        {
-                            // ENGLISH
-                            $context_msg_insert = "{$lang['docs_22']} {$lang['docs_08']}";
-                        } 
-                        else 
-                        {
-                            // NON-ENGLISH
-                            $context_msg_insert = ucfirst($lang['docs_22'])." {$lang['docs_08']}";
-                        }
+                        $context_msg_insert = "{$lang['docs_22']} {$lang['docs_08']}";
 
                         // Logging
                         REDCap::logEvent("Custom Template Engine - Uploaded document to file repository", "Successfully uploaded $filename");
