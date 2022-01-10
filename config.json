@@ -27,7 +27,7 @@
     "system-settings": [
         {
             "key": "templates-folder",
-            "name": "Saved Templates Folder. Will create the folder if it doesn't exist.",
+            "name": "Saved Templates Directory Path. Will be created if it doesn't exist.",
             "required": true,
             "type": "text",
             "repeatable": false,
@@ -35,15 +35,22 @@
         },
         {
             "key": "compiled-templates-folder",
-            "name": "Compiled Templates Folder. Will create the folder if it doesn't exist. **Used by Smarty to store compiled templates**",
+            "name": "Compiled Templates Directory Path. Will be created if it doesn't exist. **Used by Smarty to store compiled templates**",
             "required": true,
             "type": "text",
             "repeatable": false,
             "super-users-only": true
         },
         {
+            "key": "temp-folder",
+            "name": "Temporary Files Directory Path. Will be created if it doesn't exist.",
+            "required": true,
+            "type": "text",
+            "super-users-only": true
+        },
+        {
             "key": "img-folder",
-            "name": "Images Folder. Will create the folder if it doesn't exist. **Must be a publically acccessible folder given as a path relative to your REDCap external modules folder i.e '../../images'**",
+            "name": "Images Folder. Will be created if it doesn't exist. **Must be a publically acccessible folder that can be given as either a full path, or relative path to your REDCap external modules folder i.e '../../images'**",
             "required": true,
             "type": "text",
             "repeatable": false,
@@ -53,7 +60,7 @@
     "project-settings": [
         {
             "key": "save-report-to-repo",
-            "name": "Save Filled Reports to File Repository?",
+            "name": "Do Not Save Filled Reports to File Repository",
             "type": "checkbox",
             "repeatable": false,
             "super-users-only": true

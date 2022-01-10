@@ -5,7 +5,7 @@ namespace BCCHR\CustomTemplateEngine;
 /**
  * Require Smarty class.
  */
-require_once "vendor/smarty/smarty/libs/Smarty.class.php";
+require_once "vendor/autoload.php";
 
 use REDCap;
 use Smarty;
@@ -49,15 +49,40 @@ class Template
     }
 
     /**
+     * Checks whether all the siblings that come before or after an html element are empty
+     *
+     * @access private
+     * @param DOMNode $elem                 Root element.
+     * @param String $whichSibling          Which sibling/direction to check. Can be either "previous" or "next". 
+     * @return Boolean                      True if the given element and all its siblings are empty, false otherwise.
+     */
+    private function areSiblingsEmpty($elem, $whichSibling)
+    {   
+        if ($elem == null)
+        {
+            return true;
+        }
+        else if ($whichSibling == "previous")
+        {
+            return $this->areSiblingsEmpty($elem->previousSibling, "previous") && empty($elem->nodeValue);
+        }
+
+        return $this->areSiblingsEmpty($elem->nextSibling, "next") && empty($elem->nodeValue);
+    }
+
+    /**
      * Retrieves empty child nodes within given element.
      * 
      * @access private
-     * @param DOMNode $elem     Root element.
-     * @return Array An array of all empty nodes.
+     * @see Template::areSiblingsEmpty()    For checking whether a table row is empty of data.
+     * @param DOMNode $elem                 Root element.
+     * @return Array                        An array of all empty nodes.
      */
     private function getEmptyNodes($elem)
     {
         $empty_elems = array();
+
+        $isEmptyOrWhitespace = ctype_space($elem->nodeValue) || str_replace(array(" ", "\xC2\xA0"), "", $elem->nodeValue) == "";
 
         if ($elem->hasChildNodes())
         {
@@ -70,23 +95,15 @@ class Template
         /**
          * Checks for special whitespace characters, and tags that don't contain children.
          */
-        else if ((ctype_space($elem->nodeValue) || str_replace(array(" ", "\xC2\xA0"), "", $elem->nodeValue) == "") && 
-                $elem->tagName != "img" && $elem->tagName != "body" && $elem->tagName != "hr" && $elem->tagName != "br")
+        else if ($isEmptyOrWhitespace && $elem->tagName != "img" && $elem->tagName != "body" && $elem->tagName != "hr" && $elem->tagName != "br")
         {
             /**
-             * Empty table data elements and headers may pad out other data in table. 
+             * Empty <td> and <th> elements may pad out other data in table. 
              * Make sure the entire row is empty, before removing.
              */
-            if ($elem->tagName == "td")
+            if ($elem->tagName == "td" || $elem->tagName == "th")
             {
-                if (empty($elem->previousSibling) && $elem->previousSibling->tagName != "td")
-                {
-                    $empty_elems[] = $elem;
-                }
-            }
-            else if ($elem->tagName == "th")
-            {
-                if (empty($elem->previousSibling) && $elem->previousSibling->tagName != "th")
+                if ($this->areSiblingsEmpty($elem->previousSibling, "previous") && $this->areSiblingsEmpty($elem->nextSibling, "next") && empty($elem->nodeValue))
                 {
                     $empty_elems[] = $elem;
                 }
@@ -101,108 +118,6 @@ class Template
     }
 
     /**
-     * Replaces given text with replacement.
-     * 
-     * @access private
-     * @param String $text          The text to replace.
-     * @param String $replacement   The replacement text.
-     * @return String A string with the replaced text.
-     */
-    private function replaceStrings($text, $replacement)
-    {
-        preg_match_all("/'/", $text, $quotes, PREG_OFFSET_CAPTURE);
-        $quotes = $quotes[0];
-        if (sizeof($quotes) % 2 === 0)
-        {
-            $i = 0;
-            $to_replace = array();
-            while ($i < sizeof($quotes))
-            {
-                $to_replace[] = substr($text, $quotes[$i][1], $quotes[$i + 1][1] - $quotes[$i][1] + 1);
-                $i = $i + 2;
-            }
-
-            $text = str_replace($to_replace, $replacement, $text);
-        }
-        return $text;
-    }
-
-    /**
-     * Parses a syntax string into blocks.
-     * 
-     * @access private
-     * @param String $syntax     The syntax to parse.
-     * @return Array An array of blocks that make up the syntax passed.
-     */
-    private function getSyntaxParts($syntax)
-    {
-        //Replace strings with ''
-        $syntax = $this->replaceStrings(trim($syntax), "''");
-
-        $parts = array();
-        $previous = array();
-
-        $i = 0;
-        while($i < strlen($syntax))
-        {
-            $char = $syntax[$i];
-            switch($char)
-            {
-                case ",":
-                case "(":
-                case ")":
-                case "]":
-                    $part = trim(implode("", $previous));
-                    $previous = array();
-                    if ($part !== "")
-                    {
-                        $parts[] = $part;
-                    }
-                    $parts[] = $char;
-                    $i++;
-                    break;
-                case "[":
-                    if ($syntax[$i-1] == " ")
-                    {
-                        $parts[] = " ";
-                    }
-                    $part = trim(implode("", $previous));
-                    if ($part !== "")
-                    {
-                        $parts[] = $part;
-                    }
-                    $parts[] = $char;
-                    $previous = array();
-                    $i++;
-                    break;
-                case " ":
-                    $part = trim(implode("", $previous));
-                    $previous = array();
-                    if ($part !== "")
-                    {
-                        $parts[] = $part;
-                    }
-                    $i++;
-                    break;
-                default:
-                    $previous[] = $char;
-                    if ($i == strlen($syntax) - 1)
-                    {
-                        $part = trim(implode("", $previous));
-                        if ($part !== "")
-                        {
-                            $parts[] = $part;
-                        }
-                    }
-                    $i++;
-                    break;
-            }
-        }
-
-        return $parts;
-    }
-
-    /**
      * Parses event data into an assosiative array that will be used by Smarty to fill templates 
      * with data.
      * 
@@ -212,7 +127,7 @@ class Template
      * 
      * @access private
      * @param Array $event_data     Event data for a REDcap record.
-     * @return Array An associative array of fields mapped to values, or events mapped to an array of fields mapped to values (if longitudinal). 
+     * @return Array                An associative array of fields mapped to values, or events mapped to an array of fields mapped to values (if longitudinal). 
      */
     private function parseEventData($event_data)
     {
@@ -291,7 +206,7 @@ class Template
                     {
                         $event_fields_and_vals[$field_name] = $this->de_identified_replacement;
                     }
-                    else if($this->dictionary[$field_name]["field_type"] === "notes")
+                    else if ($this->dictionary[$field_name]["field_type"] === "notes")
                     {
                         $event_fields_and_vals[$field_name] = str_replace("\r\n", "<br/>", htmlentities($value));
                     }
@@ -306,25 +221,153 @@ class Template
     }
 
     /**
-     * Checks whether fields and events exist within project, and whether they are being queried correctly.
+     * Replaces given text with replacement.
+     * 
+     * @access private
+     * @param String $text          The text to replace.
+     * @param String $replacement   The replacement text.
+     * @return String               A string with the replaced text.
+     */
+    private function replaceStrings($text, $replacement)
+    {
+        preg_match_all("/'/", $text, $quotes, PREG_OFFSET_CAPTURE);
+        $quotes = $quotes[0];
+        if (sizeof($quotes) % 2 === 0)
+        {
+            $i = 0;
+            $to_replace = array();
+            while ($i < sizeof($quotes))
+            {
+                $to_replace[] = substr($text, $quotes[$i][1], $quotes[$i + 1][1] - $quotes[$i][1] + 1);
+                $i = $i + 2;
+            }
+
+            $text = str_replace($to_replace, $replacement, $text);
+        }
+        return $text;
+    }
+
+    /**
+     * Parses a syntax string into blocks.
+     * 
+     * @access private
+     * @param String $syntax     The syntax to parse.
+     * @return Array             An array of blocks that make up the syntax passed.
+     */
+    private function getSyntaxParts($syntax)
+    {
+        $syntax = str_replace(array("['", "']"), array("[", "]"), $syntax);
+        $syntax = $this->replaceStrings(trim($syntax), "''");         //Replace strings with ''
+
+        $parts = array();
+        $previous = array();
+
+        $i = 0;
+        while($i < strlen($syntax))
+        {
+            $char = $syntax[$i];
+            switch($char)
+            {
+                case ",":
+                case "(":
+                case ")":
+                case "]":
+                    $part = trim(implode("", $previous));
+                    $previous = array();
+                    if ($part !== "")
+                    {
+                        $parts[] = $part;
+                    }
+                    $parts[] = $char;
+                    $i++;
+                    break;
+                case "[":
+                    if ($syntax[$i-1] == " ")
+                    {
+                        $parts[] = " ";
+                    }
+                    $part = trim(implode("", $previous));
+                    if ($part !== "")
+                    {
+                        $parts[] = $part;
+                    }
+                    $parts[] = $char;
+                    $previous = array();
+                    $i++;
+                    break;
+                case " ":
+                    $part = trim(implode("", $previous));
+                    $previous = array();
+                    if ($part !== "")
+                    {
+                        $parts[] = $part;
+                    }
+                    $i++;
+                    break;
+                default:
+                    $previous[] = $char;
+                    if ($i == strlen($syntax) - 1)
+                    {
+                        $part = trim(implode("", $previous));
+                        if ($part !== "")
+                        {
+                            $parts[] = $part;
+                        }
+                    }
+                    $i++;
+                    break;
+            }
+        }
+
+        return $parts;
+    }
+
+    /**
+     * Checks whether fields and events exist within project
      * 
      * @access private
      * @param String $text      The line of text to validate.
-     * @param Integer $lin_num  The current line number in the template.
-     * @return Array An array of errors, with the line number appended to indicate where it occured.
+     * @return Array            An array of errors, with the line number appended to indicate where it occured.
      */
-    private function validateFieldsAndEvents($text, $line_num)
+    private function isValidFieldOrEvent($var)
     {
-        $errors = array();
+        $var = trim($var, "'");
 
         $events = REDCap::getEventNames(true, true); // If there are no events (the project is classical), the method will return false
 
+        /**
+         * Get REDCap completion fields
+         */
         $external_fields = array();
         foreach ($this->instruments as $unique_name => $label)
         {   
             $external_fields[] = "{$unique_name}_complete";
             $external_fields[] = "{$unique_name}_timestamp";
         }
+
+        if ($var !== "allValues" && !in_array($var, $external_fields))
+        {
+            $dictionary = $this->dictionary[$var];
+            if (($events === FALSE && empty($dictionary)) ||
+                ($events !== FALSE && !in_array($var, $events) && empty($dictionary)))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Checks whether fields and events are being queried correctly.
+     * 
+     * @access private
+     * @param String $text       The line of text to validate.
+     * @param Integer $line_num  The current line number in the template.
+     * @return Array             An array of errors, with the line number appended to indicate where it occured.
+     */
+    private function validateFieldQueries($text, $line_num)
+    {
+        $errors = array();
 
         // Get all occurences of an opening square bracket "["
         preg_match_all('/\[/', $text, $opening_brackets, PREG_OFFSET_CAPTURE);
@@ -342,31 +385,21 @@ class Template
                     $var = substr($text, $start_pos, $closing_bracket - $start_pos);
                     if (substr($var, 0, 1) !== "'" && substr($var, strlen($var)-1, 1) !== "'")
                     {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] <strong>'$var'</strong> must be enclosed with single quotes";
+                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] <strong>'$var'</strong> must be enclosed with single quotes.";
                     }
 
                     $var = trim($var, "'\"");
 
-                    if ($var !== "allValues" && !in_array($var, $external_fields))
+                    if ($var !== "allValues")
                     {
                         $dictionary = $this->dictionary[$var];
-                        if ($events === FALSE && empty($dictionary))
+                        if (!empty($dictionary))
                         {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] <strong>'$var'</strong> is not a valid event/field in this project";
-                        }
-                        else if ($events !== FALSE && !in_array($var, $events) && empty($dictionary))
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] <strong>'$var'</strong> is not a valid event/field in this project";
-                        }
-                        else if (!empty($dictionary))
-                        {
-                            if ($dictionary[$var]["field_type"] === "checkbox")
+                            if ($dictionary["field_type"] === "checkbox")
                             {
-                                $all_values_str = substr($text, $closing_bracket+1, 13);
+                                // Check if checkbox is queried via in_array()
                                 $in_array = false;
-
                                 $in_array_start_pos = 0;
-
                                 while (($in_array_start_pos = strpos($text, "in_array('", $in_array_start_pos)) !== FALSE)
                                 {
                                     $end_of_check_value = strpos($text, "', \$redcap", $in_array_start_pos+1);
@@ -379,6 +412,8 @@ class Template
                                     $in_array_start_pos = $in_array_start_pos + 1;
                                 }
 
+                                // check if checkbox is queried via ['allValues']
+                                $all_values_str = substr($text, $closing_bracket+1, 13);
                                 if ($all_values_str !== "['allValues']" && !$in_array)
                                 {   
                                     $errors[] =  "<b>ERROR</b> [EDITOR] LINE [$line_num] <strong>'$var'</strong> is a checkbox and can only be queried using in_array or \$redcap['$var']['allValues']";
@@ -389,375 +424,346 @@ class Template
                 }
             }
         }
-
         return $errors;
     }
 
     /**
-     * Validate general syntax.
+     * Validate syntax.
      * 
      * @access private
-     * @see Template::getSyntaxParts() For retreiving blocks of syntax from the given syntax string.
-     * @param String $syntax     The syntax to validate.
-     * @param Integer $line_num      The current line number in the template.
-     * @return Array An array of errors, with the line number appended to indicate where it occured.
+     * @see Template::validateFieldQueries()    For checking whether fields and events are queried correctly.
+     * @see Template::getSyntaxParts()          For retreiving blocks of syntax from the given syntax string.
+     * @param String $syntax                    The syntax to validate.
+     * @param Integer $line_num                 The current line number in the template.
+     * @return Array                            An array of errors, with the line number appended to indicate where it occured.
      */
     private function validateSyntax($syntax, $line_num)
     {
-        $errors = array();
-        
-        $parts = $this->getSyntaxParts($syntax);
-
-        $opening_squares = array_keys($parts, "[");
-        $closing_squares = array_keys($parts, "]");
-
-        $opening_parenthesis = array_keys($parts, "(");
-        $closing_parenthesis = array_keys($parts, ")");
-        
-        // Check symmetry of ()
-        if (sizeof($opening_parenthesis) != sizeof($closing_parenthesis))
+        if (!empty($syntax))
         {
-            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Odd number of parenthesis (. You've either added an extra parenthesis, or forgot to close one.";
-        }
+            $errors = $this->validateFieldQueries($syntax, $line_num);
 
-        // Check symmetry of []
-        if (sizeof($opening_squares) != sizeof($closing_squares))
-        {
-            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Odd number of square brackets [. You've either added an extra bracket, or forgot to close one.";
-        }
-
-        foreach($parts as $index => $part)
-        {
-            switch ($part) {
-                case "if":
-                case "elseif":
-                    // Must have either a ( or ) or $redcap or $showLabelAndRow or in_array after
-                    if ($index != sizeof($parts) - 1)
-                    {
-                        if ($index !== 0)
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Mal-formed <strong>$part</strong> condition. <strong>$part</strong> clause must be first part of syntax.";
-                        }
-                        else 
-                        {
-                            $next_part = $parts[$index + 1];
-
-                            if (($next_part !== "(" 
-                                && ($next_part != "''" && $previous == "in_array")
-                                && $next_part !== ")" 
-                                && $next_part !== "\$redcap" 
-                                && $next_part !== "\$showLabelAndRow" 
-                                && $next_part !== "in_array"
-                                && $next_part !== "''"))
-                            {
-                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>$part</strong>.";
-                            }
-                        }
-                    }
-                    else
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Mal-formed <strong>$part</strong> condition. You cannot have an empty <strong>$part</strong> clause.";
-                    }
-                    break;
-                case "(":
-                    $previous = $parts[$index - 1];
-                    $next_part = $parts[$index + 1];
-                
-                    if (($next_part !== "(" 
-                        && ($next_part != "''" && $previous == "in_array")
-                        && $next_part !== ")" 
-                        && $next_part !== "\$redcap" 
-                        && $next_part !== "\$showLabelAndRow" 
-                        && $next_part !== "in_array"
-                        && $next_part !== "''"))
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>(</strong>.";
-                    }
-                    else if ($next_part == "(" && $previous == "in_array")
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Malformed <strong>in_array()</strong> function.";
-                    }
-                    break;
-                case ")":
-                    // Must have either a ) or logical operator after, if not the last part of syntax
-                    if ($index != sizeof($parts) - 1)
-                    {
-                        $next_part = $parts[$index + 1];
-                        if ($next_part !== ")" && !in_array($next_part, $this->logical_operators))
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>)</strong>.";
-                        }
-                    }
-                    break;
-                case "eq":
-                case "ne":
-                case "neq":
-                case "gt":
-                case "ge":
-                case "gte":
-                case "lt":
-                case "le":
-                case "lte":
-                    // Must have either a ( or $redcap or $showLabelAndRow or in_array or string or not after
-                    // If there's another logical operator two spaces before, is illegal.
-                    if ($index == 0)
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Cannot have a comparison operator <strong>$part</strong> as the first part in syntax.";
-                    }
-                    else if ($index != sizeof($parts) - 1)
-                    {
-                        $previous = $parts[$index - 2];
-                        $next_part = $parts[$index + 1];
-
-                        if (in_array($previous, $this->logical_operators) && $previous !== "or" && $previous !== "and")
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$part</strong>. You cannot chain comparison operators together, you must use an <strong>and</strong> or an <strong>or</strong>";
-                        }
-                        if (!empty($next_part) 
-                            && $next_part !== "(" 
-                            && $next_part !== "\$redcap" 
-                            && $next_part !== "\$showLabelAndRow" 
-                            && $next_part !== "''" 
-                            && $next_part !== "in_array"
-                            && $next_part !== "not" 
-                            && !is_numeric($next_part))
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>$part</strong>.";
-                        }
-                    }
-                    else
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Cannot have a comparison operator <strong>$part</strong> as the last part in syntax.";
-                    }
-                    break;
-                case "not":
-                case "or":
-                case "and":
-                    // Must have either a ( or $redcap or $showLabelAndRow or in_array or string or not after
-                    if ($index == 0)
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Cannot have a logical operator <strong>$part</strong> as the first part in syntax.";
-                    }
-                    else if ($index != sizeof($parts) - 1)
-                    {
-                        $next_part = $parts[$index + 1];
-                        if (!empty($next_part) 
-                            && $next_part !== "(" 
-                            && $next_part !== "\$redcap" 
-                            && $next_part !== "\$showLabelAndRow" 
-                            && $next_part !== "''" 
-                            && $next_part !== "in_array"
-                            && $next_part !== "not" 
-                            && !is_numeric($next_part))
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>$part</strong>.";
-                        }
-                    }
-                    else
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Cannot have a logical operator <strong>$part</strong> as the last part in syntax.";
-                    }
-                    break;
-                case "''":
-                    // Must have either a logical operator or ) or , or ] after a string
-                    if ($index != sizeof($parts) - 1)
-                    {
-                        $next_part = $parts[$index + 1];
-                        if ($next_part !== ")" 
-                            && $next_part != "," 
-                            && $next_part != "]"
-                            && !in_array($next_part, $this->logical_operators))
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after string value within ''.";
-                        }
-                    }
-                    break;
-                case "\$redcap":
-                    // Must have a [
-                    if ($index != sizeof($parts) - 1)
-                    {
-                        $next_part = $parts[$index + 1];
-                        if ($next_part !== "[")
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>\$redcap</strong> field query.";
-                        }
-                    }
-                    else
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>\$redcap</strong> field query at end of syntax.";
-                    }
-                    break;
-                case "[":
-                    // Must have a ''
-                    if ($index != sizeof($parts) - 1)
-                    {
-                        $previous = $parts[$index - 1];
-                        $next_part = $parts[$index + 1];
-
-                        if ($previous !== "\$redcap" && $previous !== "]")
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Each field and events query must be preceeded by <strong>\$redcap</strong>";
-                        }
-
-                        if ($next_part !== "''")
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>[</strong>.";
-                        }
-                    }
-                    else
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Cannot have opening <strong>[</strong> as end of syntax.";
-                    }
-                    break;
-                case "\$showLabelAndRow":
-                    // Must have either a logical operator or ) after, if not last item in syntax
-                    if ($index != sizeof($parts) - 1)
-                    {
-                        $next_part = $parts[$index + 1];
-                        if ($next_part !== ")" 
-                            && !in_array($next_part, $this->logical_operators))
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>$part</strong>.";
-                        }
-                    }
-                    break;
-                case "]":
-                    // Must have either a logical operator or ) or [ after, if not last item in syntax
-                    if ($index != sizeof($parts) - 1)
-                    {
-                        $previous_2 = $parts[$index - 2];
-                        $next_part = $parts[$index + 1];
-
-                        if ($previous_2 !== "[")
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Unclosed or empty <strong>]</strong> bracket.";
-                        }
-
-                        if ($next_part !== ")" 
-                            && $next_part !== "["
-                            && !in_array($next_part, $this->logical_operators))
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>'$next_part'</strong> after <strong>$part</strong>.";
-                        }
-                    }
-                    break;
-                case ",":
-                    // Must have a $redcap field query after, has to be part of in_array function call
-                    if ($index != sizeof($parts) - 1)
-                    {
-                        $previous = $parts[$index - 1];
-                        $previous_2 = $parts[$index - 2];
-                        $previous_3 = $parts[$index - 3];
-
-                        if ($previous_3 !== "in_array" || $previous_2 !== "(" || $previous !== "''")
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Improper use of <strong>,</strong> in syntax. Are you trying to call in_array()?";
-                        }
-
-                        $next_part = $parts[$index + 1];
-                        if ($next_part !== "\$redcap")
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num]. Invalid <strong>$next_part</strong> after <strong>,</strong>.";
-                        }
-                    }
-                    else
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] <strong>$part</strong> cannot be end of syntax";
-                    }
-                    break;
-                case "in_array":
-                    // Must have a ( after
-                    if ($index != sizeof($parts) - 1)
-                    {
-                        $next_part = $parts[$index + 1];
-                        if ($next_part !== "(")
-                        {
-                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Malformed <strong>in_array()</strong> function.";
-                        }
-                    }
-                    else
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Malformed <strong>in_array()</strong> function.";
-                    }
-                    break;
-                case "else":
-                case "/if":
-                    // Must be the only clause in syntax
-                    if ($index != sizeof($parts) - 1)
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Mal-formed <strong>$part</strong> clause. Must be of form <strong>{{$part}}</strong>.";
-                    }
-                    break;
-                default:
-                    // If it's a number, must have ) or logical operator after, if not last item in syntax
-                    if (is_numeric($part))
-                    {
-                        if ($index != sizeof($parts) - 1)
-                        {
-                            $next_part = $parts[$index + 1];
-                            if (!empty($next_part) && $next_part !== ")" && !in_array($next_part, $this->logical_operators))
-                            {
-                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>$part</strong>.";
-                            }
-                        }
-                    }
-                    else
-                    {
-                        $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Unknown error at <strong>$part</strong>, possibly disallowed, please double check your syntax.";
-                    }
-                    break;
-            }
-        }
-
-        return $errors;
-    }
-
-    /**
-     * Validate line of text.
-     * 
-     * @access private
-     * @see Template::validateSyntax() For checking whether general syntax is correct.
-     * @see Template::validatefieldsAndEvents() For checking existing fields and events, and that they're queried correctly.
-     * @param String $text      The line of text to validate.
-     * @param Integer $lin_num  The current line number in the template.
-     * @return Array An array of errors, with the line number appended to indicate where it occured.
-     */
-    private function validateText($text, $line_num)
-    {
-        $explode = explode(" ", $text);
-        $errors = array();
-
-        if (!empty($text))
-        {
-            if ((sizeof(explode("'", $text)) - 1) % 2 > 0)
+            if ((sizeof(explode("'", $syntax)) - 1) % 2 > 0)
             {
                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Odd number of single quotes exist. You've either added an extra quote, forgotten to close one, or forgotten to escape one.";
             }
-            else if ($text != strip_tags($text))
+            else if ($syntax != strip_tags($syntax))
             {
                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Report logic cannot have any HTML between {}";
             }
-            else if (preg_match("/{/", $text) !== 0 || preg_match("/}/", $text) !== 0)
+            else if (preg_match("/{/", $syntax) !== 0 || preg_match("/}/", $syntax) !== 0)
             {
                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] There is either a '{'  or '}' within {}. They are special characters and can only denote the beginning and end of syntax.";
             }
-            else if (empty($errors))
-            {  
-                // Validate syntax arrangement
-                $errors = array_merge($errors, $this->validateSyntax($text, $line_num));
+            
+            // Check symmetry of ()
+            if (sizeof(array_keys($parts, "(")) != sizeof(array_keys($parts, ")")))
+            {
+                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Odd number of parenthesis (. You've either added an extra parenthesis, or forgot to close one.";
+            }
+
+            // Check symmetry of []
+            if (sizeof(array_keys($parts, "[")) != sizeof(array_keys($parts, "]")))
+            {
+                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Odd number of square brackets [. You've either added an extra bracket, or forgot to close one.";
+            }
+            
+            $parts = $this->getSyntaxParts($syntax);
+
+            foreach($parts as $index => $part)
+            {
+                switch ($part) {
+                    case "if":
+                    case "elseif":
+                        // Must have either a ( or ) or $redcap or $showLabelAndRow or in_array after
+                        if ($index != sizeof($parts) - 1)
+                        {
+                            if ($index !== 0)
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Mal-formed <strong>$part</strong> condition. <strong>$part</strong> clause must be first part of syntax.";
+                            }
+                            else 
+                            {
+                                $next_part = $parts[$index + 1];
+
+                                if (($next_part !== "(" 
+                                    && ($next_part != "''" && $previous == "in_array")
+                                    && $next_part !== ")" 
+                                    && $next_part !== "\$redcap" 
+                                    && $next_part !== "\$showLabelAndRow" 
+                                    && $next_part !== "in_array"
+                                    && $next_part !== "''"))
+                                {
+                                    $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>$part</strong>.";
+                                }
+                            }
+                        }
+                        else
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Mal-formed <strong>$part</strong> condition. You cannot have an empty <strong>$part</strong> clause.";
+                        }
+                        break;
+                    case "(":
+                        $previous = $parts[$index - 1];
+                        $next_part = $parts[$index + 1];
                     
-                // Fields and events must exist in project
-                // Check that checkboxes are queried properly
-                $errors = array_merge($errors, $this->validateFieldsAndEvents($text, $line_num));
+                        if (($next_part !== "(" 
+                            && ($next_part != "''" && $previous == "in_array")
+                            && $next_part !== ")" 
+                            && $next_part !== "\$redcap" 
+                            && $next_part !== "\$showLabelAndRow" 
+                            && $next_part !== "in_array"
+                            && $next_part !== "''"))
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>(</strong>.";
+                        }
+                        else if ($next_part == "(" && $previous == "in_array")
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Malformed <strong>in_array()</strong> function.";
+                        }
+                        break;
+                    case ")":
+                        // Must have either a ) or logical operator after, if not the last part of syntax
+                        if ($index != sizeof($parts) - 1)
+                        {
+                            $next_part = $parts[$index + 1];
+                            if ($next_part !== ")" && !in_array($next_part, $this->logical_operators))
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>)</strong>.";
+                            }
+                        }
+                        break;
+                    case "eq":
+                    case "ne":
+                    case "neq":
+                    case "gt":
+                    case "ge":
+                    case "gte":
+                    case "lt":
+                    case "le":
+                    case "lte":
+                        // Must have either a ( or $redcap or $showLabelAndRow or in_array or string or not after
+                        // If there's another logical operator two spaces before, is illegal.
+                        if ($index == 0)
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Cannot have a comparison operator <strong>$part</strong> as the first part in syntax.";
+                        }
+                        else if ($index != sizeof($parts) - 1)
+                        {
+                            $previous = $parts[$index - 2];
+                            $next_part = $parts[$index + 1];
+
+                            if (in_array($previous, $this->logical_operators) && $previous !== "or" && $previous !== "and")
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$part</strong>. You cannot chain comparison operators together, you must use an <strong>and</strong> or an <strong>or</strong>";
+                            }
+                            if (!empty($next_part) 
+                                && $next_part !== "(" 
+                                && $next_part !== "\$redcap" 
+                                && $next_part !== "\$showLabelAndRow" 
+                                && $next_part !== "''" 
+                                && $next_part !== "in_array"
+                                && $next_part !== "not" 
+                                && !is_numeric($next_part))
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>$part</strong>.";
+                            }
+                        }
+                        else
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Cannot have a comparison operator <strong>$part</strong> as the last part in syntax.";
+                        }
+                        break;
+                    case "not":
+                    case "or":
+                    case "and":
+                        // Must have either a ( or $redcap or $showLabelAndRow or in_array or string or not after
+                        if ($index == 0)
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Cannot have a logical operator <strong>$part</strong> as the first part in syntax.";
+                        }
+                        else if ($index != sizeof($parts) - 1)
+                        {
+                            $next_part = $parts[$index + 1];
+                            if (!empty($next_part) 
+                                && $next_part !== "(" 
+                                && $next_part !== "\$redcap" 
+                                && $next_part !== "\$showLabelAndRow" 
+                                && $next_part !== "''" 
+                                && $next_part !== "in_array"
+                                && $next_part !== "not" 
+                                && !is_numeric($next_part))
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>$part</strong>.";
+                            }
+                        }
+                        else
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Cannot have a logical operator <strong>$part</strong> as the last part in syntax.";
+                        }
+                        break;
+                    case "''":
+                        // Must have either a logical operator or ) or , or ]
+                        if ($index != sizeof($parts) - 1)
+                        {
+                            $next_part = $parts[$index + 1];
+                            if ($next_part !== ")" 
+                                && $next_part != "," 
+                                && $next_part != "]"
+                                && !in_array($next_part, $this->logical_operators))
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after string value within ''.";
+                            }
+                        }
+                        break;
+                    case "\$redcap":
+                        // Must have a [
+                        if ($index != sizeof($parts) - 1)
+                        {
+                            $next_part = $parts[$index + 1];
+                            if ($next_part !== "[")
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>\$redcap</strong> field query.";
+                            }
+                        }
+                        else
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>\$redcap</strong> field query at end of syntax.";
+                        }
+                        break;
+                    case "[":
+                        // Must have a ''
+                        if ($index != sizeof($parts) - 1)
+                        {
+                            $previous = $parts[$index - 1];
+                            $next_part = $parts[$index + 1];
+
+                            if ($previous !== "\$redcap" && $previous !== "]")
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Each field and events query must be preceeded by <strong>\$redcap</strong>";
+                            }
+
+                            if ($next_part == "]")
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Cannot have empty [] brackets";
+                            }
+                        }
+                        else
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Cannot have opening <strong>[</strong> as end of syntax.";
+                        }
+                        break;
+                    case "\$showLabelAndRow":
+                        // Must have either a logical operator or ) after, if not last item in syntax
+                        if ($index != sizeof($parts) - 1)
+                        {
+                            $next_part = $parts[$index + 1];
+                            if ($next_part !== ")" 
+                                && !in_array($next_part, $this->logical_operators))
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>$part</strong>.";
+                            }
+                        }
+                        break;
+                    case "]":
+                        // Must have either a logical operator or ) or [ after, if not last item in syntax
+                        if ($index != sizeof($parts) - 1)
+                        {
+                            $previous_2 = $parts[$index - 2];
+                            $next_part = $parts[$index + 1];
+
+                            if ($previous_2 !== "[")
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Unclosed or empty <strong>]</strong> bracket.";
+                            }
+
+                            if ($next_part !== ")" 
+                                && $next_part !== "["
+                                && !in_array($next_part, $this->logical_operators))
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>'$next_part'</strong> after <strong>$part</strong>.";
+                            }
+                        }
+                        break;
+                    case ",":
+                        // Must have a $redcap field query after, has to be part of in_array function call
+                        if ($index != sizeof($parts) - 1)
+                        {
+                            $previous = $parts[$index - 1];
+                            $previous_2 = $parts[$index - 2];
+                            $previous_3 = $parts[$index - 3];
+
+                            if ($previous_3 !== "in_array" || $previous_2 !== "(" || $previous !== "''")
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Improper use of <strong>,</strong> in syntax. Are you trying to call in_array()?";
+                            }
+
+                            $next_part = $parts[$index + 1];
+                            if ($next_part !== "\$redcap")
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num]. Invalid <strong>$next_part</strong> after <strong>,</strong>.";
+                            }
+                        }
+                        else
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] <strong>$part</strong> cannot be end of syntax";
+                        }
+                        break;
+                    case "in_array":
+                        // Must have a ( after
+                        if ($index != sizeof($parts) - 1)
+                        {
+                            $next_part = $parts[$index + 1];
+                            if ($next_part !== "(")
+                            {
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Malformed <strong>in_array()</strong> function.";
+                            }
+                        }
+                        else
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Malformed <strong>in_array()</strong> function.";
+                        }
+                        break;
+                    case "else":
+                    case "/if":
+                        // Must be the only clause in syntax
+                        if ($index != sizeof($parts) - 1)
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Mal-formed <strong>$part</strong> clause. Must be of form <strong>{{$part}}</strong>.";
+                        }
+                        break;
+                    default:
+                        // If it's a number, must have ) or logical operator after, if not last item in syntax
+                        if (is_numeric($part))
+                        {
+                            if ($index != sizeof($parts) - 1)
+                            {
+                                $next_part = $parts[$index + 1];
+                                if (!empty($next_part) && $next_part !== ")" && !in_array($next_part, $this->logical_operators))
+                                {
+                                    $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>$part</strong>.";
+                                }
+                            }
+                        }
+                        // Check if it's a string
+                        else if (!empty($part) && 
+                                $part[0] != "'" && 
+                                $part[0] != "\"" && 
+                                $part[strlen($part) - 1] != "'" && 
+                                $part[strlen($part) - 1] != "\"" &&
+                                !$this->isValidFieldOrEvent($part))
+                        {
+                            $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] <strong>$part</strong> is not a valid event/field/syntax in this project";
+                        }
+                        break;
+                }
             }
         }
         return $errors;
     }
 
     /**
-     * Valdiates if statements.
-     * 
-     * Checks that...
+     * Validate if statements, by checking the following:
      *      
      * - If statements have matching opening and closing statements.
      * - Elseifs are associated with an if statement.
@@ -765,7 +771,7 @@ class Template
      * 
      * @access private
      * @param Array $lines      An array of lines within template.
-     * @return Array An array of errors, with their line numbers appended to indicate where it occured.
+     * @return Array            An array of errors, with their line numbers appended to indicate where it occured.
      */
     private function validateIfStatements($lines)
     {
@@ -977,10 +983,10 @@ class Template
      * Checks that there are no unclosed curly brackets within the template, as they're special characters that denote
      * Smarty syntax. If validation passes, then retrieve all text enclosed within curly brackets, and validate them.
      * 
-     * @see Template::validateText() For validating all syntax, escept if statements.
-     * @see Template::validateIfStatements() For validating if statements.
-     * @param String $template_data      Template contents.
-     * @return Array An array of errors, with their line numbers appended to indicate where it occured.
+     * @see Template::validateSyntax()            For validating all syntax, escept if statements.
+     * @see Template::validateIfStatements()    For validating if statements.
+     * @param String $template_data             Template contents.
+     * @return Array                            An array of errors, with their line numbers appended to indicate where it occured.
      */
     public function validateTemplate($template_data)
     {
@@ -1013,7 +1019,7 @@ class Template
                     if ($closing_bracket !== FALSE)
                     {
                         $text = substr($line, $start_pos, $closing_bracket - $start_pos);
-                        $errors = array_merge($errors, $this->validateText($text, $line_num));
+                        $errors = array_merge($errors, $this->validateSyntax($text, $line_num));
                     }
                     else
                     {
@@ -1023,13 +1029,7 @@ class Template
             }
         }
 
-        //Check all if statements have appropriate opening and closing clauses
-        if (empty($errors))
-        {
-            $errors = array_merge($errors, $this->validateIfStatements($lines));
-        }
-
-        return $errors;
+        return array_merge($errors, $this->validateIfStatements($lines));
     }
 
     /**
@@ -1039,12 +1039,11 @@ class Template
      * template with data. After using Smarty to fill the template, empty nodes are 
      * found and deleted.
      * 
-     * @since 2.9.2
-     * @see Template::parseEventData() For parsing event data into Array used in Smarty.
-     * @see Template::getEmptyNodes()  For retrieving empty nodes in HTML.
+     * @see Template::parseEventData()  For parsing event data into Array used in Smarty.
+     * @see Template::getEmptyNodes()   For retrieving empty nodes in HTML.
      * @param String $template_name     The Template name.
      * @param Integer $record           A REDCap record ID.
-     * @return String The template filled with REDCap record data.
+     * @return String                   The template filled with REDCap record data.
      */
     public function fillTemplate($template_name, $record)
     {
@@ -1078,10 +1077,11 @@ class Template
             {
                 $data = array();
                 $event = $events[$event_data["redcap_event_name"]];
-                if ($event_data["redcap_repeat_instance"] != "")
+
+                if (!empty($event_data["redcap_repeat_instance"]))
                 {
                     // Repeatable instrument
-                    if ($event_data["redcap_repeat_instrument"] != null && !in_array($event_data["redcap_repeat_instrument"], $repeatable_instruments_parsed)) 
+                    if (!empty($event_data["redcap_repeat_instrument"]) && !in_array($event_data["redcap_repeat_instrument"], $repeatable_instruments_parsed)) 
                     {
                         // Get latest instance of repeatable instrument.
                         // Retrieve all repeatable instances of event. 
@@ -1157,10 +1157,10 @@ class Template
             foreach($json as $index => $event_data)
             {
                 // Repeatable instrument
-                if ($event_data["redcap_repeat_instance"] != "")
+                if (!empty($event_data["redcap_repeat_instance"]))
                 {
                     // Repeatable instrument
-                    if ($event_data["redcap_repeat_instrument"] != null && !in_array($event_data["redcap_repeat_instrument"], $repeatable_instruments_parsed)) 
+                    if (!empty($event_data["redcap_repeat_instrument"]) && !in_array($event_data["redcap_repeat_instrument"], $repeatable_instruments_parsed)) 
                     {
                         // Get latest instance of repeatable instrument.
                         // Retrieve all repeatable instances of event. 
@@ -1209,7 +1209,7 @@ class Template
                 {
                     $elem->parentNode->removeChild($elem);
                 }
-                $empty_elems = $this->getEmptyNodes($body);
+                $empty_elems = $this->getEmptyNodes($body); // There may be new empty nodes after the previous ones were removed.
             }
             $filled_template = $doc->saveHTML();
         }
