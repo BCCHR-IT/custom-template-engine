@@ -160,7 +160,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 filebrowserUploadMethod: 'form',
                 fillEmptyBlocks: false,
                 extraAllowedContent: '*{*}',
-                font_names: 'Arial/Arial, Helvetica, sans-serif; Times New Roman/Times New Roman, Times, serif; Courier; DejaVu'
+                font_names: 'Arial/Arial, Helvetica, sans-serif; Times New Roman/Times New Roman, Times, serif; Courier; DejaVu; Firefly Sung'
+
             });
         </script>
         <?php
@@ -1205,6 +1206,18 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <html>
                     <head>
                         <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
+                        <style>
+                          @font-face {
+                            font-family: 'Firefly Sung';
+                            font-style: normal;
+                            font-weight: normal;
+                            src: url(http://eclecticgeek.com/dompdf/fonts/cjk/fireflysung.ttf) format('truetype');
+                          }
+                          * {
+                            font-family: Firefly Sung, Arial, Helvetica, sans-serif, Times New Roman, Times, serif, Courier, DejaVu;
+                          }
+                        </style>
+
                     </head>
                     <body>
                         <header>$header</header>
@@ -1361,8 +1374,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $HtmlPage->PrintFooterExt();
                 }
             }
-
-            $dompdf->stream($filename);
+            // How do we do this without duplicating?
+            $dompdf2 = new Dompdf();
+            $dompdf2->set_option("isHtml5ParserEnabled", true);
+            $dompdf2->set_option("isPhpEnabled", true);
+            $dompdf2->loadHtml($doc->saveHtml());
+            $dompdf2->setPaper("letter", "portrait");
+            $dompdf2->render();
+            $dompdf2->stream($filename);
             REDCap::logEvent("Downloaded Report ", $filename , "" ,$_GET["record"]);
         }
         else
