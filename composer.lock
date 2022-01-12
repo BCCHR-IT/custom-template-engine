@@ -126,8 +126,7 @@
             "dist": {
                 "type": "zip",
                 "url": "https://github.com/egorlaw/ckeditor_codemirror/archive/1.0.5.zip",
-                "reference": "8f219b9b64f7ae431733f2107dc13b79e946b634",
-                "shasum": null
+                "reference": "8f219b9b64f7ae431733f2107dc13b79e946b634"
             },
             "type": "drupal-library",
             "notification-url": "https://packagist.org/downloads/",
@@ -276,16 +275,16 @@
         },
         {
             "name": "smarty/smarty",
-            "version": "v3.1.39",
+            "version": "v3.1.43",
             "source": {
                 "type": "git",
                 "url": "https://github.com/smarty-php/smarty.git",
-                "reference": "e27da524f7bcd7361e3ea5cdfa99c4378a7b5419"
+                "reference": "273f7e00fec034f6d61112552e9caf08d19565b7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/smarty-php/smarty/zipball/e27da524f7bcd7361e3ea5cdfa99c4378a7b5419",
-                "reference": "e27da524f7bcd7361e3ea5cdfa99c4378a7b5419",
+                "url": "https://api.github.com/repos/smarty-php/smarty/zipball/273f7e00fec034f6d61112552e9caf08d19565b7",
+                "reference": "273f7e00fec034f6d61112552e9caf08d19565b7",
                 "shasum": ""
             },
             "require": {
@@ -329,7 +328,13 @@
             "keywords": [
                 "templating"
             ],
-            "time": "2021-02-17T21:57:51+00:00"
+            "support": {
+                "forum": "http://www.smarty.net/forums/",
+                "irc": "irc://irc.freenode.org/smarty",
+                "issues": "https://github.com/smarty-php/smarty/issues",
+                "source": "https://github.com/smarty-php/smarty/tree/v3.1.43"
+            },
+            "time": "2022-01-10T09:52:40+00:00"
         }
     ],
     "packages-dev": [],
@@ -342,5 +347,6 @@
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": [],
-    "platform-dev": []
+    "platform-dev": [],
+    "plugin-api-version": "2.2.0"
 }
