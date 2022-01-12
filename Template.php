@@ -19,7 +19,7 @@ class Template
      * @var Smarty $smarty      Instance of Smarty object.
      * @var Array $redcap       Stores variables that will be used by Smarty template engine to fill data.
      * 
-     * @var Boolean $show_label_and_row         Whether to show a label or row or not in template.
+     * @var Bool $show_label_and_row            Whether to show a label or row or not in template.
      * @var String $de_identified_replacement   What to replace de-identified data with.
      * @var Array $logical_operators            Allowed logical operators.
      */
@@ -54,7 +54,7 @@ class Template
      * @access private
      * @param DOMNode $elem                 Root element.
      * @param String $whichSibling          Which sibling/direction to check. Can be either "previous" or "next". 
-     * @return Boolean                      True if the given element and all its siblings are empty, false otherwise.
+     * @return Bool                         True if the given element and all its siblings are empty, false otherwise.
      */
     private function areSiblingsEmpty($elem, $whichSibling)
     {   
@@ -327,8 +327,8 @@ class Template
      * Checks whether fields and events exist within project
      * 
      * @access private
-     * @param String $text      The line of text to validate.
-     * @return Array            An array of errors, with the line number appended to indicate where it occured.
+     * @param String $var      The field name/event name to check
+     * @return Bool            True if $var is a valid REDCap field or event on the project, false otherwise
      */
     private function isValidFieldOrEvent($var)
     {

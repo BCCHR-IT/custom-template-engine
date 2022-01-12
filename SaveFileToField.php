@@ -18,8 +18,8 @@ $record = $_POST["record"];
 
 if (isset($main) && !empty($main))
 {
-    $event_name = $_POST["save-report-to-event-val"];
-    $field_name = $_POST["save-report-to-field-val"];
+    $event_name = htmlspecialchars($_POST["save-report-to-event-val"], ENT_QUOTES);
+    $field_name = htmlspecialchars($_POST["save-report-to-field-val"], ENT_QUOTES);
 
     if (empty($field_name))
     {
