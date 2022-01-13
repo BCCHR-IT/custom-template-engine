@@ -63,7 +63,7 @@ if (isset($main) && !empty($main))
     }
 
     $dompdf = new Dompdf();
-    $pdf_content = $customTemplateEngine->creatPDF($dompdf, $header, $footer, $main);
+    $pdf_content = $customTemplateEngine->createPDF($dompdf, $header, $footer, $main);
 
     if (!$customTemplateEngine->saveFileToField($filename, $pdf_content, $field_name, $record, $event_id))
     {
