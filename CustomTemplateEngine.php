@@ -647,7 +647,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             // override this.
             if (!empty($header) && !empty($footer))
             {
-                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 25px; } header { position: fixed; left: 0px; top: -100px; } footer { position: fixed; left: 0px; bottom:0px; } @page { margin: 130px 50px; }");
+                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 25px; } header { position: fixed; left: 0px; right: 0px; top: -100px; } footer { position: fixed; left: 0px; right: 0px; bottom: 0px; } @page { margin: 130px 50px; }");
             }
             else if (!empty($header))
             {
@@ -1079,7 +1079,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * 
      * @since 3.1
      */
-    public function creatPDF($dompdf_obj, $header, $footer, $main)
+    public function createPDF($dompdf_obj, $header, $footer, $main)
     {
         $contents = $this->formatPDFContents($header, $footer, $main);
 
@@ -1123,7 +1123,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         if (isset($main) && !empty($main))
         {
             $dompdf = new Dompdf();
-            $pdf_content = $this->creatPDF($dompdf, $header, $footer, $main);
+            $pdf_content = $this->createPDF($dompdf, $header, $footer, $main);
 
             if (!$this->getProjectSetting("save-report-to-repo"))
             {
@@ -1193,7 +1193,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $main = $doc->getElementsByTagName("main")->item(0);
                     
                     $header = empty($header) ? "" : $doc->saveHTML($header);
-                    $footer = empty($footer)? "" : $doc->saveHTML($footer);
+                    $footer = empty($footer) ? "" : $doc->saveHTML($footer);
                     $main = $doc->saveHTML($main);
                 
                     $contents = $this->formatPDFContents($header, $footer, $main);

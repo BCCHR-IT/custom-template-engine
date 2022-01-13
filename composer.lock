@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8ca53e8036c835cf6f5f27c0e3935483",
+    "content-hash": "53333a34831cce4f9dbcfb7052db87a5",
     "packages": [
         {
             "name": "ckeditor/ckeditor",
@@ -49,23 +49,23 @@
         },
         {
             "name": "dompdf/dompdf",
-            "version": "dev-master",
+            "version": "v1.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/dompdf/dompdf.git",
-                "reference": "70413857a75ce7a925e82e8924eeb277ac0c8bc3"
+                "reference": "de4aad040737a89fae2129cdeb0f79c45513128d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/dompdf/dompdf/zipball/70413857a75ce7a925e82e8924eeb277ac0c8bc3",
-                "reference": "70413857a75ce7a925e82e8924eeb277ac0c8bc3",
+                "url": "https://api.github.com/repos/dompdf/dompdf/zipball/de4aad040737a89fae2129cdeb0f79c45513128d",
+                "reference": "de4aad040737a89fae2129cdeb0f79c45513128d",
                 "shasum": ""
             },
             "require": {
                 "ext-dom": "*",
                 "ext-mbstring": "*",
-                "phenx/php-font-lib": "^0.5.4",
-                "phenx/php-svg-lib": "^0.3.3 || ^0.4.0",
+                "phenx/php-font-lib": "^0.5.2",
+                "phenx/php-svg-lib": "^0.3.3",
                 "php": "^7.1 || ^8.0"
             },
             "require-dev": {
@@ -108,7 +108,7 @@
             ],
             "description": "DOMPDF is a CSS 2.1 compliant HTML to PDF converter",
             "homepage": "https://github.com/dompdf/dompdf",
-            "time": "2022-01-11T19:01:49+00:00"
+            "time": "2021-11-24T00:45:04+00:00"
         },
         {
             "name": "egorlaw/ckeditor_codemirror",
@@ -278,29 +278,29 @@
         },
         {
             "name": "smarty/smarty",
-            "version": "v3.1.43",
+            "version": "v4.0.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/smarty-php/smarty.git",
-                "reference": "273f7e00fec034f6d61112552e9caf08d19565b7"
+                "reference": "f707dadecbc145bac40f77f47595f32ec18eed01"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/smarty-php/smarty/zipball/273f7e00fec034f6d61112552e9caf08d19565b7",
-                "reference": "273f7e00fec034f6d61112552e9caf08d19565b7",
+                "url": "https://api.github.com/repos/smarty-php/smarty/zipball/f707dadecbc145bac40f77f47595f32ec18eed01",
+                "reference": "f707dadecbc145bac40f77f47595f32ec18eed01",
                 "shasum": ""
             },
             "require": {
-                "php": ">=5.2"
+                "php": "^7.1 || ^8.0"
             },
             "require-dev": {
-                "phpunit/phpunit": "^7.5 || ^6.5 || ^5.7 || ^4.8",
+                "phpunit/phpunit": "^8.5 || ^7.5",
                 "smarty/smarty-lexer": "^3.1"
             },
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-master": "3.1.x-dev"
+                    "dev-master": "4.0.x-dev"
                 }
             },
             "autoload": {
@@ -324,22 +324,25 @@
                 {
                     "name": "Rodney Rehm",
                     "email": "rodney.rehm@medialize.de"
+                },
+                {
+                    "name": "Simon Wisselink",
+                    "homepage": "https://www.iwink.nl/"
                 }
             ],
             "description": "Smarty - the compiling PHP template engine",
-            "homepage": "http://www.smarty.net",
+            "homepage": "https://smarty-php.github.io/smarty/",
             "keywords": [
                 "templating"
             ],
-            "time": "2022-01-10T09:52:40+00:00"
+            "time": "2022-01-10T09:52:14+00:00"
         }
     ],
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "ckeditor/ckeditor": 20,
-        "dompdf/dompdf": 20
+        "ckeditor/ckeditor": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
