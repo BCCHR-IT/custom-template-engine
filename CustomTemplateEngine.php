@@ -2853,7 +2853,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         ?>
         <script type="text/javascript">
             $(document).ready(function(){
-                $('body').on('dialogopen', function(){
+                $('body').on('dialogopen', function(event){
                     if(event.target.className=="fileuploadlink") {
                         var content = $('div.upload-source').clone();
 
