@@ -21,7 +21,7 @@
     "compatibility": {
         "php-version-min": "",
         "php-version-max": "",
-        "redcap-version-min": "8.5.14",
+        "redcap-version-min": "9.1.1",
         "redcap-version-max": ""
     },
     "system-settings": [
@@ -64,6 +64,7 @@
             "type": "checkbox",
             "repeatable": false,
             "super-users-only": true
-        } 
-    ]
+        }
+    ],
+    "framework-version": 3
 }

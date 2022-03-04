@@ -44,3 +44,7 @@ The module users the PHP template engine, Smarty, to fill in the templates with 
 ##  Web Application Load Balancing
 
 WARNING:  This module is not currently able to support REDCap instances using load balancers due to the requirement to save templates to the file system.
+
+##  Other Issues
+
+- This module is unable to properly embed images with PHP version >= 7.4

@@ -18,8 +18,8 @@ $record = $_POST["record"];
 
 if (isset($main) && !empty($main))
 {
-    $event_name = $_POST["save-report-to-event-val"];
-    $field_name = $_POST["save-report-to-field-val"];
+    $event_name = htmlspecialchars($_POST["save-report-to-event-val"], ENT_QUOTES);
+    $field_name = htmlspecialchars($_POST["save-report-to-field-val"], ENT_QUOTES);
 
     if (empty($field_name))
     {
@@ -58,12 +58,12 @@ if (isset($main) && !empty($main))
     // If longitudinal, check that field exists on chosen event.
     if (REDCap::isLongitudinal() && !$customTemplateEngine->checkFieldInEvent($field_name, $event_id))
     {
-        print json_encode(array("error" => "$field_name is not a valid field on $event_name"));
+        print json_encode(array("error" => "$field_name is not a valid field on " . (empty($event_name) ? "the first event" : $event_name)));
         return;
     }
 
     $dompdf = new Dompdf();
-    $pdf_content = $customTemplateEngine->creatPDF($dompdf, $header, $footer, $main);
+    $pdf_content = $customTemplateEngine->createPDF($dompdf, $header, $footer, $main);
 
     if (!$customTemplateEngine->saveFileToField($filename, $pdf_content, $field_name, $record, $event_id))
     {
