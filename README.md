@@ -44,7 +44,7 @@ The module users the PHP template engine, Smarty, to fill in the templates with 
 
 ## File Upload Fields
 
-Templates are listed in a dropdown list in file upload field dialogs. The user may choose to select a file and upload it in the usual manner or selet a template.
+Templates are listed in a dropdown list in file upload field dialogs. The user may choose to select a file and upload it in the usual manner or select a template.
 When a template is selected, it will be filled and saved to the field.
 
 ##  Web Application Load Balancing
