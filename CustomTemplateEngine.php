@@ -331,6 +331,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         // Save file to edocs tables in the REDCap database
         $database_success = FALSE;
         $upload_success = FALSE;
+        $docs_id = 0;
 
         $dummy_file_name = $filename . ".pdf";
         $dummy_file_name = preg_replace("/[^a-zA-Z-._0-9]/","_",$dummy_file_name);
@@ -451,19 +452,17 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $current_timestamp = date("YmdHis");
                     $ip = $_SERVER["REMOTE_ADDR"];
                     $description = isset($instance) ? "[instance = $instance],\n$field_name = '$docs_id'" : "$field_name = '$docs_id'";
-                    $sql = str_replace("'", "''", $sql);
+                    $sql = str_replace("'", "''", $query->getSQL());
 
                     $query = $this->framework->createQuery();
                     $query->add("INSERT INTO $redcap_log_event_table (ts, user, ip, page, project_id, event, object_type, sql_log, pk, event_id, data_values, description) VALUES (?, ?, ?, 'ExternalModules/index.php', ?, 'DOC_UPLOAD', 'redcap_data', ?, ?, ?, ?, 'Upload Document')",
                                 [$current_timestamp, $this->userid, $ip, $this->pid, $sql, $record, $event_id, $description]);
                     $query->execute();
-
-                    return true;
                 }
             }
         }
 
-        return false;
+        return $docs_id; // 0 if could not upload file
     }
 
     /**
@@ -1079,7 +1078,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * 
      * @since 3.1
      */
-    public function createPDF($dompdf_obj, $header, $footer, $main)
+    public function createPDF($dompdf_obj, $header, $footer, $main, $fileOrTemplateName)
     {
         $contents = $this->formatPDFContents($header, $footer, $main);
 
@@ -1091,7 +1090,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $dompdf_obj->set_option('isRemoteEnabled', TRUE);
 
         // Setup the paper size and orientation
-        $dompdf_obj->setPaper("letter", "portrait");
+        list($paperSize, $paperOrientation) = $this->getPaperSettings($fileOrTemplateName);
+        $dompdf_obj->setPaper($paperSize, $paperOrientation);
 
         // Render the HTML as PDF
         $dompdf_obj->render();
@@ -1123,7 +1123,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         if (isset($main) && !empty($main))
         {
             $dompdf = new Dompdf();
-            $pdf_content = $this->createPDF($dompdf, $header, $footer, $main);
+            $pdf_content = $this->createPDF($dompdf, $header, $footer, $main, $filename);
 
             if (!$this->getProjectSetting("save-report-to-repo"))
             {
@@ -2495,6 +2495,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         foreach($records as $record)
         {
             $to_add = $record[$id_field];
+            $previously_printed = (is_null($previously_printed)) ? [] : $previously_printed; // LS for PHP 8
+            $participant_options = (is_null($participant_options)) ? [] : $participant_options; // LS for PHP 8
             if (!in_array($to_add, $previously_printed)) 
             {
                 if (!in_array($to_add, array_keys($participant_options), true))
@@ -2827,5 +2829,202 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             return $link;
         }
+    }
+
+    /**
+     * getPaperSettings($name) 
+     * Look for module project setting with name corresponding to the tempalte or file name provided
+     * @param String $name Name of template or pdf document file name
+     * @return Array Array with two elements: 1. paper size e.g. "Letter", "A4"; 2: paper orientation "Portrait" or "Landscape""
+     */
+    protected function getPaperSettings($fileOrTemplateName) 
+    {
+        $paperSize = "letter";
+        $paperOrientation = "portrait";
+
+        $templateSettings = $this->getSubSettings('template-options');
+
+        foreach ($templateSettings as $settings) {
+            // look for a template with name occurring within the file name of what's being generated 
+            // (pretty horrid - will catch "MyTemplate" before "MyTemplate_New" - need better way of recording template names perhaps recording to project settings on create/save/delete and auto-generate template name for files system storage?)
+            if (strpos($fileOrTemplateName, $settings['template-name']) !== false) {
+                $paperSize = (empty($settings['option-paper-size'])) ? $paperSize : $settings['option-paper-size'];
+                $paperOrientation = ($settings['option-paper-orientation']) ? "landscape" : $paperOrientation;
+                break;
+            }
+        }
+
+        return array($paperSize, $paperOrientation);
+    }
+
+    public function redcap_data_entry_form_top($project_id, $record, $instrument, $event_id, $group_id, $repeat_instance) 
+    {
+        global $Proj, $lang;
+
+        // is there a file upload field on this form?
+        $ff = false;
+        foreach (array_keys($Proj->forms[$instrument]['fields']) as $f) {
+            if ($Proj->metadata[$f]['element_type'] === 'file') {
+                $ff = true;
+                break;
+            }
+        }
+        if (!$ff) return; // no file upload field -> return
+
+        // any valid templates?
+        $all_templates = array_diff(scandir($this->templates_dir), array("..", "."));
+        $valid_templates = array();
+        $suffix = "_$this->pid.html";
+        foreach($all_templates as $template) {
+            if (strpos($template, $suffix) !== FALSE) {
+                array_push($valid_templates, rtrim($template, $suffix));
+            }
+        }
+
+        if (count($valid_templates) === 0) return; // no templates -> return
+
+        // make a select list of templates to include in the file upload dialog form for each field
+        $templateSelect = '<select class="upload-source-select form-control form-control-sm"><option value="0">Choose file</option>';
+        $n = 0;
+        foreach($valid_templates as $template) {
+            $n++;
+            $templateSelect .= "<option value=\"$n\">$template</option>";
+        }
+        $templateSelect .= '</select>';
+        $uploadDialogContent = '<div class="upload-source my-2 d-none"><div class="font-weight-bold"><i class="fas fa-cube mr-1"></i>Custom Template Engine</div><div>Choose a file or generate from a template '.$templateSelect.'</div><button class="upload-source-btn btn btn-primaryrc mt-2" style="font-size:14px;display:none;"><i class="fas fa-upload mr-1"></i>Fill template and upload</button></div>';
+        echo $uploadDialogContent;
+
+        $fillAndSaveUrl = $this->getUrl('FillAndSave.php');
+        $fillAndSaveUrl .= "&id=".urlencode($record)."&event_id=$event_id&instrument=$instrument&instance=$repeat_instance";
+
+        ?>
+        <script type="text/javascript">
+            $(document).ready(function(){
+                $('body').on('dialogopen', function(event){
+                    if(event.target.id=="file_upload") { //className=="fileuploadlink") {
+                        var content = $('div.upload-source').clone();
+
+                        $(content).find('button.upload-source-btn').on('click', function(e){
+                            var templateName = $('#form_file_upload').find('select.upload-source-select').find(":selected").text();
+                            e.preventDefault();
+                            $('#form_file_upload').find('div.upload-source').hide();
+                            $('#f1_upload_process').show();
+                            $(this).prop('disabled, true');
+
+                            $.ajax({
+                                url: '<?=$fillAndSaveUrl?>',
+                                type: 'POST',
+                                dataType: 'json',
+                                data: { 
+                                    template_name: templateName,
+                                    field_name: $('#field_name').val()
+                                },
+                                success: function(data) {
+                                    console.log(data);
+                                    window.parent.dataEntryFormValuesChanged = true;
+                                    window.parent.window.stopUpload(data.result,data.field_name,data.doc_id,data.save_filename,data.record,data.doc_size,data.event_id,data.file_download_page,data.file_delete_page,data.doc_id_hash,data.instance);
+                                    if (data.inlineActionTag) {
+                                        window.parent.window.$(function(){ window.parent.window.initInlineImages(data.field_name) });
+                                    }
+                                },
+                                error: function(data) {
+                                    window.parent.window.stopUpload(0,'',0,'','','','','','','','');
+                                    
+                                }
+                            });
+
+                            return false;
+                        });
+
+                        $(content).find('select.upload-source-select').on('change', function() {
+                            var selIdx = $(this).val();
+                            var selName = $(this).find(":selected").text();
+                            if (selIdx==0) {
+                                // choose a file
+                                $('#f1_upload_form').show();
+                                $('#form_file_upload').find('button.upload-source-btn').hide();
+                            } else { 
+                                $('#f1_upload_form').hide();
+                                $('#form_file_upload').find('button.upload-source-btn').show();
+                            }
+                        });
+                        $(content).insertAfter('#this_upload_field').removeClass('d-none');
+                    }
+                });
+            });
+        </script>
+        <?php
+    }
+
+    /**
+     * fillAndSave
+     * Takes $_POST from file upload field dialog, generates PDF of specified template for current record and uploads it to the field/event.
+     */
+    public function fillAndSave() {
+        global $project_id, $Proj;
+        $record = rawurldecode(urldecode($_REQUEST['id']));
+        $event_id = $_REQUEST['event_id'];
+        $instance = $_REQUEST['instance'];
+        $field_name = explode('-', $_REQUEST['field_name'])[0];
+        $template_name = $_REQUEST['template_name'];
+
+        $save_filename = $template_name.'_'.$record.'_'.date('Y-m-d_His').'.pdf';
+        $template_filename = $template_name.'_'.$project_id.'.html';
+        $template = new Template($this->templates_dir, $this->compiled_dir);
+        $filled_template = $template->fillTemplate($template_filename, $record);
+
+        $doc = new DOMDocument();
+        $doc->loadHTML($filled_template);
+    
+        $header = $doc->getElementsByTagName("header")->item(0);
+        $footer = $doc->getElementsByTagName("footer")->item(0);
+        $main = $doc->getElementsByTagName("main")->item(0);
+
+        $filled_main = $doc->saveHTML($main);
+        $filled_header = empty($header) ? "" : $doc->saveHTML($header);
+        $filled_footer = empty($footer)? "" : $doc->saveHTML($footer);
+
+        $dompdf = new Dompdf();
+        $pdf_content = $this->createPDF($dompdf, $filled_header, $filled_footer, $filled_main, $template_name);
+    
+        $doc_size = strlen($pdf_content);
+        $doc_id = $this->saveFileToField($save_filename, $pdf_content, $field_name, $record, $event_id, $instance, true);
+        if ($doc_id) {
+            $result = 1;
+        } else {
+            $msg = "Failed to generate PDF and save to field. <br>Template=$template_name; Record=$record; Field=$field_name ";
+            \REDCap::logEvent("Custom Template Engine - Generate and Save Failed!", $msg);
+            $result = 0;
+        }
+
+        
+        // return response for upload as per DataEntry/file_upload.php
+        // SURVEYS: Use the surveys/index.php page as a pass through for certain files (file uploads/downloads, etc.)
+        if (isset($_GET['s']) && !empty($_GET['s']))
+        {
+            $file_download_page = APP_PATH_SURVEY . "index.php?pid=$project_id&__passthru=".urlencode("DataEntry/file_download.php");
+            $file_delete_page   = APP_PATH_SURVEY . "index.php?pid=$project_id&__passthru=".urlencode("DataEntry/file_delete.php");
+        }
+        else
+        {
+            $file_download_page = APP_PATH_WEBROOT . "DataEntry/file_download.php?pid=$project_id";
+            $file_delete_page   = APP_PATH_WEBROOT . "DataEntry/file_delete.php?pid=$project_id&page=" . $_GET['instrument'];
+        }
+
+        $return = array(
+            'result' => $result,
+            'field_name' => $field_name,
+            'doc_id' => $doc_id,
+            'save_filename' => $save_filename,
+            'record' => js_escape($record),
+            'doc_size' => " (" . round_up($doc_size/1024/1024) . " MB)",
+            'event_id' => $event_id,
+            'file_download_page' => $file_download_page,
+            'file_delete_page' => $file_delete_page,
+            'doc_id_hash' => \Files::docIdHash($doc_id),
+            'instance' => $instance,
+            'inlineActionTag' => (strpos($Proj->metadata[$field_name]['misc'], '@INLINE') !== false)
+        );
+        return $return;
     }
 }

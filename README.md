@@ -17,7 +17,8 @@ When switching from the old module to the rebranded module, you must disable the
 - Images Folder: Required configuration that defines the publically accessible storage of images uploaded by users. 
 
 ## Project Configurations
-- Save Filled Templates to File Repository: This is specific to downloading a filled template, and will save a copy of the PDF to the File Repository. 
+- Save Filled Templates to File Repository: This is specific to downloading a filled template, and will save a copy of the PDF to the File Repository.
+- [Optional] Enter templates by name and specify an alternative paper size, e.g. A4 (default is Letter), and/or select landscape orientation.
 
 ## Permissions
 
@@ -40,6 +41,11 @@ Users must have access to data exports and reports in order to delete a template
 ## Filling and Downloading Template
 
 The module users the PHP template engine, Smarty, to fill in the templates with the apprpriate record data. Smarty will compile the template and store it in the previously configured compiled templates folder. The user is free to make edits to the template content before downloading. When the template is downloaded, if saving templates to the file repository has been configured, then the module will do so.
+
+## File Upload Fields
+
+Templates are listed in a dropdown list in file upload field dialogs. The user may choose to select a file and upload it in the usual manner or selet a template.
+When a template is selected, it will be filled and saved to the field.
 
 ##  Web Application Load Balancing
 
