@@ -121,8 +121,7 @@
             "dist": {
                 "type": "zip",
                 "url": "https://github.com/egorlaw/ckeditor_codemirror/archive/1.0.5.zip",
-                "reference": "8f219b9b64f7ae431733f2107dc13b79e946b634",
-                "shasum": null
+                "reference": "8f219b9b64f7ae431733f2107dc13b79e946b634"
             },
             "type": "drupal-library",
             "notification-url": "https://packagist.org/downloads/",
@@ -278,16 +277,16 @@
         },
         {
             "name": "smarty/smarty",
-            "version": "v4.0.3",
+            "version": "v4.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/smarty-php/smarty.git",
-                "reference": "f707dadecbc145bac40f77f47595f32ec18eed01"
+                "reference": "ffa2b81a8e354a49fd8a2f24742dc9dc399e8007"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/smarty-php/smarty/zipball/f707dadecbc145bac40f77f47595f32ec18eed01",
-                "reference": "f707dadecbc145bac40f77f47595f32ec18eed01",
+                "url": "https://api.github.com/repos/smarty-php/smarty/zipball/ffa2b81a8e354a49fd8a2f24742dc9dc399e8007",
+                "reference": "ffa2b81a8e354a49fd8a2f24742dc9dc399e8007",
                 "shasum": ""
             },
             "require": {
@@ -335,7 +334,12 @@
             "keywords": [
                 "templating"
             ],
-            "time": "2022-01-10T09:52:14+00:00"
+            "support": {
+                "forum": "https://github.com/smarty-php/smarty/discussions",
+                "issues": "https://github.com/smarty-php/smarty/issues",
+                "source": "https://github.com/smarty-php/smarty/tree/v4.2.1"
+            },
+            "time": "2022-09-14T10:59:01+00:00"
         }
     ],
     "packages-dev": [],
@@ -347,5 +351,6 @@
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": [],
-    "platform-dev": []
+    "platform-dev": [],
+    "plugin-api-version": "2.3.0"
 }
