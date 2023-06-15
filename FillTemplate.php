@@ -6,6 +6,7 @@
  */
 $customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
 
+if ($_POST["participantID"] == null) { exit(1);}  // PHP8 compatability fix; can't pass a blank participantID scalar. Dan Evans 2023-06-09
 if (sizeof($_POST["participantID"]) == 1)
 {
     /**
