@@ -682,7 +682,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     public function uploadImages()
     {
         // Required: anonymous function reference number as explained above.
-        $func_num = $_GET["CKEditorFuncNum"] ;
+        $func_num = htmpspecialchars($_GET["CKEditorFuncNum"], ENT_QUOTES);
         // Optional: compare it with the value of `ckCsrfToken` sent in a cookie to protect your server side uploader against CSRF.
         // Available since CKEditor 4.5.6.
         $token = $_POST["ckCsrfToken"] ;
@@ -707,9 +707,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     if ($check !== false)
                     {
                         $name = pathinfo(basename($upload["name"]));
-                        $filename = str_replace(" ", "_", $name["filename"]) . "_" . $_GET["pid"] . "." . $name["extension"];
+			$epid = filter_input(INPUT_GET, 'pid', FILTER_SANITIZE_SPECIAL_CHARS);
+			$escaped_filename = htmlentities($name['filename'], ENT_QUOTES);
+			$escaped_extension = htmlentities($name['extension'], ENT_QUOTES);
+                        // $filename = str_replace(" ", "_", $name["filename"] . "_" . $epid . "." . $name["extension"];
+			$filename = str_replace(" ", "_", $escaped_filename) . "_" . $epid . "." . $escaped_extension;
 
-                        if (move_uploaded_file($tmp_name, $this->img_dir . $filename))
+                        if (move_uploaded_file(realpath($tmp_name), realpath($this->img_dir . $filename)))
                         {
                             $realpath = realpath($this->img_dir);
                             $publicly_accessible_start_pos = strpos($realpath, "redcap");
@@ -879,8 +883,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      */
     public function deleteTemplate()
     {
-        $templateToDelete = $_POST["templateToDelete"];
-        if (unlink($this->templates_dir . $templateToDelete))
+        $templateToDelete = filter_input(INPUT_POST, 'templateToDelete', FILTER_SANITIZE_SPECIAL_CHARS);
+        if (unlink(realpath($this->templates_dir . $templateToDelete)))
         {
             REDCap::logEvent("Custom Template Engine - Deleted template", $templateToDelete);
             return TRUE;
@@ -907,7 +911,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $footer = REDCap::filterHtml(preg_replace(array("/&lsquo;/", "/&rsquo;/", "/&nbsp;/"), array("'", "'", " "), $_POST["footer-editor"]));
         $data = REDCap::filterHtml(preg_replace(array("/&lsquo;/", "/&rsquo;/", "/&nbsp;/"), array("'", "'", " "), $_POST["editor"]));
 
-        $name = trim($_POST["templateName"]);
+        $name = trim(htmlspecialchars($_POST["templateName"], ENT_QUOTES);
         $action = $_POST["action"];
 
         // Check if template has content
@@ -991,12 +995,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                  * Else if template names are the same save the template.
                  * Else, if the new template name is already in use return error, else save template and rename.
                  */
-                $currTemplateName = $_POST["currTemplateName"];
-                if (file_exists($this->templates_dir . $currTemplateName))
+                $currTemplateName = filter_input(INPUT_POST, 'currTemplateName', FILTER_SANITIZE_SPECIAL_CHARS);
+                if (file_exists(realpath($this->templates_dir . $currTemplateName)))
                 {
                     if ($currTemplateName == "{$name}_{$this->pid}.html" || $currTemplateName == "{$name}_{$this->pid} - INVALID.html")
                     {
-                        if ($doc->saveHTMLFile($this->templates_dir . $currTemplateName) === FALSE)
+                        if ($doc->saveHTMLFile(realpath($this->templates_dir . $currTemplateName)) === FALSE)
                         {
                             $other_errors[] = "<b>ERROR</b> Unable to save template. Please contact your REDCap administrator";
                         }
@@ -1006,14 +1010,14 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             if ((!empty($template_errors) || !empty($header_errors) || !empty($footer_errors)) && strpos($currTemplateName, " - INVALID") === FALSE)
                             {
                                 $filename = strpos($currTemplateName, " - INVALID") !== FALSE ? $currTemplateName : str_replace(".html", " - INVALID.html", $currTemplateName);
-                                rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
+                                rename(realpath($this->templates_dir. $currTemplateName), realpath($this->templates_dir . $filename));
                             }
                             else if (strpos($currTemplateName, " - INVALID") !== FALSE)
                             {
                                 $filename = str_replace(" - INVALID", "", $currTemplateName);
-                                rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
+                                rename($this->templates_dir. $currTemplateName), $this->templates_dir . $filename);
                             }
-                            $currTemplateName = $filename;
+                            $currTemplateName = realpath($filename);
                         }
                     }
                     else if (!file_exists("$this->templates_dir{$name}_$this->pid.html") && !file_exists("$this->templates_dir{$name}_{$this->pid} - INVALID.html") )
@@ -1159,8 +1163,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     {
         $errors = array();
 
-        $records = $_POST["participantID"];
-        $template_filename = $_POST['template'];
+        $records = htmlspecialchars($_POST["participantID"], ENT_QUOTES);
+        $template_filename = htmlspecialchars($_POST['template'], ENT_QUOTES);
         $template = new Template($this->templates_dir, $this->compiled_dir);
 
         $zip_name = "{$this->temp_dir}reports.zip";
@@ -1261,7 +1265,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             header('Content-Description: File Transfer');
             header('Content-Type: application/zip');
-            setCookie("fileDownloadToken", $_POST["download_token_value"], time() + 60, "", $_SERVER["SERVER_NAME"]); // Cannot specify path due to issue in IE that prevents cookie from being read. Default sets path as current directory.
+            $dl_token_value = filter_input(INPUT_POST, 'download_token_value', FILTER_SANITIZE_SPECIAL_CHARS);
+            setCookie("fileDownloadToken", $dl_token_value, ENT_QUOTES), time() + 60, "", $_SERVER["SERVER_NAME"]); // Cannot specify path due to issue in IE that prevents cookie from being read. Default sets path as current directory.
             header('Content-Disposition: attachment; filename="'.basename($zip_name).'"');
             header('Content-length: '.filesize($zip_name));
             readfile($zip_name);
@@ -1313,7 +1318,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             exit("<div class='red'>You don't have premission to view this page</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
         }
 
-        $record = $_POST["participantID"][0];
+        $record = htmlspecialchars($_POST["participantID"][0], ENT_QUOTES);
 
         if (empty($record))
         {
@@ -1557,7 +1562,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             $this->checkPermissions();
             $template_name = $curr_template_name = $template;
-            $template = file_get_contents($this->templates_dir . $template_name);
+            $template = file_get_contents(realpath($this->templates_dir . $template_name));
 
             $doc = new DOMDocument();
             $doc->loadHTML($template);
@@ -2625,7 +2630,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                         <label for="applyFilter">Filter records previously processed</label>
                                         <?php if (sizeof($participant_options) > 0):?>
                                             <select id="participantIDs" name="participantID[]" class="form-control selectpicker" style="background-color:white" data-live-search="true" data-max-options="20" multiple required>
-                                            <?php 
+                                            <?php
                                                 foreach($participant_options as $id => $option)
                                                 {
                                                     print "<option value='$id'>$option</option>";
@@ -2635,7 +2640,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                             <p><i style="color:red">If you select more than 1 record, you are unable to preview the report before it downloads, and are unable to save it to a record field.</i></p>
                                             <p><i style="color:red">Large templates may take several seconds, when batch filling.</i></p>
                                         <?php else:?>
-                                            <p>No Existing Records</p>        
+                                            <p>No Existing Records</p>
                                         <?php endif;?>
                                     </td>
                                 </tr>
