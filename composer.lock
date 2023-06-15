@@ -359,16 +359,16 @@
         },
         {
             "name": "smarty/smarty",
-            "version": "v4.0.3",
+            "version": "v4.3.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/smarty-php/smarty.git",
-                "reference": "f707dadecbc145bac40f77f47595f32ec18eed01"
+                "reference": "e28cb0915b4e3749bf57d4ebae2984e25395cfe5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/smarty-php/smarty/zipball/f707dadecbc145bac40f77f47595f32ec18eed01",
-                "reference": "f707dadecbc145bac40f77f47595f32ec18eed01",
+                "url": "https://api.github.com/repos/smarty-php/smarty/zipball/e28cb0915b4e3749bf57d4ebae2984e25395cfe5",
+                "reference": "e28cb0915b4e3749bf57d4ebae2984e25395cfe5",
                 "shasum": ""
             },
             "require": {
@@ -416,7 +416,12 @@
             "keywords": [
                 "templating"
             ],
-            "time": "2022-01-10T09:52:14+00:00"
+            "support": {
+                "forum": "https://github.com/smarty-php/smarty/discussions",
+                "issues": "https://github.com/smarty-php/smarty/issues",
+                "source": "https://github.com/smarty-php/smarty/tree/v4.3.1"
+            },
+            "time": "2023-03-28T19:47:03+00:00"
         }
     ],
     "packages-dev": [],
