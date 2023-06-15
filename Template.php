@@ -458,7 +458,8 @@ class Template
             }
             
             // Check symmetry of ()
-            if (sizeof(array_keys($parts, "(")) != sizeof(array_keys($parts, ")")))
+            if ($parts == null) { $parts = array();}  // PHP8 compatability patch Dan Evans, 2023-06-09
+	    if (sizeof(array_keys($parts, "(")) != sizeof(array_keys($parts, ")")))
             {
                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Odd number of parenthesis (. You've either added an extra parenthesis, or forgot to close one.";
             }
