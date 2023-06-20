@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "dd9e0b2feb925a63420862fe98d5d56d",
+    "content-hash": "4fab9020933926f85611d3687a83f5e4",
     "packages": [
         {
             "name": "ckeditor/ckeditor",
-            "version": "dev-full/4.11.x",
+            "version": "dev-full/4.21.x",
             "source": {
                 "type": "git",
-                "url": "https://github.com/ckeditor/ckeditor-releases.git",
-                "reference": "6f1346dc4ac94a6e22ebde53d92b3267159c4c05"
+                "url": "https://github.com/ckeditor/ckeditor4-releases.git",
+                "reference": "4662f97b3197f41bb834ca6f934b4120e67ff77c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/ckeditor/ckeditor-releases/zipball/6f1346dc4ac94a6e22ebde53d92b3267159c4c05",
-                "reference": "6f1346dc4ac94a6e22ebde53d92b3267159c4c05",
+                "url": "https://api.github.com/repos/ckeditor/ckeditor4-releases/zipball/4662f97b3197f41bb834ca6f934b4120e67ff77c",
+                "reference": "4662f97b3197f41bb834ca6f934b4120e67ff77c",
                 "shasum": ""
             },
             "type": "library",
@@ -30,13 +30,14 @@
             "authors": [
                 {
                     "name": "CKSource",
-                    "homepage": "http://cksource.com"
+                    "homepage": "https://cksource.com"
                 }
             ],
             "description": "JavaScript WYSIWYG web text editor.",
-            "homepage": "http://ckeditor.com",
+            "homepage": "https://ckeditor.com/ckeditor-4/",
             "keywords": [
                 "CKEditor",
+                "ckeditor4",
                 "editor",
                 "fckeditor",
                 "html",
@@ -45,7 +46,13 @@
                 "text",
                 "wysiwyg"
             ],
-            "time": "2019-04-09T13:35:04+00:00"
+            "support": {
+                "forum": "https://stackoverflow.com/tags/ckeditor",
+                "issues": "https://github.com/ckeditor/ckeditor4/issues",
+                "source": "https://github.com/ckeditor/ckeditor4",
+                "wiki": "https://ckeditor.com/docs/ckeditor4/latest/"
+            },
+            "time": "2023-03-22T10:35:24+00:00"
         },
         {
             "name": "dompdf/dompdf",
@@ -108,42 +115,6 @@
                 "source": "https://github.com/dompdf/dompdf/tree/v2.0.3"
             },
             "time": "2023-02-07T12:51:48+00:00"
-        },
-        {
-            "name": "egorlaw/ckeditor_codemirror",
-            "version": "1.0.5",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/egorlaw/ckeditor.codemirror.git",
-                "reference": "8f219b9b64f7ae431733f2107dc13b79e946b634"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://github.com/egorlaw/ckeditor_codemirror/archive/1.0.5.zip",
-                "reference": "8f219b9b64f7ae431733f2107dc13b79e946b634"
-            },
-            "type": "drupal-library",
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Egor Guriyanov",
-                    "email": "egorlaw@gmail.com",
-                    "homepage": "https://github.com/egorlaw",
-                    "role": "Developer"
-                }
-            ],
-            "description": "Composer wrapper for CKEditor Codemirror plugin",
-            "homepage": "https://github.com/egorlaw/ckeditor.codemirror",
-            "keywords": [
-                "CKEditor",
-                "javascript",
-                "plugin",
-                "text-highlight"
-            ],
-            "time": "2017-11-16T07:32:37+00:00"
         },
         {
             "name": "masterminds/html5",

@@ -40,7 +40,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     function __construct()
     {
         parent::__construct();
-        $this->userid = strtolower(USERID);
+        $this->userid = defined('USERID') ? strtolower(USERID) : null;
         /**
          * External Module functions to get module settings.
          */
@@ -166,9 +166,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     {
         ?>
         <script>
-            CKEDITOR.plugins.addExternal('codemirror', '<?php print $this->getUrl("vendor/egorlaw/ckeditor_codemirror/plugin.js"); ?>');
+            // CKEDITOR.plugins.addExternal('codemirror', '<?php print $this->getUrl("vendor/egorlaw/ckeditor_codemirror/plugin.js"); ?>');
             CKEDITOR.replace('<?php print $id;?>', {
-                extraPlugins: 'codemirror',
+                // extraPlugins: 'codemirror',
                 toolbar: [
                     { name: 'clipboard', items: [ 'Undo', 'Redo' ] },
                     { name: 'basicstyles', items: [ 'Bold', 'Italic', 'Underline', 'Strike', 'RemoveFormat'] },
@@ -181,7 +181,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 ],
                 height: <?php print $height; ?>,
                 bodyClass: 'document-editor',
-                contentsCss: [ 'https://cdn.ckeditor.com/4.8.0/full-all/contents.css', '<?php print $this->getUrl("app.css"); ?>' ],
+                contentsCss: [ 'https://cdn.ckeditor.com/4.21.0/full-all/contents.css', '<?php print $this->getUrl("app.css"); ?>' ],
                 filebrowserBrowseUrl: '<?php print $this->getUrl("BrowseImages.php"); ?>&type=Images',
                 filebrowserUploadUrl: '<?php print $this->getUrl("UploadImages.php"); ?>&type=Images',
                 filebrowserUploadMethod: 'form',
@@ -682,10 +682,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     public function uploadImages()
     {
         // Required: anonymous function reference number as explained above.
-        $func_num = htmpspecialchars($_GET["CKEditorFuncNum"], ENT_QUOTES);
+	$func_num = filter_input(INPUT_GET, 'CKEditorFuncNum', FILTER_SANITIZE_SPECIAL_CHARS);
         // Optional: compare it with the value of `ckCsrfToken` sent in a cookie to protect your server side uploader against CSRF.
         // Available since CKEditor 4.5.6.
-        $token = $_POST["ckCsrfToken"] ;
+        $token = filter_input(INPUT_POST, 'CKEditorFuncNum', FILTER_SANITIZE_SPECIAL_CHARS);
         $cookie_token = $_COOKIE["ckCsrfToken"];
 
         // url of the image to return
@@ -789,11 +789,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             <title>Browsing Files</title>
             <link href="<?php print $this->getUrl("app.css"); ?>" rel="stylesheet" type="text/css">
             <!-- Latest compiled and minified CSS -->
-            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
             <!-- Optional theme -->
-            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+            <!-- <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous"> -->
             <!-- Latest compiled and minified JavaScript -->
-            <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
             <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
             <script>
                 // Helper function to get parameters from the query string.
@@ -907,12 +907,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      */
     public function saveTemplate()
     {
-        $header = REDCap::filterHtml(preg_replace(array("/&lsquo;/", "/&rsquo;/", "/&nbsp;/"), array("'", "'", " "), $_POST["header-editor"]));
-        $footer = REDCap::filterHtml(preg_replace(array("/&lsquo;/", "/&rsquo;/", "/&nbsp;/"), array("'", "'", " "), $_POST["footer-editor"]));
-        $data = REDCap::filterHtml(preg_replace(array("/&lsquo;/", "/&rsquo;/", "/&nbsp;/"), array("'", "'", " "), $_POST["editor"]));
+        $header = REDCap::filterHtml(preg_replace(array("/&lsquo;/", "/&rsquo;/", "/&nbsp;/"), array("'", "'", " "), filter_input(INPUT_POST, 'header-editor', FILTER_SANITIZE_SPECIAL_CHARS)));
+        $footer = REDCap::filterHtml(preg_replace(array("/&lsquo;/", "/&rsquo;/", "/&nbsp;/"), array("'", "'", " "), filter_input(INPUT_POST, 'footer-editor', FILTER_SANITIZE_SPECIAL_CHARS)));
+        $data = REDCap::filterHtml(preg_replace(array("/&lsquo;/", "/&rsquo;/", "/&nbsp;/"), array("'", "'", " "), filter_input(INPUT_POST, 'editor', FILTER_SANITIZE_SPECIAL_CHARS)));
 
-        $name = trim(htmlspecialchars($_POST["templateName"], ENT_QUOTES);
-        $action = $_POST["action"];
+        $name = trim(filter_input(INPUT_POST, 'templateName', FILTER_SANITIZE_SPECIAL_CHARS));
+        $action = filter_input(INPUT_POST, 'action', FILTER_SANITIZE_SPECIAL_CHARS);
 
         // Check if template has content
         if (empty($data))
@@ -930,7 +930,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
             if ($action == "edit")
             {
-                $currTemplateName = $_POST["currTemplateName"];
+                $currTemplateName = filter_input(INPUT_POST, 'currTemplateName', FILTER_SANITIZE_SPECIAL_CHARS);
             }
         }
         else
@@ -1015,7 +1015,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             else if (strpos($currTemplateName, " - INVALID") !== FALSE)
                             {
                                 $filename = str_replace(" - INVALID", "", $currTemplateName);
-                                rename($this->templates_dir. $currTemplateName), $this->templates_dir . $filename);
+                                rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
                             }
                             $currTemplateName = realpath($filename);
                         }
@@ -1266,7 +1266,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             header('Content-Description: File Transfer');
             header('Content-Type: application/zip');
             $dl_token_value = filter_input(INPUT_POST, 'download_token_value', FILTER_SANITIZE_SPECIAL_CHARS);
-            setCookie("fileDownloadToken", $dl_token_value, ENT_QUOTES), time() + 60, "", $_SERVER["SERVER_NAME"]); // Cannot specify path due to issue in IE that prevents cookie from being read. Default sets path as current directory.
+            setCookie("fileDownloadToken", $dl_token_value, time() + 60, "", $_SERVER["SERVER_NAME"]); // Cannot specify path due to issue in IE that prevents cookie from being read. Default sets path as current directory.
             header('Content-Disposition: attachment; filename="'.basename($zip_name).'"');
             header('Content-length: '.filesize($zip_name));
             readfile($zip_name);
@@ -2539,7 +2539,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $this->createModuleFolders();
 
         $rights = REDCap::getUserRights($this->userid);
-        $participant_options = $this->getDropdownOptions($_GET["filter"]);
+        $participant_options = $this->getDropdownOptions(filter_input(INPUT_GET, 'filter', FILTER_SANITIZE_SPECIAL_CHARS));
 	if ($participant_options == null) {$participant_options = array();} // PHP8 compatability fix, Dan Evans, 2023-06-09
         $total = count($participant_options);
 
@@ -2571,13 +2571,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         <div class="container"> 
             <div class="jumbotron">
                 <?php
-                    $created = $_GET["created"];
+                    $created = filter_input(INPUT_GET, 'created', FILTER_SANITIZE_SPECIAL_CHARS);
                     if ($created === "1")
                     {
                         print "<div class='green container'>Your template was successfully saved</div><br/>";
                     }
 
-                    $deleted = $_GET["deleted"];
+                    $deleted = filter_input(INPUT_GET, 'deleted', FILTER_SANITIZE_SPECIAL_CHARS);
                     if ($deleted === "1")
                     {
                         print "<div class='green container'>Your template was successfully deleted</div><br/>";
@@ -2626,7 +2626,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                         Choose up to 20 records
                                     </td>
                                     <td class="data">
-                                        <input id="applyFilter" type="checkbox" <?php print $_GET["filter"] == "1" ? "checked" : ""; ?>>  <!-- PHP8 compatability fix, Dan Evans 2023-06-09 -->
+                                        <input id="applyFilter" type="checkbox" <?php print filter_input(INPUT_GET, 'filter', FILTER_SANITIZE_SPECIAL_CHARS) == "1" ? "checked" : ""; ?>>  <!-- PHP8 compatability fix, Dan Evans 2023-06-09 -->
                                         <label for="applyFilter">Filter records previously processed</label>
                                         <?php if (sizeof($participant_options) > 0):?>
                                             <select id="participantIDs" name="participantID[]" class="form-control selectpicker" style="background-color:white" data-live-search="true" data-max-options="20" multiple required>

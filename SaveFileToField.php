@@ -13,8 +13,8 @@ $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor
 $footer = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]));
 $main = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["editor"]));
 
-$filename = $_POST["filename"];
-$record = $_POST["record"];
+$filename = filter_input(INPUT_POST, 'filename', FILTER_SANITIZE_SPECIAL_CHARS);
+$record = filter_input(INPUT_POST, 'record', FILTER_SANITIZE_SPECIAL_CHARS);
 
 if (isset($main) && !empty($main))
 {

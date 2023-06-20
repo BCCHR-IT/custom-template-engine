@@ -1,8 +1,7 @@
 {
     "require": {
-        "ckeditor/ckeditor": "dev-full/4.11.x",
-        "egorlaw/ckeditor_codemirror": "^1.0",
+        "ckeditor/ckeditor": "dev-full/4.21.x",
         "dompdf/dompdf": "^2.0",
-        "smarty/smarty": "^4.0"
+        "smarty/smarty": "^4.1"
     }
 }
