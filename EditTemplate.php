@@ -9,7 +9,8 @@ require_once APP_PATH_DOCROOT . "ProjectGeneral/header.php";
  * page.
  */
 $customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
-$customTemplateEngine->generateCreateEditTemplatePage($_POST["template"]);
+$template_filtered = filter_input(INPUT_POST, 'template', FILTER_SANITIZE_SPECIAL_CHARS);
+$customTemplateEngine->generateCreateEditTemplatePage($template_filtered);
 
 /**
  * Include REDCap footer.

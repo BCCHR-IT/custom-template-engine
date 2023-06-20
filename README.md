@@ -48,3 +48,13 @@ WARNING:  This module is not currently able to support REDCap instances using lo
 ##  Other Issues
 
 - This module is unable to properly embed images with PHP version >= 7.4
+
+##  Changelog
+* v3.2.0
+  * Made compatible with PHP 8, tested with PHP 8.1.
+  * Defined EM config.json minimal compatible PHP version as 7.4.0
+  * upgraded included Javascript libraries:
+    * ckeditor to latest v4.21
+    * dompdf to latest v2.0
+    * smarty to latest v4.1
+
