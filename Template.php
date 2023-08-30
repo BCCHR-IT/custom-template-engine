@@ -1,6 +1,6 @@
 <?php 
 
-namespace BCCHR\CustomTemplateEngine;
+namespace MCRI\CustomTemplateEngine;
 
 /**
  * Require Smarty class.
