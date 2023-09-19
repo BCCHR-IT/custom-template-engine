@@ -7,7 +7,7 @@ require_once "vendor/autoload.php";
 
 use Dompdf\Dompdf;
 
-$customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
+$customTemplateEngine = new \MCRI\CustomTemplateEngine\CustomTemplateEngine();
 
 $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor"]));
 $footer = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]));
@@ -68,7 +68,7 @@ if (isset($main) && !empty($main))
     if (!$customTemplateEngine->saveFileToField($filename, $pdf_content, $field_name, $record, $event_id))
     {
         REDCap::logEvent("Custom Template Engine - Failed to Save Report to Field!", "Field name: $field_name", "", $record);
-        print json_encode(array("error" => "An unknown error occured. Please contact the BCCHR REDCap team."));
+        print json_encode(array("error" => "An unknown error occured. Please contact the MCRI REDCap team."));
         return;
     }
 

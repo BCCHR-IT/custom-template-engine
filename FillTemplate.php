@@ -4,7 +4,7 @@
  * Create instsance of Custom Template Engine, and display template 
  * filled with REDcap data on Fill Template page.
  */
-$customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
+$customTemplateEngine = new \MCRI\CustomTemplateEngine\CustomTemplateEngine();
 
 if (sizeof($_POST["participantID"]) == 1)
 {
