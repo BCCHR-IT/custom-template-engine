@@ -50,6 +50,18 @@ WARNING:  This module is not currently able to support REDCap instances using lo
 - This module is unable to properly embed images with PHP version >= 7.4
 
 ##  Changelog
+* v4.0.0
+  * Minimal REDCap version is v12.4
+  * Implemented support for the RC v12.4+ instrument-level data export permissions.
+  * Upgraded Javascript Libraries
+    * ckeditor to dev-full/4.21.x
+    * smarty to 4.3.4
+* v3.2.1
+  * upgraded bootstrap-selector to 1.15.0-beta3 to solve bug where records would not display in pulldown when filling templates
+  * set maximum REDCap version to 12.1.x
+  * Upgrading Javascript libraries
+    * masterminds/html5 to 2.8.1
+    * smarty/smarty to v4.3.2
 * v3.2.0
   * Made compatible with PHP 8, tested with PHP 8.1.
   * Defined EM config.json minimal compatible PHP version as 7.4.0

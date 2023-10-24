@@ -4,7 +4,7 @@
     "description": "This module allows you to create HTML templates and fill them with record data from your project. You can download the filled templates as a PDF, which are saved to the File Repository.",
     "authors": [
         {
-            "name": "BCCHR Software Dev Team (original work by Ashley Lee)",
+            "name": "BCCHR Development Team (original work by Ashley Lee)",
             "email": "devteam@bcchr.ca",
             "institution": "BC Children's Hospital Research Institute"
         }
@@ -21,7 +21,7 @@
     "compatibility": {
         "php-version-min": "7.4.0",
         "php-version-max": "",
-        "redcap-version-min": "9.1.1",
+        "redcap-version-min": "12.4.0",
         "redcap-version-max": ""
     },
     "system-settings": [
@@ -56,6 +56,9 @@
             "repeatable": false,
             "super-users-only": true
         }
+    ],
+    "no-csrf-pages": [
+        "BrowseImages", "UploadImages"
     ],
     "project-settings": [
         {
