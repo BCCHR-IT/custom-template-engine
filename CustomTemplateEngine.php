@@ -185,6 +185,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 filebrowserBrowseUrl: '<?php print $this->getUrl("BrowseImages.php"); ?>&type=Images',
                 filebrowserUploadUrl: '<?php print $this->getUrl("UploadImages.php"); ?>&type=Images',
                 filebrowserUploadMethod: 'form',
+                clipboard_handleImages: false,
                 fillEmptyBlocks: false,
                 extraAllowedContent: '*{*}',
                 font_names: 'Arial/Arial, Helvetica, sans-serif; Times New Roman/Times New Roman, Times, serif; Courier; DejaVu; DejaVu Sans, sans-serif'
@@ -611,6 +612,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      */
     private function formatPDFContents($header = "", $footer = "", $main)
     {
+
         if (isset($main) && !empty($main))
         {
             $doc = new DOMDocument();
@@ -647,7 +649,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             // override this.
             if (!empty($header) && !empty($footer))
             {
-                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 25px; } header { position: fixed; left: 0px; right: 0px; top: -100px; } footer { position: fixed; left: 0px; right: 0px; bottom: 0px; } @page { margin: 130px 50px; }");
+                // $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 25px; } header { position: fixed; left: 0px; right: 0px; top: -100px;} footer { position: fixed; left: 0px; right: 0px; bottom: 0px; height: 150px;} @page { margin: 130px 50px; }");
+                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 25px; } header { position: fixed; left: 0px; right: 0px; top: -100px;} footer { position: fixed; left: 0px; right: 0px; bottom: 400px; } @page { margin: 130px 50px; }");
             }
             else if (!empty($header))
             {
@@ -682,22 +685,24 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     public function uploadImages()
     {
         // Required: anonymous function reference number as explained above.
-	$func_num = filter_input(INPUT_GET, 'CKEditorFuncNum', FILTER_SANITIZE_SPECIAL_CHARS);
+	    $func_num = filter_input(INPUT_GET, 'CKEditorFuncNum', FILTER_SANITIZE_SPECIAL_CHARS);
         // Optional: compare it with the value of `ckCsrfToken` sent in a cookie to protect your server side uploader against CSRF.
         // Available since CKEditor 4.5.6.
-        $token = filter_input(INPUT_POST, 'CKEditorFuncNum', FILTER_SANITIZE_SPECIAL_CHARS);
-        $cookie_token = $_COOKIE["ckCsrfToken"];
+        // $token = filter_input(INPUT_POST, 'CKEditorFuncNum', FILTER_SANITIZE_SPECIAL_CHARS);
+        $token = filter_input(INPUT_POST, 'ckCsrfToken', FILTER_SANITIZE_SPECIAL_CHARS);
+
+        // $cookie_token = $_COOKIE["ckCsrfToken"];
+        $cookie_token = filter_input(INPUT_COOKIE, 'ckCsrfToken', FILTER_SANITIZE_SPECIAL_CHARS);
 
         // url of the image to return
         $url = "";
         // error message, empty if none
         $message = "";
-
         if ($token === $cookie_token)
         {
-            // Check the $_FILES array and save the file. Assign the correct path to a variable ($url).
             if (isset($_FILES["upload"]) && !empty($_FILES["upload"]))
             {
+            // Check the $_FILES array and save the file. Assign the correct path to a variable ($url).
                 $upload = $_FILES["upload"];
                 if ($upload["error"] == UPLOAD_ERR_OK)
                 {
@@ -707,13 +712,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     if ($check !== false)
                     {
                         $name = pathinfo(basename($upload["name"]));
-			$epid = filter_input(INPUT_GET, 'pid', FILTER_SANITIZE_SPECIAL_CHARS);
-			$escaped_filename = htmlentities($name['filename'], ENT_QUOTES);
-			$escaped_extension = htmlentities($name['extension'], ENT_QUOTES);
-                        // $filename = str_replace(" ", "_", $name["filename"] . "_" . $epid . "." . $name["extension"];
-			$filename = str_replace(" ", "_", $escaped_filename) . "_" . $epid . "." . $escaped_extension;
+            			$epid = filter_input(INPUT_GET, 'pid', FILTER_SANITIZE_SPECIAL_CHARS);
+			            $escaped_filename = htmlentities($name['filename'], ENT_QUOTES);
+            			$escaped_extension = htmlentities($name['extension'], ENT_QUOTES);
+			            $filename = str_replace(" ", "_", $escaped_filename) . "_" . $epid . "." . $escaped_extension;
 
-                        if (move_uploaded_file(realpath($tmp_name), realpath($this->img_dir . $filename)))
+                        if (move_uploaded_file(realpath($tmp_name), $this->img_dir . $filename))
                         {
                             $realpath = realpath($this->img_dir);
                             $publicly_accessible_start_pos = strpos($realpath, "redcap");
@@ -742,12 +746,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 }
                 else
                 {
-                    $message = "ERROR: error uploading file.";
+                    $message = "ERROR: error uploading file, error is: " . $upload['error'] . ".";
                 }
             }
             else
             {
-                $message = "ERROR: error uploading file.";
+                $message = "ERROR: error uploading file, file does not exist or is empty.";
             }
         }
         else
@@ -800,7 +804,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 function getUrlParam( paramName ) {
                     var reParam = new RegExp( "(?:[\?&]|&)" + paramName + "=([^&]+)", "i" );
                     var match = window.location.search.match( reParam );
-
                     return ( match && match.length > 1 ) ? match[1] : null;
                 }
                 // Simulate user action of selecting a file to be returned to CKEditor.
@@ -998,7 +1001,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 $currTemplateName = filter_input(INPUT_POST, 'currTemplateName', FILTER_SANITIZE_SPECIAL_CHARS);
                 if (file_exists(realpath($this->templates_dir . $currTemplateName)))
                 {
-                    if ($currTemplateName == "{$name}_{$this->pid}.html" || $currTemplateName == "{$name}_{$this->pid} - INVALID.html")
+                    if (($currTemplateName == "{$name}_{$this->pid}.html") || ($currTemplateName == "{$name}_{$this->pid} - INVALID.html"))
                     {
                         if ($doc->saveHTMLFile(realpath($this->templates_dir . $currTemplateName)) === FALSE)
                         {
@@ -1106,7 +1109,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     /**
      * Outputs a PDF of a report to browser.
      *
-     * Retrieves body, header, and footer contents of template passed via HTTP POST.
+     * Retrieves body, header, and footer contents of template passed via HTTP wPOST.
      * Formats the contents within the PDF, and uses DOMPDF to output PDF to browser.
      * If saving to the File Repository is allowed, then a copy of the PDF is saved there.
      * Upon successful download, log in REDCap Returns Warning if main content editor is empty.
@@ -1163,7 +1166,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     {
         $errors = array();
 
-        $records = htmlspecialchars($_POST["participantID"], ENT_QUOTES);
+        // $records = htmlspecialchars($_POST["participantID"], ENT_QUOTES);
+        $records = array_map('htmlspecialchars', $_POST["participantID"], array(ENT_QUOTES));
         $template_filename = htmlspecialchars($_POST['template'], ENT_QUOTES);
         $template = new Template($this->templates_dir, $this->compiled_dir);
 
@@ -1188,18 +1192,18 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 {
                     $filename = basename($template_filename, "_$this->pid.html") . "_$record";
                     $filled_template = $template->fillTemplate($template_filename, $record);
-
+                    
                     $doc = new DOMDocument();
                     $doc->loadHTML($filled_template);
 
                     $header = $doc->getElementsByTagName("header")->item(0);
                     $footer = $doc->getElementsByTagName("footer")->item(0);
                     $main = $doc->getElementsByTagName("main")->item(0);
-
                     $header = empty($header) ? "" : $doc->saveHTML($header);
                     $footer = empty($footer) ? "" : $doc->saveHTML($footer);
                     $main = $doc->saveHTML($main);
 
+                    //$contents = $this->formatPDFContents($header, $footer."<br />manual addition", $main);
                     $contents = $this->formatPDFContents($header, $footer, $main);
 
                     if (!empty($contents))
@@ -1322,7 +1326,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
         if (empty($record))
         {
-            exit("<div class='red'>No record has been select. Please go back and select a record to fill the template.</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
+            exit("<div class='red'>No record has been selected. Please go back and select a record to fill the template.</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
         }
 
         $template_filename = $_POST['template'];
@@ -1340,6 +1344,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $main = $doc->getElementsByTagName("main")->item(0);
 
             $filled_main = $doc->saveHTML($main);
+            $fm_entities = htmlentities($filled_main);
             $filled_header = empty($header) ? "" : $doc->saveHTML($header);
             $filled_footer = empty($footer)? "" : $doc->saveHTML($footer);
         }
@@ -1561,7 +1566,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         if (!empty($template))
         {
             $this->checkPermissions();
-            $template_name = $curr_template_name = $template;
+            $template_name = $template;
+            $curr_template_name = $template;
             $template = file_get_contents(realpath($this->templates_dir . $template_name));
 
             $doc = new DOMDocument();
@@ -2111,7 +2117,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 if ($field["field_type"] !== "descriptive")
                                 {
                                     print "<p><strong>$index</strong> -> {\$redcap['$index']}</p>";
-                                        
+
                                     if (!empty($field["select_choices_or_calculations"]) && $field["field_type"] !== "calc")
                                     {
                                         $valuesAndLabels = explode("|", $field["select_choices_or_calculations"]);
@@ -2216,7 +2222,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 CKEDITOR.instances.headerEditor.updateElement();
                 CKEDITOR.instances.footerEditor.updateElement();
                 CKEDITOR.instances.editor.updateElement();
-
+                // here you are. validation is stripping the template name out, so fix that.
+                console.log("pre validation: " + $('form').serialize());
                 if ($("#editor").val() == "" || $("#templateName").val() == "")
                 {
                     alert("You need to enter a template name, AND something in the main editor to save.");
@@ -2232,7 +2239,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             if (json.errors)
                             {
                                 var toAppend;
-
+                                console.log(json.errors);
                                 if (json.errors.otherErrors) {
                                     json.errors.otherErrors.forEach(function(item) {
                                         toAppend += "<p>" + item + "</p>";
@@ -2273,7 +2280,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     $("#footer-errors-header").hide();
                                     $("#footer-errors").hide()
                                 }
-                                
+
                                 if (json.errors.templateErrors) {
                                     toAppend = "";
                                     json.errors.templateErrors.forEach(function(item) {
@@ -2287,8 +2294,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     $("#body-errors-header").hide();
                                     $("#body-errors").hide()
                                 }
-
-                                $("#currTemplateName").val(json.currTemplateName);
                                 $("#action").val("edit");
                                 $("#errors-container").show();
                                 window.scroll(0,0); // Errors are at top of page
@@ -2371,7 +2376,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 			if ($limitRecords) {
                 $query->add("and")->addInClause("record", $records);
             }
-            
+
 			$q = $query->execute();
 			while ($row = $q->fetch_assoc())
 			{
@@ -2443,7 +2448,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
     /**
      * For each record in $records, generate a label that contains the record id and all secondary ids.
-     * 
+     *
      * @param Array $records   Array or records.
      * @since 3.0
      */
@@ -2562,8 +2567,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
         ?>
         <!-- boostrap-select files -->
+        <!--
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.15/dist/css/bootstrap-select.min.css">
         <script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.15/dist/js/bootstrap-select.min.js"></script>
+        -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.14.0-beta3/dist/css/bootstrap-select.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.14.0-beta3/dist/js/bootstrap-select.min.js"></script>
         <!-- js-cookie-->
         <script src="https://cdn.jsdelivr.net/npm/js-cookie@2/src/js.cookie.min.js"></script>
         <!-- Module CSS -->
@@ -2591,9 +2600,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 <hr>
                 <h4>This plugin allows you to create report templates and fill them with data from records in your REDCap project.</h4> 
                 <br>
-                <?php if ($rights[$this->userid]["reports"]) :?> 
+                <?php if ($rights[$this->userid]["reports"]) :?>
                     <div class="container syntax-rule">
-                        <a class="btn btn-link" href=<?php print $this->getUrl("CreateTemplate.php");?>>Create New Template</a> |
+                        <a class="btn btn-link" style="font-size: 16px; text-decoration: underline; font-color: blue;" href=<?php print $this->getUrl("CreateTemplate.php");?>>Create New Template</a> |
                         <?php if (sizeof($edit_templates) > 0):?>
                             <button type="button" class="btn btn-link" data-toggle="modal" data-target="#exampleModalCenter">Edit Template</button> | 
                         <?php else:?>
@@ -2626,7 +2635,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                         Choose up to 20 records
                                     </td>
                                     <td class="data">
-                                        <input id="applyFilter" type="checkbox" <?php print filter_input(INPUT_GET, 'filter', FILTER_SANITIZE_SPECIAL_CHARS) == "1" ? "checked" : ""; ?>>  <!-- PHP8 compatability fix, Dan Evans 2023-06-09 -->
+                                        <input id="applyFilter" type="checkbox" <?php print filter_input(INPUT_GET, 'filter', FILTER_SANITIZE_SPECIAL_CHARS) == "1" ? "checked" : ""; ?>>
                                         <label for="applyFilter">Filter records previously processed</label>
                                         <?php if (sizeof($participant_options) > 0):?>
                                             <select id="participantIDs" name="participantID[]" class="form-control selectpicker" style="background-color:white" data-live-search="true" data-max-options="20" multiple required>
@@ -2657,7 +2666,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                                 ?>
                                             </select>
                                         <?php else:?>
-                                            <span>No Existing Templates</span>        
+                                            <span>No Existing Templates</span>
                                         <?php endif;?>
                                     </td>
                                 </tr>
@@ -2697,7 +2706,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     {
                                         print "<option value=\"" . $template . "\">" . $template . "</option>";
                                     }
-                                ?>        
+                                ?>
                             </select>
                         </div>
                         <div class="modal-footer">
@@ -2725,7 +2734,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 {
                                     print "<option value=\"" . $template . "\">" . $template . "</option>";
                                 }
-                            ?>        
+                            ?>
                         </select>
                     </div>
                     <div class="modal-footer">
@@ -2785,7 +2794,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
                     var token = new Date().getTime();
                     $('#download_token_value_id').val(token);
-                    
+
                     fileDownloadCheckTimer = window.setInterval(function () {
                         var cookieValue = Cookies.get('fileDownloadToken');
                         if (cookieValue == token)
@@ -2795,7 +2804,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             $("#fill-template-btn").prop("disabled", false);
                             $("#progressBar").progressbar("destroy");
                             $("#participantIDs").val("default");
-                            $("#participantIDs").selectpicker("refresh");
+                            // $("#participantIDs").selectpicker("refresh");
+                            $("#participantIDs").selectpicker("deselectAll");  // bootstrap-select change for v1.14.0-beta3 2023-08-16 by Dan Evans
                             $("#fill-template-btn").text("Fill Template");
                         }
                     }, 1000)
