@@ -1,6 +1,6 @@
 <?php 
 
-namespace MCRI\CustomTemplateEngine;
+namespace BCCHR\CustomTemplateEngine;
 
 /**
  * Require Smarty class.
@@ -10,6 +10,7 @@ require_once "vendor/autoload.php";
 use REDCap;
 use Smarty;
 use DOMDocument;
+require_once "./ExportRights.php";  // class to manage instrument-level rights
 
 class Template
 {
@@ -22,14 +23,17 @@ class Template
      * @var Bool $show_label_and_row            Whether to show a label or row or not in template.
      * @var String $de_identified_replacement   What to replace de-identified data with.
      * @var Array $logical_operators            Allowed logical operators.
+     * @var Array $date_formats                 Array of date formats.
      */
     private $smarty;
     private $redcap;
-    private $dictionary;
-    private $instruments;
-
+    private $dictionary = array();
+    private $instruments = array();
+    private $date_formats = array();  // added default value for php8 compatibility to avoid passing null to in_array(). Never populated.
     private $show_label_and_row = true;
-    private $de_identified_replacement = "[DE-IDENTIFIED]";
+    private $de_identified_replacement = "[DE-IDENTIFIED]";  // rights value 2
+    private $removed_replacement = "[ID REMOVED]";  // rights value 3
+    private $no_rights_replacement = "[NO RIGHTS]";  // rights value 0
     private $logical_operators = array("eq", "ne", "neq", "gt", "lt", "ge", "gte", "lte", "le", "not", "or", "and");
 
     /**
@@ -133,11 +137,11 @@ class Template
     {
         $user = strtolower(USERID);
         $rights = REDCap::getUserRights($user);
-        
+        $rights_object = new ExportRights($rights);  // populate a rights object with this user's instrument-level rights
         $external_fields = array();
         $this->instruments = REDCap::getInstrumentNames();
         foreach ($this->instruments as $unique_name => $label)
-        {   
+        {
             $external_fields[] = "{$unique_name}_complete";
             $external_fields[] = "{$unique_name}_timestamp";
         }
@@ -150,25 +154,41 @@ class Template
             {
                 $event_fields_and_vals[$field_name] = $value;
             }
-            else if ($field_name !== "redcap_event_name")
+            // else if ($field_name !== "redcap_event_name")
+            else if ($field_name !== "redcap_event_name" 
+                    && $field_name !== "redcap_repeat_instrument" 
+                    && $field_name !== "redcap_repeat_instance")
             {
-                if ($this->dictionary[$field_name]["field_type"] === "checkbox")
-                {
+                if ($this->dictionary[$field_name]["field_type"] === "checkbox") {  // modify checkbox values
                     /*
-                    * Check if user's data rights
-                    * 
-                    * De-identified: All unvalidated text fields & notes will be removed, as well as any date/time fields and Identifier fields.
-                    * 
-                    * Remove all tagged Identifier Fields: Only identifiers removed.
-                    * 
+                    * Check user's data rights
+                    * Value 0 = no rights
+                    * Value 1 = full rights
+                    * Value 2 = de-identified rights
+                    * Value 3 = remove all identifiers rights
+                    * De-identified rights: All unvalidated text fields & notes will be removed, as well as any date/time fields
+                    * Remove all identifiers rights: hide data from all tagged identifier fields.
                     */
-                    if (($rights[$user]["data_export_tool"] === "2" || $rights[$user]["data_export_tool"] === "3") && $this->dictionary[$field_name]["identifier"] === "y")
-                    {
-                        $event_fields_and_vals[$field_name] = array();
-                        $event_fields_and_vals[$field_name]["allValues"] = $this->de_identified_replacement;
-                    }
-                    else
-                    {
+                    $event_fields_and_vals[$field_name] = array();
+
+                    if ($rights_object->field_to_rights_value[$field_name] !== "1") {  // check if data needs to be hidden
+
+                        if (($rights_object->field_to_rights_value[$field_name] === "3") && ($this->dictionary[$field_name]["identifier"] === "y")) {  // remove all identifiers, and this is an identifier
+
+                            $event_fields_and_vals[$field_name]["allValues"] = $this->removed_replacement;
+
+                        } else if ($rights_object->field_to_rights_value[$field_name] === "2") {  // de-identified rights, so remove marked identifiers, freetext and date/time fields
+
+                            $event_fields_and_vals[$field_name]["allValues"] = $this->de_identified_replacement;
+
+                        } else { // no rights, so remove everything
+
+                            $event_fields_and_vals[$field_name]["allValues"] = $this->no_rights_replacement;
+
+                        }  // end else
+
+                    } else {  // full rights, so treat this data normally
+
                         $all_choices = explode("|", $this->dictionary[$field_name]["select_choices_or_calculations"]);
                         $all_choices = array_map(function ($v) {
                             $v = strip_tags($v);
@@ -185,41 +205,71 @@ class Template
                         }
 
                         $event_fields_and_vals[$field_name]["allValues"] = implode(", ", explode(",", $value));
-                    }
-                }
-                else
-                {
+
+                    }  // end else
+
+                } else { // non-checkbox fields, so check more thorougly
                     /*
-                    * Check if user's data rights
-                    * 
-                    * De-identified: All unvalidated text fields & notes will be removed, as well as any date/time fields and Identifier fields.
-                    * 
-                    * Remove all tagged Identifier Fields: Only identifiers removed.
-                    * 
+                    * Check user's data rights
+                    * Value 0 = no rights
+                    * Value 1 = full rights
+                    * Value 2 = de-identified rights
+                    * Value 3 = remove all identifiers rights
+                    * De-identified rights: All unvalidated text fields & notes will be removed, as well as any date/time fields
+                    * Remove all identifiers rights: hide data from all tagged identifier fields.
                     */
-                    if ((($rights[$user]["data_export_tool"] === "2" && 
-                            ($this->dictionary[$field_name]["field_type"] === "notes" ||
-                            ($this->dictionary[$field_name]["field_type"] === "text" && (in_array($this->dictionary[$field_name]["text_validation_type_or_show_slider_number"], $this->date_formats) ||
-                                                                                    empty($this->dictionary[$field_name]["text_validation_type_or_show_slider_number"]))))) 
-                        ||
-                        (($rights[$user]["data_export_tool"] === "2" || $rights[$user]["data_export_tool"] === "3") && $this->dictionary[$field_name]["identifier"] === "y")) &&
-                        !empty($value))
-                    {
-                        $event_fields_and_vals[$field_name] = $this->de_identified_replacement;
-                    }
-                    else if ($this->dictionary[$field_name]["field_type"] === "notes")
-                    {
-                        $event_fields_and_vals[$field_name] = str_replace("\r\n", "<br/>", htmlentities($value));
-                    }
-                    else
-                    {
-                        $event_fields_and_vals[$field_name] = $value;
-                    }
-                }
-            }
-        }
+                    $event_fields_and_vals[$field_name] = $value;
+
+                    if ($rights_object->field_to_rights_value[$field_name] !== "1") {  // check if value needs to be modified
+
+                        if ($rights_object->field_to_rights_value[$field_name] === "3") {  // remove identifiers right, and this is an identifier
+
+                            if ($this->dictionary[$field_name]["identifier"] === "y") {
+
+                                $event_fields_and_vals[$field_name] = $this->removed_replacement;
+
+                            } // end if
+
+                        } else if ($rights_object->field_to_rights_value[$field_name] === "2") { // de-identified rights, so remove freetext fields, marked identifiers, and date/time fields
+
+                            if ((($this->dictionary[$field_name]["field_type"] === "text") && (in_array($this->dictionary[$field_name]["text_validation_type_or_show_slider_number"], $this->date_formats) ||
+                                    empty($this->dictionary[$field_name]["text_validation_type_or_show_slider_number"]))) // non-validated text fields, meaning free short text, but not calc fields or decimal/date/int
+                                || ($this->dictionary[$field_name]["field_type"] === "notes") 
+                                || ($this->dictionary[$field_name]["identifier"] === "y")) {
+
+                                $event_fields_and_vals[$field_name] = $this->de_identified_replacement;
+
+                            }  // end if
+
+                        } else {  // rights value of 0, so remove all data from these fields
+
+                                $event_fields_and_vals[$field_name] = $this->no_rights_replacement;
+
+                        }  // end else
+
+                    } else {  // treat the data normally
+
+                        if ($this->dictionary[$field_name]["field_type"] === "notes") { // make HTML entities
+
+                            $event_fields_and_vals[$field_name] = str_replace("\r\n", "<br/>", htmlentities($value));
+
+                        } else {  // return without modification
+
+                            $event_fields_and_vals[$field_name] = $value;
+
+                        }  // end else
+
+                    }  // end else
+
+                }  // end else
+
+            } // end else if
+
+        }  // end foreach
+
         return $event_fields_and_vals;
-    }
+
+    }  // end function
 
     /**
      * Replaces given text with replacement.
@@ -458,7 +508,8 @@ class Template
             }
             
             // Check symmetry of ()
-            if (sizeof(array_keys($parts, "(")) != sizeof(array_keys($parts, ")")))
+            if ($parts == null) { $parts = array();}  // PHP8 compatability patch Dan Evans, 2023-06-09
+	    if (sizeof(array_keys($parts, "(")) != sizeof(array_keys($parts, ")")))
             {
                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Odd number of parenthesis (. You've either added an extra parenthesis, or forgot to close one.";
             }
@@ -1051,7 +1102,7 @@ class Template
         $filled_template = "";
 
         $user = strtolower(USERID);
-        $rights = REDCap::getUserRights($user);
+        //$rights = REDCap::getUserRights($user);
 
         $template = REDCap::getData("json", $record, null, null, null, TRUE, FALSE, TRUE, null, TRUE);
 
@@ -1078,7 +1129,6 @@ class Template
             {
                 $data = array();
                 $event = $events[$event_data["redcap_event_name"]];
-
                 if (!empty($event_data["redcap_repeat_instance"]))
                 {
                     // Repeatable instrument
@@ -1090,7 +1140,6 @@ class Template
                             return $value["redcap_repeat_instrument"] == $event_data["redcap_repeat_instrument"];
                         });
                         $repeatable_instrument_instances = array_values($repeatable_instrument_instances);
-
                         // Get the latest instance and parse it. 
                         $repeat_instances = array_column($repeatable_instrument_instances, "redcap_repeat_instance");
                         $latest_instance = max($repeat_instances);
@@ -1105,25 +1154,25 @@ class Template
                             // Merges repeatable instrument data with non-repeatable instrument data in same event.
                             $data = $this->redcap[$event];
                             $repeatable_instrument_data = $this->parseEventData($repeatable_instrument_instances[$key]);
-                            
+
                             foreach($repeatable_instrument_data as $field => $value)
                             {
                                 if (empty($data[$field]))
                                     $data[$field] = $value;
                             }
                         }
-                        
+
                         $repeatable_instruments_parsed[] = $event_data["redcap_repeat_instrument"];
                     }
                     // Repeatable event
                     else if (empty($this->redcap[$event]))
                     {
-                        // Retrieve all repeatable instances of event. 
+                        // Retrieve all repeatable instances of event.
                         $repeatable_event_instances = array_filter($json, function($value) use($event_data){
                             return $value["redcap_event_name"] == $event_data["redcap_event_name"];
                         });
                         $repeatable_event_instances = array_values($repeatable_event_instances);
-                        
+
                         // Get the latest instance and parse it. 
                         $repeat_instances = array_column($repeatable_event_instances, "redcap_repeat_instance");
                         $latest_instance = max($repeat_instances);
@@ -1134,11 +1183,11 @@ class Template
                 else
                 {
                     if (empty($this->redcap[$event]))
-                    {   
+                    {
                         $data = $this->parseEventData($event_data);
                     }
                     else
-                    {
+                   {
                         $data = array_merge($this->redcap[$event], $this->parseEventData($event_data));
                     }
                 }
@@ -1150,7 +1199,7 @@ class Template
                         $this->redcap = array_merge($this->redcap, $data);
                     }
                     $this->redcap[$event] = $data;
-                }
+                } 
             }
         }
         else
@@ -1189,6 +1238,7 @@ class Template
                 else
                 {
                     $this->redcap = $this->parseEventData($event_data);
+                    // parseEventData() is stripping out the comments field!
                 }
             }
         }
@@ -1202,7 +1252,7 @@ class Template
             $doc = new DOMDocument();
             $doc->loadHTML($filled_template);
             $body = $doc->getElementsByTagName("body")->item(0);
-            
+
             $empty_elems = $this->getEmptyNodes($body);
             while (!empty($empty_elems))
             {
@@ -1218,7 +1268,7 @@ class Template
         {
             throw new Exception("Error on line " . $e->getLine() . ": " . $e->getMessage());
         }
-        
+
         return $filled_template;
     }
 }

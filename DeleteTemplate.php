@@ -3,7 +3,7 @@
  * Initialize Custom Template Engine object, and call method to delete a
  * template.
  */
-$customTemplateEngine = new \MCRI\CustomTemplateEngine\CustomTemplateEngine();
+$customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
 $result = $customTemplateEngine->deleteTemplate();
 
 /**

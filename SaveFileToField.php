@@ -7,14 +7,14 @@ require_once "vendor/autoload.php";
 
 use Dompdf\Dompdf;
 
-$customTemplateEngine = new \MCRI\CustomTemplateEngine\CustomTemplateEngine();
+$customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
 
 $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor"]));
 $footer = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]));
 $main = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["editor"]));
 
-$filename = $_POST["filename"];
-$record = $_POST["record"];
+$filename = filter_input(INPUT_POST, 'filename', FILTER_SANITIZE_SPECIAL_CHARS);
+$record = filter_input(INPUT_POST, 'record', FILTER_SANITIZE_SPECIAL_CHARS);
 
 if (isset($main) && !empty($main))
 {
@@ -37,11 +37,11 @@ if (isset($main) && !empty($main))
         $sql = "SELECT event_id FROM redcap_events_metadata 
                 join redcap_events_arms on
                 redcap_events_metadata.arm_id = redcap_events_arms.arm_id
-                where redcap_events_arms.project_id = " . $customTemplateEngine->getProjectId() . " 
+                where redcap_events_arms.project_id = ?
                 order by event_id asc
                 limit 1";
 
-        $result = $customTemplateEngine->query($sql);
+        $result = $customTemplateEngine->query($sql, array($customTemplateEngine->getProjectId()));
 
         if (!$result)
         {
@@ -63,12 +63,12 @@ if (isset($main) && !empty($main))
     }
 
     $dompdf = new Dompdf();
-    $pdf_content = $customTemplateEngine->createPDF($dompdf, $header, $footer, $main, $filename);
+    $pdf_content = $customTemplateEngine->createPDF($dompdf, $header, $footer, $main);
 
     if (!$customTemplateEngine->saveFileToField($filename, $pdf_content, $field_name, $record, $event_id))
     {
         REDCap::logEvent("Custom Template Engine - Failed to Save Report to Field!", "Field name: $field_name", "", $record);
-        print json_encode(array("error" => "An unknown error occured. Please contact the MCRI REDCap team."));
+        print json_encode(array("error" => "An unknown error occured. Please contact the BCCHR REDCap team."));
         return;
     }
 

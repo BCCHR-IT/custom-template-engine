@@ -8,7 +8,7 @@ require_once APP_PATH_DOCROOT . "ProjectGeneral/header.php";
  * Initialize Custom Template Engine object, and call method
  * to generate Create Template page.
  */
-$customTemplateEngine = new \MCRI\CustomTemplateEngine\CustomTemplateEngine();
+$customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
 $customTemplateEngine->generateCreateEditTemplatePage();
 
 /**

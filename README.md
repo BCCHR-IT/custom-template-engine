@@ -17,8 +17,7 @@ When switching from the old module to the rebranded module, you must disable the
 - Images Folder: Required configuration that defines the publically accessible storage of images uploaded by users. 
 
 ## Project Configurations
-- Save Filled Templates to File Repository: This is specific to downloading a filled template, and will save a copy of the PDF to the File Repository.
-- [Optional] Enter templates by name and specify an alternative paper size, e.g. A4 (default is Letter), and/or select landscape orientation.
+- Save Filled Templates to File Repository: This is specific to downloading a filled template, and will save a copy of the PDF to the File Repository. 
 
 ## Permissions
 
@@ -42,11 +41,6 @@ Users must have access to data exports and reports in order to delete a template
 
 The module users the PHP template engine, Smarty, to fill in the templates with the apprpriate record data. Smarty will compile the template and store it in the previously configured compiled templates folder. The user is free to make edits to the template content before downloading. When the template is downloaded, if saving templates to the file repository has been configured, then the module will do so.
 
-## File Upload Fields
-
-Templates are listed in a dropdown list in file upload field dialogs. The user may choose to select a file and upload it in the usual manner or select a template.
-When a template is selected, it will be filled and saved to the field.
-
 ##  Web Application Load Balancing
 
 WARNING:  This module is not currently able to support REDCap instances using load balancers due to the requirement to save templates to the file system.
@@ -54,3 +48,25 @@ WARNING:  This module is not currently able to support REDCap instances using lo
 ##  Other Issues
 
 - This module is unable to properly embed images with PHP version >= 7.4
+
+##  Changelog
+* v4.0.0
+  * Minimal REDCap version is v12.4
+  * Implemented support for the RC v12.4+ instrument-level data export permissions.
+  * Upgraded Javascript Libraries
+    * ckeditor to dev-full/4.21.x
+    * smarty to 4.3.4
+* v3.2.1
+  * upgraded bootstrap-selector to 1.15.0-beta3 to solve bug where records would not display in pulldown when filling templates
+  * set maximum REDCap version to 12.1.x
+  * Upgrading Javascript libraries
+    * masterminds/html5 to 2.8.1
+    * smarty/smarty to v4.3.2
+* v3.2.0
+  * Made compatible with PHP 8, tested with PHP 8.1.
+  * Defined EM config.json minimal compatible PHP version as 7.4.0
+  * upgraded included Javascript libraries:
+    * ckeditor to latest v4.21
+    * dompdf to latest v2.0
+    * smarty to latest v4.1
+

@@ -1,16 +1,13 @@
 {
-    "name": "Custom Template Engine (MCRI)",
-    "namespace": "MCRI\\CustomTemplateEngine",
+    "name": "Custom Template Engine",
+    "namespace": "BCCHR\\CustomTemplateEngine",
     "description": "This module allows you to create HTML templates and fill them with record data from your project. You can download the filled templates as a PDF, which are saved to the File Repository.",
     "authors": [
         {
-            "name": "Luke Stevens",
-            "email": "luke.stevens@mcri.edu.au",
-            "institution": "Murdoch Children's Research Institute"
+            "name": "BCCHR Development Team (original work by Ashley Lee)",
+            "email": "devteam@bcchr.ca",
+            "institution": "BC Children's Hospital Research Institute"
         }
-    ],
-    "permissions": [
-        "redcap_data_entry_form_top"
     ],
     "links": {
         "project": [
@@ -22,9 +19,9 @@
         ]
     },
     "compatibility": {
-        "php-version-min": "",
+        "php-version-min": "7.4.0",
         "php-version-max": "",
-        "redcap-version-min": "9.1.1",
+        "redcap-version-min": "12.4.0",
         "redcap-version-max": ""
     },
     "system-settings": [
@@ -58,7 +55,10 @@
             "type": "text",
             "repeatable": false,
             "super-users-only": true
-        }   
+        }
+    ],
+    "no-csrf-pages": [
+        "BrowseImages", "UploadImages"
     ],
     "project-settings": [
         {
@@ -67,34 +67,7 @@
             "type": "checkbox",
             "repeatable": false,
             "super-users-only": true
-        },
-        {
-            "key": "template-options",
-            "name": "Template configuration options",
-            "required": false,
-            "type": "sub_settings",
-            "repeatable": true,
-            "sub_settings": [
-                {
-                    "key": "template-name",
-                    "name": "Template name",
-                    "required": true,
-                    "type": "text"
-                },
-                {
-                    "key": "option-paper-size",
-                    "name": "Paper size<br>(Optional - specify if different to Letter e.g. A4)",
-                    "required": false,
-                    "type": "text"
-                },
-                {
-                    "key": "option-paper-orientation",
-                    "name": "Use landscape orientation instead of portrait?",
-                    "required": false,
-                    "type": "checkbox"
-                }
-            ]
         }
     ],
-    "framework-version": 3						  
+    "framework-version": 9
 }
