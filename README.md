@@ -70,4 +70,3 @@ WARNING:  This module is not currently able to support REDCap instances using lo
     * ckeditor to latest v4.21
     * dompdf to latest v2.0
     * smarty to latest v4.1
-
