@@ -1086,7 +1086,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      *
      * @since 3.1
      */
-    public function createPDF($dompdf_obj, $header, $footer, $main)
+    public function createPDF($dompdf_obj, $header, $footer, $main, $fileOrTemplateName="")
     {
         $contents = $this->formatPDFContents($header, $footer, $main);
 
@@ -1098,7 +1098,8 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $dompdf_obj->set_option('isRemoteEnabled', TRUE);
 
         // Setup the paper size and orientation
-        $dompdf_obj->setPaper("letter", "portrait");
+        list($paperSize, $paperOrientation) = $this->getPaperSettings($fileOrTemplateName);
+        $dompdf_obj->setPaper($paperSize, $paperOrientation);
 
         // Render the HTML as PDF
         $dompdf_obj->render();
@@ -1130,7 +1131,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         if (isset($main) && !empty($main))
         {
             $dompdf = new Dompdf();
-            $pdf_content = $this->createPDF($dompdf, $header, $footer, $main);
+            $pdf_content = $this->createPDF($dompdf, $header, $footer, $main, $filename);
 
             if (!$this->getProjectSetting("save-report-to-repo"))
             {
@@ -2846,5 +2847,31 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         {
             return $link;
         }
+    }
+
+    /**
+     * getPaperSettings($name) 
+     * Look for module project setting with name corresponding to the tempalte or file name provided
+     * @param String $name Name of template or pdf document file name
+     * @return Array Array with two elements: 1. paper size e.g. "Letter", "A4"; 2: paper orientation "Portrait" or "Landscape""
+     */
+    protected function getPaperSettings($fileOrTemplateName) 
+    {
+        $paperSize = "letter";
+        $paperOrientation = "portrait";
+
+        $templateSettings = $this->getSubSettings('template-options');
+
+        foreach ($templateSettings as $settings) {
+            // look for a template with name occurring within the file name of what's being generated 
+            // (pretty horrid - will catch "MyTemplate" before "MyTemplate_New" - need better way of recording template names perhaps recording to project settings on create/save/delete and auto-generate template name for files system storage?)
+            if (strpos($fileOrTemplateName, $settings['template-name']) !== false) {
+                $paperSize = (empty($settings['option-paper-size'])) ? $paperSize : $settings['option-paper-size'];
+                $paperOrientation = ($settings['option-paper-orientation']) ? "landscape" : $paperOrientation;
+                break;
+            }
+        }
+
+        return array($paperSize, $paperOrientation);
     }
 }
