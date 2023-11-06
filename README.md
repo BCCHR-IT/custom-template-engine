@@ -18,6 +18,7 @@ When switching from the old module to the rebranded module, you must disable the
 
 ## Project Configurations
 - Save Filled Templates to File Repository: This is specific to downloading a filled template, and will save a copy of the PDF to the File Repository. 
+- [Optional] Enter templates by name and specify an alternative paper size, e.g. A4 (default is Letter), and/or select landscape orientation.
 
 ## Permissions
 
@@ -40,6 +41,10 @@ Users must have access to data exports and reports in order to delete a template
 ## Filling and Downloading Template
 
 The module users the PHP template engine, Smarty, to fill in the templates with the apprpriate record data. Smarty will compile the template and store it in the previously configured compiled templates folder. The user is free to make edits to the template content before downloading. When the template is downloaded, if saving templates to the file repository has been configured, then the module will do so.
+
+## File Upload Fields
+
+File upload fields on data entry forms (not survey forms) with the action tag `@CUSTOM-TEMPLATE-UPLOAD` will give an option for either selecting a file for upload (as normal) or selecting one of the project's templates from a dropdown list. If the user selscts a template, it will be filled from the current record's data and automatically saved to the field.
 
 ##  Web Application Load Balancing
 
@@ -69,4 +74,3 @@ WARNING:  This module is not currently able to support REDCap instances using lo
     * ckeditor to latest v4.21
     * dompdf to latest v2.0
     * smarty to latest v4.1
-
