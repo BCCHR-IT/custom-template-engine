@@ -18,6 +18,7 @@ When switching from the old module to the rebranded module, you must disable the
 
 ## Project Configurations
 - Save Filled Templates to File Repository: This is specific to downloading a filled template, and will save a copy of the PDF to the File Repository. 
+- [Optional] Enter templates by name and specify an alternative paper size, e.g. A4 (default is Letter), and/or select landscape orientation.
 
 ## Permissions
 
@@ -73,4 +74,3 @@ WARNING:  This module is not currently able to support REDCap instances using lo
     * ckeditor to latest v4.21
     * dompdf to latest v2.0
     * smarty to latest v4.1
-

@@ -67,6 +67,33 @@
             "type": "checkbox",
             "repeatable": false,
             "super-users-only": true
+        },
+        {
+            "key": "template-options",
+            "name": "Template configuration options",
+            "required": false,
+            "type": "sub_settings",
+            "repeatable": true,
+            "sub_settings": [
+                {
+                    "key": "template-name",
+                    "name": "Template name",
+                    "required": true,
+                    "type": "text"
+                },
+                {
+                    "key": "option-paper-size",
+                    "name": "Paper size<br>(Optional - specify if different to Letter e.g. A4)",
+                    "required": false,
+                    "type": "text"
+                },
+                {
+                    "key": "option-paper-orientation",
+                    "name": "Use landscape orientation instead of portrait?",
+                    "required": false,
+                    "type": "checkbox"
+                }
+            ]
         }
     ],
     "framework-version": 9,
