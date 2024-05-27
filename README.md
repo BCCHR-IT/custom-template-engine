@@ -51,6 +51,14 @@ WARNING:  This module is not currently able to support REDCap instances using lo
   * Added code to process the new format returned by REDCap::getUserRightsdata()
   * Fixed bug found when downloading a zip file of batched reports (modified headers set before download)
   * Modified code to store data into the proper redcap_dataX tables introduced in RC v14.0.
+  * Upgrading packages to address security issues:
+    * dompdf/dompdf (v2.0.3 => v2.0.8)
+    * masterminds/html5 (2.8.1 => 2.9.0)
+    * phenx/php-font-lib (0.5.4 => 0.5.6)
+    * phenx/php-svg-lib (0.5.0 => 0.5.4)
+    * sabberworm/php-css-parser (8.4.0 => v8.5.1)
+    * smarty/smarty (v4.3.4 => v4.5.2)
+
 * v4.0.0
   * Minimal REDCap version is v12.4
   * Implemented support for the RC v12.4+ instrument-level data export permissions.

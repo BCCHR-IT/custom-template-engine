@@ -1221,7 +1221,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                  */
                 foreach($records as $record)
                 {
-                    $filename = basename($template_filename, "_$this->pid.html") . "_$record";
+                    $filename = REDCap::escapeHtml(basename($template_filename, "_$this->pid.html") . "_$record");
                     $filled_template = $template->fillTemplate($template_filename, $record);
                     
                     $doc = new DOMDocument();
@@ -1234,7 +1234,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $footer = empty($footer) ? "" : $doc->saveHTML($footer);
                     $main = $doc->saveHTML($main);
 
-                    //$contents = $this->formatPDFContents($header, $footer."<br />manual addition", $main);
                     $contents = $this->formatPDFContents($header, $footer, $main);
 
                     if (!empty($contents))
