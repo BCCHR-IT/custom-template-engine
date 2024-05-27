@@ -9,6 +9,7 @@ require_once APP_PATH_DOCROOT . "ProjectGeneral/header.php";
  * to generate Create Template page.
  */
 $customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
+$customTemplateEngine->setPaths();
 $customTemplateEngine->generateCreateEditTemplatePage();
 
 /**

@@ -4,4 +4,5 @@
  * and upload image.
  */
 $customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
+$customTemplateEngine->setPaths();
 $customTemplateEngine->uploadImages();

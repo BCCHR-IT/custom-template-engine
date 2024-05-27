@@ -9,6 +9,7 @@ require_once APP_PATH_DOCROOT . "ProjectGeneral/header.php";
  * to generate Index page.
  */
 $customReportBuilder = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
+$customReportBuilder->setPaths();
 $customReportBuilder->generateIndexPage();
 
 /**

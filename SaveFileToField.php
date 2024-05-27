@@ -8,6 +8,7 @@ require_once "vendor/autoload.php";
 use Dompdf\Dompdf;
 
 $customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
+$customTemplateEngine->setPaths();
 
 $header = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["header-editor"]));
 $footer = REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $_POST["footer-editor"]));

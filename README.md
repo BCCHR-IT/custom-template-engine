@@ -45,11 +45,12 @@ The module users the PHP template engine, Smarty, to fill in the templates with 
 
 WARNING:  This module is not currently able to support REDCap instances using load balancers due to the requirement to save templates to the file system.
 
-##  Other Issues
-
-- This module is unable to properly embed images with PHP version >= 7.4
-
 ##  Changelog
+* v4.1.0
+  * Basic date formatting through Smarty; can format with dd-mm-yyyy formatting by passing formatting information through the template as ```{$redcap['visit_date']|date_format:'%d-%m-%Y'}``` This will format the visit_date into two digit day, two digit month, four digit year. **Please note**: this is currently the only other format allowed outside the default REDCap display.
+  * Added code to process the new format returned by REDCap::getUserRightsdata()
+  * Fixed bug found when downloading a zip file of batched reports (modified headers set before download)
+  * Modified code to store data into the proper redcap_dataX tables introduced in RC v14.0.
 * v4.0.0
   * Minimal REDCap version is v12.4
   * Implemented support for the RC v12.4+ instrument-level data export permissions.

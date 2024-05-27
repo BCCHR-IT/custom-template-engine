@@ -32,7 +32,7 @@ class ExportRights {
 
 		if (!is_array($rights) || empty($rights)) {
 
-			throw new InvalidArgumentException("Error: array output from REDCap::getUserRights required.");
+			throw new \InvalidArgumentException("Error: array output from REDCap::getUserRights required.");
 
 		}  // end elseif
 
@@ -53,6 +53,9 @@ class ExportRights {
 	/*
 	** parses the output of REDCap::getUserRights() into a set of associative arrays defining the rights 
 	**  for a user on a per-field basis.
+    **
+    ** N.B.: This is a likely place to look for issues with rights not being applied properly. The format 
+    **  for how rights were stored/returned by the REDCap::getUserRights() call has changed once already.
 	*/
 
 		foreach ($this->raw_rights as $k => $v) {  // outer assoc array is keyed by username, so isolate value
@@ -64,37 +67,46 @@ class ExportRights {
 
 		foreach ($rights_arr as $key => $value) {  // for each k,v pair in the inner assoc array
 
-			if ($key == 'data_export_instruments') {  // capture the instrument names and their value
+			if ($key == 'data_export_instruments') {  // capture the instrument names and their value, pre v14.0-ish, uncertain when it changed.
 
 				$rights_str = str_replace('][', '|', substr($value, 1, -1));  // cut off first and last character and change splitting character
 				$raw_rights_arr = explode('|', $rights_str);  // make into an array
 
-				foreach ($raw_rights_arr as $tuple) {  // for every instrument-value tuple
+			} else if ($key == 'forms_export') {  // v14.0+ version of the rights object (at latest, the above works in v13.7
 
-					$rights_tuple = explode(',', $tuple);  // split into array on the comma
+                $raw_rights_arr = array();
+                foreach ($value as $rk => $rv) {
 
-					if (!in_array($rights_tuple, $this->instruments)) {  // capture instrument names
+                    array_push($raw_rights_arr, "$rk,$rv");
 
-						array_push($this->instruments, $rights_tuple[0]);
+                }  // end foreach
+
+            }  // end else
+
+			foreach ($raw_rights_arr as $tuple) {  // for every instrument-value tuple
+
+				$rights_tuple = explode(',', $tuple);  // split into array on the comma
+
+				if (!in_array($rights_tuple, $this->instruments)) {  // capture instrument names
+
+					array_push($this->instruments, $rights_tuple[0]);
+
+				}  // end if
+
+				$field_array = REDCap::getFieldNames($rights_tuple[0]);  // get all the fields in this instrument
+
+				foreach ($field_array as $field_name) {  // capture field names and their export rights
+
+					if (!in_array($field_name, $this->field_names)) {
+
+						array_push($this->field_names, $field_name);
+						$this->field_to_rights_value[$field_name] = $rights_tuple[1];
 
 					}  // end if
 
-					$field_array = REDCap::getFieldNames($rights_tuple[0]);  // get all the fields in this instrument
-
-					foreach ($field_array as $field_name) {  // capture field names and their export rights
-
-						if (!in_array($field_name, $this->field_names)) {
-
-							array_push($this->field_names, $field_name);
-							$this->field_to_rights_value[$field_name] = $rights_tuple[1];
-
-						}  // end if
-
-					}  // end foreach
-
 				}  // end foreach
 
-			}  // end if
+			}  // end foreach
 
 		}  // end foreach
 

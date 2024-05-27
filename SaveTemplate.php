@@ -4,5 +4,6 @@
  * and save template.
  */
 $customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
+$customTemplateEngine->setPaths();
 $result = $customTemplateEngine->saveTemplate();
 print json_encode($result);

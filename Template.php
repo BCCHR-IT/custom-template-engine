@@ -35,6 +35,7 @@ class Template
     private $removed_replacement = "[ID REMOVED]";  // rights value 3
     private $no_rights_replacement = "[NO RIGHTS]";  // rights value 0
     private $logical_operators = array("eq", "ne", "neq", "gt", "lt", "ge", "gte", "lte", "le", "not", "or", "and");
+    private $formatting_operators = array("|date_format:''");  // used to provide date formatting via Smarty
 
     /**
      * Class constructor.
@@ -138,6 +139,9 @@ class Template
         $user = strtolower(USERID);
         $rights = REDCap::getUserRights($user);
         $rights_object = new ExportRights($rights);  // populate a rights object with this user's instrument-level rights
+        print "<!-- Rights for $user\n ";
+        print_r($rights);
+        print "-->\n";
         $external_fields = array();
         $this->instruments = REDCap::getInstrumentNames();
         foreach ($this->instruments as $unique_name => $label)
@@ -526,6 +530,11 @@ class Template
             {
                 switch ($part) {
                     case "if":
+                    /*
+                    ** date formatting added from suggestion of user @Seaborg on github: https://github.com/BCCHR-IT/custom-template-engine/issues/42#issuecomment-1719068536
+                    */
+                    case "|date_format:'%d-%m-%Y'":
+                        break;
                     case "elseif":
                         // Must have either a ( or ) or $redcap or $showLabelAndRow or in_array after
                         if ($index != sizeof($parts) - 1)
@@ -579,7 +588,6 @@ class Template
                         if ($index != sizeof($parts) - 1)
                         {
                             $next_part = $parts[$index + 1];
-                            if ($next_part !== ")" && !in_array($next_part, $this->logical_operators))
                             {
                                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>)</strong>.";
                             }
@@ -660,9 +668,14 @@ class Template
                         {
                             $next_part = $parts[$index + 1];
                             if ($next_part !== ")" 
-                                && $next_part != "," 
-                                && $next_part != "]"
-                                && !in_array($next_part, $this->logical_operators))
+                                && ($next_part != ",") 
+                                && ($next_part != "]")
+                                // && !in_array($next_part, $this->logical_operators))
+                                /*
+                                ** date formatting code added from suggestion by @Seaborg on github: https://github.com/BCCHR-IT/custom-template-engine/issues/42#issuecomment-1719068536
+                                */
+                                && !in_array($next_part, $this->logical_operators)
+                                && ($next_part !== "|date_format:''"))
                             {
                                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after string value within ''.";
                             }
@@ -729,11 +742,13 @@ class Template
                                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Unclosed or empty <strong>]</strong> bracket.";
                             }
 
-                            if ($next_part !== ")" 
-                                && $next_part !== "["
-                                && !in_array($next_part, $this->logical_operators))
+                            if (($next_part !== ")") 
+                                && ($next_part !== "[")
+                                && !in_array($next_part, $this->logical_operators)
+                                && !in_array($next_part, $this->formatting_operators))
                             {
-                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>'$next_part'</strong> after <strong>$part</strong>.";
+                                // $test = in_array($next_part, $this->logical_operators) ? 'yes' : implode('-', $this->logical_operators);
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalidd <strong>'$next_part'</strong> after <strong>$part</strong>.";
                             }
                         }
                         break;
@@ -803,6 +818,7 @@ class Template
                                 $part[0] != "\"" && 
                                 $part[strlen($part) - 1] != "'" && 
                                 $part[strlen($part) - 1] != "\"" &&
+                                $part[strlen($part) -1] != "|" && // needed for parsing datetime hints
                                 !$this->isValidFieldOrEvent($part))
                         {
                             $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] <strong>$part</strong> is not a valid event/field/syntax in this project";

@@ -4,6 +4,7 @@
  * template.
  */
 $customTemplateEngine = new \BCCHR\CustomTemplateEngine\CustomTemplateEngine();
+$customTemplateEngine->setPaths();
 $result = $customTemplateEngine->deleteTemplate();
 
 /**
