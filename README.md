@@ -46,18 +46,20 @@ The module users the PHP template engine, Smarty, to fill in the templates with 
 WARNING:  This module is not currently able to support REDCap instances using load balancers due to the requirement to save templates to the file system.
 
 ##  Changelog
-* v4.1.0
+* v4.1.1
   * Basic date formatting through Smarty; can format with dd-mm-yyyy formatting by passing formatting information through the template as ```{$redcap['visit_date']|date_format:'%d-%m-%Y'}``` This will format the visit_date into two digit day, two digit month, four digit year. **Please note**: this is currently the only other format allowed outside the default REDCap display.
   * Added code to process the new format returned by REDCap::getUserRightsdata()
   * Fixed bug found when downloading a zip file of batched reports (modified headers set before download)
   * Modified code to store data into the proper redcap_dataX tables introduced in RC v14.0.
   * Upgrading packages to address security issues:
-    * dompdf/dompdf (v2.0.3 => v2.0.8)
+    * dompdf/dompdf (v2.0.3 => v3.0.0)
+      * php-font-lib (0.5.4 => 1.0.0)
+      * php-svg-lib (0.5.0 => 1.0.0)
     * masterminds/html5 (2.8.1 => 2.9.0)
-    * phenx/php-font-lib (0.5.4 => 0.5.6)
-    * phenx/php-svg-lib (0.5.0 => 0.5.4)
     * sabberworm/php-css-parser (8.4.0 => v8.5.1)
-    * smarty/smarty (v4.3.4 => v4.5.2)
+    * smarty/smarty (v4.3.4 => v5.1.0)
+  * New packages installed per upgrades above:
+    * polyfill-mbstring (v1.29.0)
 
 * v4.0.0
   * Minimal REDCap version is v12.4
