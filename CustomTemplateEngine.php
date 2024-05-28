@@ -1221,7 +1221,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                  */
                 foreach($records as $record)
                 {
-                    $filename = REDCap::escapeHtml(basename($template_filename, "_$this->pid.html") . "_$record");
+                    $filename = $this->escape(basename($template_filename, "_$this->pid.html") . "_$record");
                     $filled_template = $template->fillTemplate($template_filename, $record);
                     
                     $doc = new DOMDocument();
