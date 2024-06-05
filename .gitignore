@@ -1,3 +1,5 @@
 vendor/
 *.zip
+error_log
+*.xml
 

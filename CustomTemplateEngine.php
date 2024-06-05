@@ -55,7 +55,21 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $this->temp_dir = $this->getSystemSetting("temp-folder");
         $this->img_dir = $this->getSystemSetting("img-folder");
         $this->pid = $this->getProjectId();
-        $this->redcap_data_table = \REDCap::getDataTable($this->pid);
+        /*
+        ** check REDCap version of the server; versions before v14 only have a single data table and no
+        ** getDataTable() function, which returns -1 if first < second, 0 if equal, 1 otherwise
+        */
+
+        if ( \REDCap::versionCompare(REDCAP_VERSION, '14.0.0') == -1) {  // pre v14, so only a single table an no function to call
+
+            $this->redcap_data_table = 'redcap_data';
+
+        } else {  // use REDCap::getDataTable() function to check if there may be other redcap_data tables
+
+            $this->redcap_data_table = \REDCap::getDataTable($this->pid);
+            // REDCap::logEvent('version is ' . REDCAP_VERSION . ' compare check is ' . \REDCap::versionCompare(REDCAP_VERSION, '14.0.0'));
+
+        }  // end if
 
         if (!empty($this->pid)) {
 
@@ -970,8 +984,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         else
         {
             // Validate Template
-            $template = new Template($this->templates_dir, $this->compiled_dir);
-
+            // $template = new Template($this->templates_dir, $this->compiled_dir);
+            $template = new Template();
+            $template->setPaths($this->templates_dir, $this->compiled_dir);
             $template_errors = $template->validateTemplate($data);
             $header_errors = $template->validateTemplate($header);
             $footer_errors = $template->validateTemplate($footer);
@@ -1200,7 +1215,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         // $records = htmlspecialchars($_POST["participantID"], ENT_QUOTES);
         $records = array_map('htmlspecialchars', $_POST["participantID"], array(ENT_QUOTES));
         $template_filename = htmlspecialchars($_POST['template'], ENT_QUOTES);
-        $template = new Template($this->templates_dir, $this->compiled_dir);
+        // $template = new Template($this->templates_dir, $this->compiled_dir);
+        $template = new Template();
+        $template->setPaths($this->templates_dir, $this->compiled_dir);
 
         $zip_name = "{$this->temp_dir}reports.zip";
         $z = new ZipArchive();
@@ -1306,12 +1323,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             header('Content-Type: application/zip;\n');
             header("Content-Transfer-Encoding: Binary");
             header("Content-Disposition: attachment; filename=\"".basename($zip_name)."\"");
-/*
-            header('Content-Description: File Transfer');
-            header('Content-Type: application/zip');
-            header('Content-Disposition: attachment; filename="'.basename($zip_name).'"');
-            header('Content-length: '.filesize($zip_name));
-*/
             readfile($zip_name);
             REDCap::logEvent("Custom Template Engine - Downloaded Reports ", $template_filename , "" , implode(", ", $records));
         }
@@ -1369,7 +1380,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }
 
         $template_filename = $_POST['template'];
-        $template = new Template($this->templates_dir, $this->compiled_dir);
+        //$template = new Template($this->templates_dir, $this->compiled_dir);
+        $template = new Template();
+        $template->setPaths($this->templates_dir, $this->compiled_dir);
 
         try
         {

@@ -8,7 +8,7 @@ namespace BCCHR\CustomTemplateEngine;
 require_once "vendor/autoload.php";
 
 use REDCap;
-use Smarty;
+use Smarty\Smarty;
 use DOMDocument;
 require_once "./ExportRights.php";  // class to manage instrument-level rights
 
@@ -43,6 +43,7 @@ class Template
      * @param String $templates_dir     Directory where templates are stored.
      * @param String $compiled_dir      Directory where templates compiled by Smarty are stored.
      */
+/*
     function __construct($templates_dir, $compiled_dir) 
     {
         $this->dictionary = REDCap::getDataDictionary('array', false);
@@ -52,7 +53,20 @@ class Template
         $this->smarty->setCompileDir($compiled_dir);
         $this->smarty->assign("showLabelAndRow", $this->show_label_and_row);
     }
+*/
+    public function setPaths($templates_dir, $compiled_dir) {
+    /*
+    **lazy loading to avoid the constructor, for the EM framework recommendations
+    */
+        $this->dictionary = REDCap::getDataDictionary('array', false);
+        $this->instruments = REDCap::getInstrumentNames();
+        $this->smarty = new Smarty();
+        $this->smarty->setTemplateDir($templates_dir);
+        $this->smarty->setCompileDir($compiled_dir);
+        $this->smarty->assign("showLabelAndRow", $this->show_label_and_row);
 
+    }  // end setPaths()
+ 
     /**
      * Checks whether all the siblings that come before or after an html element are empty
      *
