@@ -43,17 +43,7 @@ class Template
      * @param String $templates_dir     Directory where templates are stored.
      * @param String $compiled_dir      Directory where templates compiled by Smarty are stored.
      */
-/*
-    function __construct($templates_dir, $compiled_dir) 
-    {
-        $this->dictionary = REDCap::getDataDictionary('array', false);
-        $this->instruments = REDCap::getInstrumentNames();
-        $this->smarty = new Smarty();
-        $this->smarty->setTemplateDir($templates_dir);
-        $this->smarty->setCompileDir($compiled_dir);
-        $this->smarty->assign("showLabelAndRow", $this->show_label_and_row);
-    }
-*/
+
     public function setPaths($templates_dir, $compiled_dir) {
     /*
     **lazy loading to avoid the constructor, for the EM framework recommendations
@@ -152,7 +142,8 @@ class Template
     {
         $user = strtolower(USERID);
         $rights = REDCap::getUserRights($user);
-        $rights_object = new ExportRights($rights);  // populate a rights object with this user's instrument-level rights
+        $rights_object = new ExportRights();  // create a rights object
+        $rights_object->setRights($rights);  // set the rights within this object
         print "<!-- Rights for $user\n ";
         print_r($rights);
         print "-->\n";

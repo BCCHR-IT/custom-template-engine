@@ -46,6 +46,9 @@ The module users the PHP template engine, Smarty, to fill in the templates with 
 WARNING:  This module is not currently able to support REDCap instances using load balancers due to the requirement to save templates to the file system.
 
 ##  Changelog
+* v4.1.4
+  * bug fixes for backward compatibility, as well as addressing a bug with ampersands in filenames
+  * required array value type checking done by in_array() to true (so '12.4' and 12.4 are not considered a match)
 * v4.1.3
   * upgraded packages to address security isues:
     * smarty/smarty (v5.1.0 => v5.3.0)

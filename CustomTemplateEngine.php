@@ -971,9 +971,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             $HtmlPage->PrintFooterExt();
         }
         // Template name cannot have director separator in it
-        else if (strpos($name, "/") !== FALSE || strpos($name, "\\") !== FALSE)
+        else if (strpos($name, "/") !== FALSE || strpos($name, "\\") !== FALSE || strpos($name, "&") !== FALSE)
         {
-            $other_errors[] = "<b>ERROR</b> You cannot have '/' or '\\' in your template name! Template was not saved!";
+            $other_errors[] = "<b>ERROR</b> You cannot have '&', '/' or '\\' in your template name! Template was not saved!";
             $filename = $name;
 
             if ($action == "edit")
@@ -2274,8 +2274,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                 CKEDITOR.instances.headerEditor.updateElement();
                 CKEDITOR.instances.footerEditor.updateElement();
                 CKEDITOR.instances.editor.updateElement();
-                // here you are. validation is stripping the template name out, so fix that.
-                console.log("pre validation: " + $('form').serialize());
+                //console.log("pre validation: " + $('form').serialize());
                 if ($("#editor").val() == "" || $("#templateName").val() == "")
                 {
                     alert("You need to enter a template name, AND something in the main editor to save.");

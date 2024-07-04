@@ -28,18 +28,21 @@ class ExportRights {
 	private $field_names = array();  // an array of field names for this PID
 	public $field_to_rights_value = array();  // and associative array, keys are field names, value is 0/1/2
 
-	public function __construct($rights) {  // class constructor
+    public function setRights($r) {
+    /*
+    ** lazy loading call to replace constructor version of setting the rights
+    */
 
-		if (!is_array($rights) || empty($rights)) {
+        if (!is_array($r) || empty($r)) {
 
-			throw new \InvalidArgumentException("Error: array output from REDCap::getUserRights required.");
+            throw new \InvalidArgumentException("Error: array output from REDCap::getUserRights required.");
 
-		}  // end elseif
+        }  // end elseif
 
-		$this->raw_rights = $rights;
-		$this->parseRights();
+        $this->raw_rights = $r;
+        $this->parseRights();  // parse the rights content passed in
 
-	}  // end ___construct()
+    }  // end setRights()
 
     public function __toString() {
     /*
@@ -57,6 +60,8 @@ class ExportRights {
     ** N.B.: This is a likely place to look for issues with rights not being applied properly. The format 
     **  for how rights were stored/returned by the REDCap::getUserRights() call has changed once already.
 	*/
+
+        $raw_rights_arr = array();  // filled below
 
 		foreach ($this->raw_rights as $k => $v) {  // outer assoc array is keyed by username, so isolate value
 
@@ -87,7 +92,7 @@ class ExportRights {
 
 				$rights_tuple = explode(',', $tuple);  // split into array on the comma
 
-				if (!in_array($rights_tuple, $this->instruments)) {  // capture instrument names
+				if (!in_array($rights_tuple, $this->instruments, true)) {  // capture instrument names
 
 					array_push($this->instruments, $rights_tuple[0]);
 
@@ -97,7 +102,7 @@ class ExportRights {
 
 				foreach ($field_array as $field_name) {  // capture field names and their export rights
 
-					if (!in_array($field_name, $this->field_names)) {
+					if (!in_array($field_name, $this->field_names, true)) {
 
 						array_push($this->field_names, $field_name);
 						$this->field_to_rights_value[$field_name] = $rights_tuple[1];
