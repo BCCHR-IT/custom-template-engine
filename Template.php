@@ -593,6 +593,7 @@ class Template
                         if ($index != sizeof($parts) - 1)
                         {
                             $next_part = $parts[$index + 1];
+			    if ($next_part !== ")" && !in_array($next_part, $this->logical_operators))
                             {
                                 $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>$next_part</strong> after <strong>)</strong>.";
                             }
