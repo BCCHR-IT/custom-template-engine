@@ -2510,6 +2510,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $id_field = REDCap::getRecordIdField();
         $records = json_decode(REDCap::getData("json", null, array($id_field), null, $rights[$this->userid]["group_id"]), true);
 
+        // Instantiate variables
+        $deleted = [];
+        $printed = [];
+        $previously_printed = [];
+
         if ($filter) 
         {
             $log_event_table = method_exists('\REDCap', 'getLogEventTable') ? REDCap::getLogEventTable($this->pid) : "redcap_log_event";

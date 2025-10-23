@@ -46,6 +46,11 @@ The module users the PHP template engine, Smarty, to fill in the templates with 
 WARNING:  This module is not currently able to support REDCap instances using load balancers due to the requirement to save templates to the file system.
 
 ##  Changelog
+* v4.1.5
+  * bug fixes for missing checkbox values in repeating instruments (classic & longitudinal)
+  * improved merge logic to preserve non-empty data and detect semantically empty values
+  * refined event/instrument scoping for repeating instruments
+  * fixed filter button fatal error by initializing arrays
 * v4.1.4
   * bug fixes for backward compatibility, as well as addressing a bug with ampersands in filenames
   * required array value type checking done by in_array() to true (so '12.4' and 12.4 are not considered a match)
