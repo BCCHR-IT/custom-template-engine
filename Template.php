@@ -1176,11 +1176,6 @@ class Template
                     if (!empty($event_data["redcap_repeat_instrument"])
                         && !in_array($event_data["redcap_repeat_instrument"] . '|' . $event, $repeatable_instruments_parsed))
                     {
-                        // error_log(date("c") . 'REPEATABLE event_data["redcap_repeat_instrument"] ' . print_r($event_data["redcap_repeat_instrument"], TRUE). "\r\n", 3, __DIR__ . "/error_log");
-                        $printres = $event_data["redcap_repeat_instrument"] . '|' . $event;
-                        // error_log(date("c") . '$event_data["redcap_repeat_instrument"] . | . $event ' . print_r($printres, TRUE). "\r\n", 3, __DIR__ . "/error_log");
-                        // error_log(date("c") . '$repeatable_instruments_parsed ' . print_r($repeatable_instruments_parsed, TRUE). "\r\n", 3, __DIR__ . "/error_log");
-                        // Instances for THIS event + THIS instrument
                         $repeatable_instrument_instances = array_filter($json, function($value) use ($event_data) {
                             return $value["redcap_repeat_instrument"] == $event_data["redcap_repeat_instrument"]
                                 && $value["redcap_event_name"] == $event_data["redcap_event_name"];
@@ -1193,20 +1188,16 @@ class Template
                             $key              = array_search($latest_instance, $repeat_instances);
 
                             $latestData = $this->parseEventData($repeatable_instrument_instances[$key]);
-                            // error_log(date("c") . 'latestData: ' . print_r($latestData, TRUE). "\r\n", 3, __DIR__ . "/error_log");
                             // Merge into event-scoped data without clobbering meaningful values
                             $data = empty($this->redcap[$event]) ? array() : $this->redcap[$event];
-                            // error_log(date("c") . 'data before foreach: ' . print_r($data, TRUE). "\r\n", 3, __DIR__ . "/error_log");
                             foreach ($latestData as $field => $value) {
                                 if (!isset($data[$field]) || $this->isSemanticallyEmptyValue($data[$field])) {
                                     $data[$field] = $value;
                                 }
                             }
                         }
-
                         // mark (event|instrument) as parsed
                         $repeatable_instruments_parsed[] = $event_data["redcap_repeat_instrument"] . '|' . $event;
-                        // error_log(date("c") . 'AFTER ADDING $repeatable_instruments_parsed ' . print_r($repeatable_instruments_parsed, TRUE). "\r\n", 3, __DIR__ . "/error_log");
                     }
                     // Repeatable event
                     else if (empty($this->redcap[$event]))
@@ -1257,25 +1248,17 @@ class Template
                     if (!empty($event_data["redcap_repeat_instrument"]) && !in_array($event_data["redcap_repeat_instrument"], $repeatable_instruments_parsed)) 
                     {
                         // Get latest instance of repeatable instrument.
-                        // Retrieve all repeatable instances of event. 
                         $repeatable_instrument_instances = array_filter($json, function($value) use($event_data){
                             return $value["redcap_repeat_instrument"] == $event_data["redcap_repeat_instrument"];
                         });
-                        // error_log(date("c") . " repeatable_instrument_instances: " . print_r($repeatable_instrument_instances, TRUE). "\r\n", 3, __DIR__ . "/error_log");
                         $repeatable_instrument_instances = array_values($repeatable_instrument_instances);
-                        // error_log(date("c") . " repeatable_instrument_instances after values: " . print_r($repeatable_instrument_instances, TRUE). "\r\n", 3, __DIR__ . "/error_log");
 
-                        // Get the latest instance and parse it. 
                         $repeat_instances = array_column($repeatable_instrument_instances, "redcap_repeat_instance");
-                        // error_log(date("c") . " repeat_instances: " . print_r($repeat_instances, TRUE). "\r\n", 3, __DIR__ . "/error_log");
                         $latest_instance = max($repeat_instances);
-                        // error_log(date("c") . " latest_instance: " . print_r($latest_instance, TRUE). "\r\n", 3, __DIR__ . "/error_log");
                         $key = array_search($latest_instance, $repeat_instances);
-                        // error_log(date("c") . " key: " . print_r($key, TRUE). "\r\n", 3, __DIR__ . "/error_log");
 
                         // Merges repeatable instrument data with non-repeatable instrument data in same event.
                         $repeatable_instrument_data = $this->parseEventData($repeatable_instrument_instances[$key]);
-                        // error_log(date("c") . " repeatable_instrument_data: " . print_r($repeatable_instrument_data, TRUE). "\r\n", 3, __DIR__ . "/error_log");
                         foreach($repeatable_instrument_data as $field => $value)
                         {
                             if (empty($this->redcap[$field]) || $this->isSemanticallyEmptyValue($this->redcap[$field]))
@@ -1283,7 +1266,6 @@ class Template
                         }
 
                         $repeatable_instruments_parsed[] = $event_data["redcap_repeat_instrument"];
-                        // error_log(date("c") . " repeatable_instruments_parsed: " . print_r($repeatable_instruments_parsed, TRUE). "\r\n", 3, __DIR__ . "/error_log");
                     }
                 }
                 else
