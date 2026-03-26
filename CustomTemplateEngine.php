@@ -40,6 +40,173 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      */
     // here you are. Remove constructor and implement lazy loading, per ~/public_html/redcap/bin/scan . output
 
+    /**
+     * CTE Trigger retrieves the trigger configuration for the project
+     *
+     * @since 4.2.0
+     */
+    private function getTriggerConfig(int $projectId): array
+    {
+        $raw = $this->getProjectSetting('cte_trigger_config', $projectId);
+
+        if (!is_string($raw) || trim($raw) === '') {
+            return ['schema' => 1, 'templates' => []];
+        }
+
+        $cfg = json_decode($raw, true);
+        if (!is_array($cfg)) {
+            return ['schema' => 1, 'templates' => []];
+        }
+        
+        // current: schema 1 - array of templates with logic, template filename, target field, and target event unique name
+        if ((int)($cfg['schema'] ?? 0) !== 1) {
+            return ['schema' => 1, 'templates' => []];
+        }
+        if (!isset($cfg['templates']) || !is_array($cfg['templates'])) {
+            return ['schema' => 1, 'templates' => []];
+        }
+
+        return [
+            'schema' => 1,
+            'templates' => $cfg['templates'],
+        ];
+    }
+
+    /**
+     * CTE Trigger saves the generated PDF bytes to the specified file upload field
+     *
+     * @since 4.2.0
+     */
+    private function savePdfBytesToUploadField(
+        string $filename,
+        string $pdfBytes,
+        string $fieldName,
+        string $record,
+        int $eventId,
+        ?int $repeatInstance = null
+    ): bool {
+        return $this->saveFileToFieldForContext($filename, $pdfBytes, $fieldName, $record, $eventId, $repeatInstance);
+    }
+
+    /**
+     * CTE Trigger resolves the appropriate event ID to save the generated PDF to
+     *
+     * @since 4.2.0
+     */
+    private function resolveEventIdForSaving(int $projectId, int $currentEventId, string $eventUniqueName = ''): int
+    {
+        if ($eventUniqueName !== '') {
+            $eid = \REDCap::getEventIdFromUniqueEvent($eventUniqueName);
+            if (!empty($eid)) return (int)$eid;
+        }
+
+        if (\REDCap::isLongitudinal()) {
+            return $currentEventId;
+        }
+
+        // If no event specified, use the FIRST event (same as SaveFileToField.php)
+        $sql = "SELECT m.event_id
+                FROM redcap_events_metadata m
+                JOIN redcap_events_arms a ON m.arm_id = a.arm_id
+                WHERE a.project_id = ?
+                ORDER BY m.event_id ASC
+                LIMIT 1";
+
+        $result = $this->query($sql, [$projectId]);
+        if ($result && ($row = $result->fetch_assoc()) && !empty($row['event_id'])) {
+            return (int)$row['event_id'];
+        }
+
+        // Should not happen; fallback
+        return 0;
+    }
+
+    /**
+     * CTE Trigger generates a PDF from a specified template for a given record
+     *
+     * @since 4.2.0
+     */
+    private function generatePdfFromTemplateForRecord(string $template_filename, string $record): string
+    {
+        $template = new \BCCHR\CustomTemplateEngine\Template();
+        $template->setPaths($this->templates_dir, $this->compiled_dir);
+
+        $filled_template = $template->fillTemplate($template_filename, $record);
+
+        $doc = new \DOMDocument();
+        $doc->loadHTML($filled_template);
+
+        $header = $doc->getElementsByTagName("header")->item(0);
+        $footer = $doc->getElementsByTagName("footer")->item(0);
+        $main = $doc->getElementsByTagName("main")->item(0);
+
+        $filled_main = $doc->saveHTML($main);
+        $fm_entities = htmlentities($filled_main);
+        $filled_header = empty($header) ? "" : $doc->saveHTML($header);
+        $filled_footer = empty($footer)? "" : $doc->saveHTML($footer);
+
+        $header = \REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $filled_header));
+        $footer = \REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $filled_footer));
+        $main   = \REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $filled_main));
+
+        $dompdf = new \Dompdf\Dompdf();
+        return $this->createPDF($dompdf, $filled_header, $filled_footer, $filled_main);
+    }
+
+    /**
+     * CTE Trigger makes a filename for the generated PDF based on the template filename and record ID
+     *
+     * @since 4.2.0
+     */
+    private function makeFilename(string $templateFilename, string $record): string
+    {
+        $base = pathinfo($templateFilename, PATHINFO_FILENAME);
+        $base = preg_replace('/_\d+$/', '', $base);
+        return "{$base}_{$record}";
+    }
+
+    /**
+     * CTE Trigger get the latest instance for a given instrument on event, to properly evaluate logic
+     *
+     * @since 4.2.0
+     */
+    private function getLatestInstanceForInstrument($record, $event_id, $instrument)
+    {
+        $record_data = REDCap::getData(
+            "json",
+            $record,
+            null,
+            $event_id,
+            null,
+            true,
+            false,
+            true,
+            null,
+            true
+        );
+
+        $json = json_decode($record_data, true);
+        if (!is_array($json)) {
+            return null;
+        }
+
+        $instance = null;
+
+        foreach ($json as $row) {
+            $rowInstrument = $row['redcap_repeat_instrument'] ?? null;
+            $rowInstance = $row['redcap_repeat_instance'] ?? null;
+
+            if (
+                $rowInstrument !== null &&
+                strtolower($rowInstrument) === strtolower($instrument) &&
+                !empty($rowInstance)
+            ) {
+                $instance = max((int)($instance ?? 0), (int)$rowInstance);
+            }
+        }
+
+        return $instance;
+    }
 
     public function setPaths() {
     /*
@@ -105,6 +272,185 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         }  // end if
 
     }  // end setPaths()
+
+    /**
+     * Allows custom actions to be performed immediately after a record has been saved on a data entry form or survey page
+     * CTE Trigger Uploads a generated PDF to a specified file upload field when the trigger conditions are met.
+     * @since 4.2.0
+     */
+    public function redcap_save_record($project_id, $record, $instrument, $event_id, $group_id, $survey_hash, $response_id, $repeat_instance) {
+        $this->setPaths();
+
+        if ((int)$project_id !== (int)$this->getProjectId()) {
+            return;
+        }
+
+        $cfg = $this->getTriggerConfig((int)$project_id);
+        $templates = $cfg['templates'] ?? [];
+
+        if (empty($templates) || !is_array($templates)) {
+            return;
+        }
+
+        foreach ($templates as $templateFile => $tCfg) {
+            if (!is_array($tCfg)) continue;
+            if (empty($tCfg['enabled'])) continue;
+
+            $logic = trim((string)($tCfg['logic'] ?? ''));
+            $targetField = trim((string)($tCfg['target_field'] ?? ''));
+            $targetEventUnique = trim((string)($tCfg['target_event_unique'] ?? ''));
+            if ($templateFile === '' || $logic === '' || $targetField === '') {
+                continue;
+            }
+
+            $valid = false;
+
+            $saveEventId = $this->resolveEventIdForSaving($project_id, $event_id, $targetEventUnique);
+            if ($saveEventId <= 0) {
+                continue;
+            }
+        
+            if (\REDCap::isLongitudinal() && ($this->checkFieldInEvent($targetField, $saveEventId) == false)) {
+                \REDCap::logEvent('CTE Trigger - Invalid field for event', "template={$templateFile} field={$targetField} event_id={$saveEventId}", '', (string)$record);
+                continue;
+            }
+
+            if (\REDCap::isLongitudinal() && !empty($targetEventUnique)) {
+                $valid = \REDCap::evaluateLogic(
+                    $logic,
+                    $project_id,
+                    (string)$record,
+                    $targetEventUnique,   // pass unique event name
+                    (int)$repeat_instance
+                );
+            } else {
+                $project = $this->getProject();
+                $repeatingForms = is_object($project) ? $project->getRepeatingForms((int)$event_id) : [];
+                $targetFieldForm = (!empty($targetField) && is_object($project)) ? $project->getFormForField($targetField) : null;
+                $isTargetFieldFormRepeating = $targetFieldForm !== null && is_array($repeatingForms) && in_array($targetFieldForm, $repeatingForms, true);
+                
+                $resRepeatInstrument = null;
+                $resRepeatInstance = null;
+
+                if ($isTargetFieldFormRepeating) {
+                    if ((string)$instrument === $targetFieldForm) {
+                        $resRepeatInstrument = (string)$instrument;
+                        $resRepeatInstance = ((int)$repeat_instance > 0) ? (int)$repeat_instance : 1;
+                    } else {
+                        // If the trigger field's form is repeating, but the current instrument isn't that form, we need to find the latest instance for the trigger form to evaluate the logic correctly
+                        $resRepeatInstrument = $targetFieldForm;
+                        $resRepeatInstance = $this->getLatestInstanceForInstrument((string)$record, (int)$event_id, $targetFieldForm);
+                    }
+                }
+
+                if ($resRepeatInstrument !== null && $resRepeatInstance !== null) {
+                    $valid = \REDCap::evaluateLogic(
+                        $logic,
+                        (int)$project_id,
+                        (string)$record,
+                        null,
+                        (int)$resRepeatInstance,
+                        (string)$resRepeatInstrument,
+                    );
+                } else {
+                    $valid = \REDCap::evaluateLogic(
+                        $logic,
+                        (int)$project_id,
+                        (string)$record,
+                        null,
+                    );
+                }
+            }
+            
+            if ($valid !== true) continue;
+
+            try {
+                $pdf_content = $this->generatePdfFromTemplateForRecord($templateFile, (string)$record);
+            } catch (\Throwable $e) {
+                \REDCap::logEvent('CTE Trigger - PDF generation failed', $e->getMessage(), '', (string)$record);
+                continue;
+            }
+            
+            $filename = $this->makeFilename($templateFile, (string)$record);
+
+            if (\REDCap::isLongitudinal()) {
+                if ($repeat_instance === 1) {
+                    $saveRepeatInstance = null;
+                } else {
+                    $saveRepeatInstance = (int)$repeat_instance;
+                }
+            } else {
+                $saveRepeatInstance = null;
+            }
+
+            $project = $this->getProject();
+            $targetFieldForm = (!empty($targetField) && is_object($project))
+                ? $project->getFormForField($targetField)
+                : null;
+
+            $repeatingForms = is_object($project) ? $project->getRepeatingForms((int)$saveEventId) : [];
+
+            $isClassicRepeatingTarget = !\REDCap::isLongitudinal()
+                && $targetFieldForm !== null
+                && is_array($repeatingForms)
+                && in_array($targetFieldForm, $repeatingForms, true);
+
+            if ($isClassicRepeatingTarget) {
+                if ((string)$instrument === $targetFieldForm && (int)$repeat_instance > 0) {
+                    // Saving on the repeating target form itself: use the current instance.
+                    if ($repeat_instance === 1) {
+                        $saveRepeatInstance = null;
+                    } else {
+                        $saveRepeatInstance = (int)$repeat_instance;
+                    }
+                    // \REDCap::logEvent(
+                    //     'CTE Trigger - Classic Repeating Target: Using current repeat instance',
+                    //     "template={$templateFile} field={$targetField} event_id={$saveEventId} current_repeat_instance={$repeat_instance}",
+                    //     '',
+                    //     (string)$record,
+                    //     (int)$saveEventId
+                    // );
+                } else {
+                    // Saving from another form: use the latest instance of the target form.
+                    $latest = $this->getLatestInstanceForInstrument((string)$record, (int)$saveEventId, $targetFieldForm);
+                    $saveRepeatInstance = $latest !== null ? (int)$latest : null;
+                    // \REDCap::logEvent(
+                    //     'CTE Trigger - Classic Repeating Target: Using latest repeat instance for target form',
+                    //     "template={$templateFile} field={$targetField} event_id={$saveEventId} target_form={$targetFieldForm} latest_repeat_instance={$latest}",
+                    //     '',
+                    //     (string)$record,
+                    //     (int)$saveEventId
+                    // );
+                }
+            }
+
+            $saved = $this->savePdfBytesToUploadField(
+                $filename,
+                $pdf_content,
+                $targetField,
+                (string)$record,
+                (int)$saveEventId,
+                $saveRepeatInstance
+            );
+
+            if (!$saved) {
+                \REDCap::logEvent(
+                    'CTE Trigger - Failed to Save Report to field',
+                    "Template: {$templateFile}, Field name: {$targetField}, event_id={$saveEventId}, repeat_instance=" . ($saveRepeatInstance ?? 'NULL'),
+                    "",
+                    (string)$record
+                );
+                continue;
+            }
+
+            \REDCap::logEvent(
+                'CTE Trigger - Generated PDF to field',
+                "template={$templateFile} field={$targetField} event_id={$saveEventId} repeat_instance=" . ($saveRepeatInstance ?? 'NULL'),
+                '',
+                (string)$record
+            );
+        }
+    }
 
     /**
      * Creates the templates, compiled templates, and images folders for the module, if they don't exist.
@@ -513,6 +859,202 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     }
 
     /**
+     * CTE Trigger saves a file to a upload field considering save instance and event context
+     *
+     * @since 4.2.0
+     */
+    public function saveFileToFieldForContext($filename, $file_contents, $field_name, $record, $event_id, $repeat_instance = null)
+    {
+        $database_success = FALSE;
+        $upload_success = FALSE;
+        
+        $dummy_file_name = $filename . ".pdf";
+        $dummy_file_name = preg_replace("/[^a-zA-Z-._0-9]/", "_", $dummy_file_name);
+        $dummy_file_name = str_replace("__", "_", $dummy_file_name);
+        $dummy_file_name = str_replace("__", "_", $dummy_file_name);
+
+        $stored_name = date('YmdHis') . "_pid" . $this->pid . "_" . generateRandomHash(6) . ".pdf";
+
+        $upload_success = file_put_contents(EDOC_PATH . $stored_name, $file_contents);
+        if ($upload_success === false) {
+            return false;
+        }
+
+        $dummy_file_size = $upload_success;
+
+        $query = $this->framework->createQuery();
+        $query->add(
+            "INSERT INTO redcap_edocs_metadata
+                (stored_name, mime_type, doc_name, doc_size, file_extension, project_id, stored_date)
+            VALUES (?, 'application/pdf', ?, ?, 'pdf', ?, ?)",
+            [$stored_name, $dummy_file_name, $dummy_file_size, $this->pid, date('Y-m-d H:i:s')]
+        );
+
+        if (!$query->execute()) {
+            return false;
+        }
+
+        $docs_id = db_insert_id();
+
+        $instance = $repeat_instance !== null ? (int)$repeat_instance : null;
+
+        $sql = '';
+
+        $query = $this->framework->createQuery();
+        $query->add(
+            "SELECT value
+            FROM " . $this->redcap_data_table . "
+            WHERE project_id = ?
+            AND record = ?
+            AND event_id = ?
+            AND field_name = ?",
+            [$this->pid, $record, $event_id, $field_name]
+        );
+
+        if ($instance !== null) {
+            $query->add("AND instance = ?", [$instance]);
+        } else {
+            $query->add("AND instance IS NULL");
+        }
+
+        $result = $query->execute();
+
+        if ($result && $result->num_rows > 0) {
+            if ($GLOBALS['file_upload_versioning_global_enabled'] == '' && $this->Proj->project['file_upload_versioning_enabled'] != '1') {
+                while ($row = $result->fetch_assoc()) {
+                    $old_doc_id = $row["value"];
+                }
+
+                $query = $this->framework->createQuery();
+                $query->add(
+                    "UPDATE redcap_edocs_metadata
+                    SET delete_date = ?
+                    WHERE doc_id = ?",
+                    [NOW, $old_doc_id]
+                );
+                $query->execute();
+            }
+
+            $query = $this->framework->createQuery();
+            $query->add(
+                "UPDATE " . $this->redcap_data_table . "
+                SET value = ?
+                WHERE project_id = ?
+                AND record = ?
+                AND event_id = ?
+                AND field_name = ?",
+                [$docs_id, $this->pid, $record, $event_id, $field_name]
+            );
+
+            if ($instance !== null) {
+                $query->add("AND instance = ?", [$instance]);
+            } else {
+                $query->add("AND instance IS NULL");
+            }
+
+            if (!$query->execute()) {
+                return false;
+            }
+
+            $sql = "UPDATE " . $this->redcap_data_table . "
+                    SET value = '" . db_escape((string)$docs_id) . "'
+                    WHERE project_id = '" . db_escape((string)$this->pid) . "'
+                    AND record = '" . db_escape((string)$record) . "'
+                    AND event_id = '" . db_escape((string)$event_id) . "'
+                    AND field_name = '" . db_escape((string)$field_name) . "'";
+
+            if ($instance !== null) {
+                $sql .= " AND instance = '" . db_escape((string)$instance) . "'";
+            } else {
+                $sql .= " AND instance IS NULL";
+            }
+        } else {
+            if ($this->Proj->longitudinal || $instance !== null) {
+                $query = $this->framework->createQuery();
+                $query->add(
+                    "SELECT 1
+                    FROM " . $this->redcap_data_table . "
+                    WHERE project_id = ?
+                    AND event_id = ?
+                    AND record = ?
+                    AND field_name = ?",
+                    [$this->pid, $event_id, $record, $this->Proj->table_pk]
+                );
+
+                if ($instance !== null) {
+                    $query->add("AND instance = ?", [$instance]);
+                } else {
+                    $query->add("AND instance IS NULL");
+                }
+
+                $query->add("LIMIT 1");
+
+                $result = $query->execute();
+
+                if (!$result || (int)$result->num_rows === 0) {
+                    $query = $this->framework->createQuery();
+                    $query->add(
+                        "INSERT INTO " . $this->redcap_data_table . "
+                        (project_id, event_id, record, field_name, value, instance)
+                        VALUES (?, ?, ?, ?, ?, ?)",
+                        [$this->pid, $event_id, $record, $this->Proj->table_pk, $record, $instance]
+                    );
+
+                    if (!$query->execute()) {
+                        return false;
+                    }
+                }
+            }
+
+            $query = $this->framework->createQuery();
+            $query->add(
+                "INSERT INTO " . $this->redcap_data_table . "
+                (project_id, event_id, record, field_name, value, instance)
+                VALUES (?, ?, ?, ?, ?, ?)",
+                [$this->pid, $event_id, $record, $field_name, $docs_id, $instance]
+            );
+
+            if (!$query->execute()) {
+                return false;
+            }
+
+            $instanceSql = ($instance !== null)
+                ? "'" . db_escape((string)$instance) . "'"
+                : "NULL";
+
+            $sql = "INSERT INTO " . $this->redcap_data_table . "
+                    (project_id, event_id, record, field_name, value, instance)
+                    VALUES (
+                        '" . db_escape((string)$this->pid) . "',
+                        '" . db_escape((string)$event_id) . "',
+                        '" . db_escape((string)$record) . "',
+                        '" . db_escape((string)$field_name) . "',
+                        '" . db_escape((string)$docs_id) . "',
+                        $instanceSql
+                    )";
+        }
+
+        $redcap_log_event_table = method_exists('\REDCap', 'getLogEventTable')
+            ? REDCap::getLogEventTable($this->pid)
+            : "redcap_log_event";
+
+        $current_timestamp = date("YmdHis");
+        $ip = $_SERVER["REMOTE_ADDR"] ?? '';
+        $description = ($instance !== null)
+            ? "[instance = $instance],\n$field_name = '$docs_id'"
+            : "$field_name = '$docs_id'";
+
+        $sql = str_replace("'", "''", $sql);
+
+        $query = $this->framework->createQuery();
+        $query->add("INSERT INTO $redcap_log_event_table (ts, user, ip, page, project_id, event, object_type, sql_log, pk, event_id, data_values, description) VALUES (?, ?, ?, 'ExternalModules/index.php', ?, 'DOC_UPLOAD', 'redcap_data', ?, ?, ?, ?, 'Upload Document')",
+                    [$current_timestamp, $this->userid, $ip, $this->pid, $sql, $record, $event_id, $description]);
+        $query->execute();
+
+        return true;
+    }
+
+    /**
      * Helper function that deletes a file from the File Repository, if REDCap data about it fails
      * to be inserted to the database.Stolen code from redcap version/FileRepository/index.php.
      *
@@ -649,13 +1191,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * Formats a report to give to DOMPdf, with appropriate CSS
      * and scripts to add page numbers/timestamps, at the bottom of the page.
      *
+     * @param String $main      Main content of report
      * @param String $header    Header contents of report
      * @param String $footer    Footer contents of report
-     * @param String $main      Main content of report
      * @since 3.0
      * @return String   PDF contents
      */
-    private function formatPDFContents($header = "", $footer = "", $main)
+    private function formatPDFContents($main, $header = "", $footer = "")
     {
 
         if (isset($main) && !empty($main))
@@ -1134,7 +1676,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      */
     public function createPDF($dompdf_obj, $header, $footer, $main)
     {
-        $contents = $this->formatPDFContents($header, $footer, $main);
+        $contents = $this->formatPDFContents($main, $header, $footer);
 
         // Add page numbers to the footer of every page
         $dompdf_obj->set_option("isHtml5ParserEnabled", true);
@@ -1251,7 +1793,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $footer = empty($footer) ? "" : $doc->saveHTML($footer);
                     $main = $doc->saveHTML($main);
 
-                    $contents = $this->formatPDFContents($header, $footer, $main);
+                    $contents = $this->formatPDFContents($main, $header, $footer);
 
                     if (!empty($contents))
                     {
@@ -2240,6 +2782,412 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                             </tr>
                         </tbody>
                     </table>
+                    <?php if ($action === 'edit'): ?>
+                    <script>const CTE_PID = <?= (int)$this->pid ?>;</script>
+                    <div>
+                        <input name="record" type="hidden" value="<?php print $record;?>">
+                        <input type="hidden" id="cte-template-filename" value="<?php print htmlspecialchars($curr_template_name, ENT_QUOTES); ?>">
+                        <input type="hidden" id="cte-current-record" value="<?php print htmlspecialchars($record, ENT_QUOTES); ?>">
+                    </div>
+                    <div class="mt-3">
+                        <div class="card border">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="mb-1">
+                                        Trigger Save Report to a Field
+                                        <span class="text-muted">(Optional)</span>
+                                    </h5>
+                                    <small class="text-muted">
+                                        Enable a trigger condition for this template on record save. When the trigger logic evaluates true, the report will be generated and saved to the selected file upload field.
+                                    </small>
+                                    <br>
+                                    <div class="small text-muted">
+                                    <strong>Repeating & longitudinal behavior</strong>
+                                        <ul>
+                                            <li>Saving on the target form → uses the <strong>current instance</strong></li>
+                                            <li>Saving from another form → uses the <strong>latest instance</strong></li>
+                                        </ul>
+                                    </div>
+                                    <div class="alert alert-warning py-2 px-3 small mb-0" role="alert">
+                                        <strong>Warning:</strong> This will overwrite any existing document stored in the selected field.
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch mb-0 mx-4 fs-6">
+                                    <input class="form-check-input"
+                                        type="checkbox"
+                                        id="cte-trigger-enabled"
+                                        aria-describedby="cte-trigger-enabled-help">
+                                    <label class="form-check-label" for="cte-trigger-enabled">
+                                        Enabled
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+
+                                    <?php if (REDCap::isLongitudinal()) : ?>
+                                    
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="save-report-to-event-dropdown">
+                                            Target Event
+                                        </label>
+                                        <select id="save-report-to-event-dropdown"
+                                                name="save-report-to-event-val"
+                                                class="form-select">
+                                            <option value="">Select an event</option>
+                                            <?php
+                                            $events = REDCap::getEventNames(true, true);
+                                            foreach($events as $event)
+                                            {
+                                                print "<option value='$event'>$event</option>";
+                                            }
+                                            ?>
+                                        </select>
+                                    </div>
+                                    
+                                    <?php endif; ?>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="save-report-to-field-dropdown">
+                                            Target Upload Field
+                                        </label>
+                                        <select id="save-report-to-field-dropdown"
+                                                name="save-report-to-field-val"
+                                                class="form-select">
+                                            <option value="">Select a field</option>
+                                            <?php
+                                            $file_fields = $this->getAllFileFields();
+                                            foreach($file_fields as $field => $label)
+                                            {
+                                                print "<option value='$field'>$label</option>";
+                                            }
+                                            ?>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label for="cte-trigger-logic" class="form-label">
+                                            Trigger logic (REDCap logic)
+                                        </label>
+
+                                        <textarea
+                                            id="cte-trigger-logic"
+                                            class="form-control"
+                                            rows="3"
+                                            placeholder="[field_1] = '1' and [field_2] <> ''"
+                                            aria-describedby="cte-trigger-logic-help"
+                                            spellcheck="false">
+                                        </textarea>
+
+                                        <div id="cte-trigger-logic-help" class="form-text">
+                                            REDCap logic examples:
+                                            <table style="width: 100%; border-collapse: collapse;">  
+                                                <tbody>
+                                                    <tr>  
+                                                        <td style="padding-right: 40px; vertical-align: top;"><code>([height] &gt;= 170 or [weight] &lt; 65) and [sex] = "1"</code></td>
+                                                        <td style="vertical-align: top;"><code>if (height is greater than or equal to 170 OR weight is less than 65) AND sex = male; Male is coded as 1, Male</code></td> 
+                                                    </tr>
+                                                    <tr>
+                                                        <td style="padding-right: 40px; vertical-align: top;"><code>[last_name] &lt;&gt; ""</code></td>
+                                                        <td style="vertical-align: top;"><code>if last name is not null (aka if last name field has data)</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td style="padding-right: 40px; vertical-align: top;"><code>[height] &gt;= 170 and ([race(2)] = "1" or [race(4)] = "1")</code></td>
+                                                        <td style="vertical-align: top;"><code>if height is greater than or equal to 170cm and Asian or Caucasian is checked</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                                            <button type="button"
+                                                    id="cte-save-trigger-btn"
+                                                    class="btn btn-primary btn-sm">
+                                                Save Trigger
+                                            </button>
+                                            <button type="button"
+                                                    id="cte-disable-trigger-btn"
+                                                    class="btn btn-outline-secondary btn-sm">
+                                                Disable
+                                            </button>
+                                            <button type="button"
+                                                    id="cte-delete-trigger-btn"
+                                                    class="btn btn-outline-danger btn-sm">
+                                                Delete
+                                            </button>
+                                            <span
+                                                id="cte-trigger-status"
+                                                class="small text-muted ms-md-2"
+                                                role="status"
+                                                aria-live="polite"
+                                                aria-atomic="true"
+                                            ></span>
+
+                                        </div>
+
+                                    </div>
+
+                                    <div class="col-12">
+
+                                        <div class="border rounded p-3 bg-light">
+
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-2">Current Trigger</h6>
+                                                <span class="badge bg-secondary"
+                                                    id="cte-cur-enabled">Loading…</span>
+                                            </div>
+
+                                            <dl class="row small mb-0">
+
+                                                <dt class="col-sm-3">Template</dt>
+                                                <dd class="col-sm-9">
+                                                    <code id="cte-cur-template"></code>
+                                                </dd>
+
+                                                <?php if (REDCap::isLongitudinal()) : ?>
+
+                                                <dt class="col-sm-3">Event</dt>
+                                                <dd class="col-sm-9">
+                                                    <code id="cte-cur-event"></code>
+                                                </dd>
+
+                                                <?php endif; ?>
+
+                                                <dt class="col-sm-3">Field</dt>
+                                                <dd class="col-sm-9">
+                                                    <code id="cte-cur-field"></code>
+                                                </dd>
+                                                <dt class="col-sm-3">Logic</dt>
+                                                <dd class="col-sm-9">
+                                                    <code id="cte-cur-logic"
+                                                        class="d-inline-block text-wrap"
+                                                        style="white-space:pre-wrap;"></code>
+                                                </dd>
+                                            </dl>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                    (function () {
+                        const statusEl = document.getElementById('cte-trigger-status');
+
+                        function setStatus(message) {
+                            if (statusEl) {
+                                statusEl.textContent = message || '';
+                            }
+                        }
+
+                        function getTemplateFilename() {
+                            return (document.getElementById('cte-template-filename')?.value || '').trim();
+                        }
+
+                        function getTargetField() {
+                            return (document.getElementById('save-report-to-field-dropdown')?.value || '').trim();
+                        }
+
+                        function getTargetEventUnique() {
+                            return (document.getElementById('save-report-to-event-dropdown')?.value || '').trim();
+                        }
+
+                        function getLogic() {
+                            return (document.getElementById('cte-trigger-logic')?.value || '').trim();
+                        }
+
+                        function isEnabledChecked() {
+                            return !!document.getElementById('cte-trigger-enabled')?.checked;
+                        }
+
+                        function buildGetUrl() {
+                            const template = encodeURIComponent(getTemplateFilename());
+                            return '<?= $this->getUrl("get_trigger.php") ?>' + '&template=' + template;
+                        }
+
+                        function buildSaveUrl() {
+                            return '<?= $this->getUrl("save_trigger.php", false, false) ?>';
+                        }
+
+                        function buildDeleteUrl() {
+                            return '<?= $this->getUrl("delete_trigger.php", false, false) ?>';
+                        }
+
+                        function renderCurrent(cfg) {
+                            const curEnabledEl = document.getElementById('cte-cur-enabled');
+                            const curTemplateEl = document.getElementById('cte-cur-template');
+                            const curEventEl = document.getElementById('cte-cur-event');
+                            const curFieldEl = document.getElementById('cte-cur-field');
+                            const curLogicEl = document.getElementById('cte-cur-logic');
+
+                            const enabledCheckboxEl = document.getElementById('cte-trigger-enabled');
+                            const logicTextareaEl = document.getElementById('cte-trigger-logic');
+                            const fieldSelectEl = document.getElementById('save-report-to-field-dropdown');
+                            const eventSelectEl = document.getElementById('save-report-to-event-dropdown');
+
+                            if (curTemplateEl) {
+                                curTemplateEl.textContent = getTemplateFilename() || '';
+                            }
+
+                            if (!cfg) {
+                                if (curEnabledEl) {
+                                    curEnabledEl.textContent = 'None';
+                                    curEnabledEl.className = 'badge bg-secondary';
+                                }
+
+                                if (curEventEl) curEventEl.textContent = '';
+                                if (curFieldEl) curFieldEl.textContent = '';
+                                if (curLogicEl) curLogicEl.textContent = '';
+
+                                if (enabledCheckboxEl) enabledCheckboxEl.checked = false;
+                                if (logicTextareaEl) logicTextareaEl.value = '';
+                                if (fieldSelectEl) fieldSelectEl.value = '';
+                                if (eventSelectEl) eventSelectEl.value = '';
+
+                                return;
+                            }
+
+                            if (curEnabledEl) {
+                                if (cfg.enabled) {
+                                    curEnabledEl.textContent = 'Enabled';
+                                    curEnabledEl.className = 'badge bg-success';
+                                } else {
+                                    curEnabledEl.textContent = 'Disabled';
+                                    curEnabledEl.className = 'badge bg-secondary';
+                                }
+                            }
+
+                            if (curEventEl) curEventEl.textContent = cfg.target_event_unique || '';
+                            if (curFieldEl) curFieldEl.textContent = cfg.target_field || '';
+                            if (curLogicEl) curLogicEl.textContent = cfg.logic || '';
+
+                            if (enabledCheckboxEl) enabledCheckboxEl.checked = !!cfg.enabled;
+                            if (logicTextareaEl) logicTextareaEl.value = cfg.logic || '';
+                            if (fieldSelectEl) fieldSelectEl.value = cfg.target_field || '';
+                            if (eventSelectEl) eventSelectEl.value = cfg.target_event_unique || '';
+                        }
+
+                        async function loadCurrent() {
+                            setStatus('');
+                            const url = buildGetUrl();
+
+                            const res = await fetch(url, { credentials: 'same-origin' });
+                            const text = await res.text();
+
+                            let data;
+                            try {
+                                data = JSON.parse(text);
+                            } catch (e) {
+                                console.error('get_trigger raw response:', text);
+                                setStatus('Load failed (invalid JSON).');
+                                return;
+                            }
+
+                            renderCurrent(data.config || null);
+                        }
+
+                        async function saveTrigger(enabledOverride = null) {
+                            const enabled = enabledOverride !== null ? enabledOverride : isEnabledChecked();
+                            const logic = getLogic();
+                            const template = getTemplateFilename();
+                            const targetField = getTargetField();
+                            const targetEventUnique = getTargetEventUnique();
+
+                            setStatus('Saving...');
+
+                            if (!template) {
+                                setStatus('Missing template filename.');
+                                return;
+                            }
+
+                            if (enabled) {
+                                if (!logic) {
+                                    setStatus('Logic is required.');
+                                    return;
+                                }
+
+                                if (!targetField) {
+                                    setStatus('Select a target field.');
+                                    return;
+                                }
+                            }
+
+                            const fd = new FormData();
+                            fd.append('enabled', enabled ? '1' : '0');
+                            fd.append('logic', logic);
+                            fd.append('template', template);
+                            fd.append('target_field', targetField);
+                            fd.append('target_event_unique', targetEventUnique);
+                            fd.append('redcap_csrf_token', <?=json_encode($this->getCSRFToken())?>)
+
+                            const res = await fetch(buildSaveUrl(), {
+                                method: 'POST',
+                                body: fd,
+                                credentials: 'same-origin'
+                            });
+
+                            const text = await res.text();
+                            console.log('save_trigger raw response:', text);
+
+                            let data;
+                            try {
+                                data = JSON.parse(text);
+                            } catch (e) {
+                                console.error('save_trigger raw response:', text);
+                                setStatus(`Save failed (HTTP ${res.status}).`);
+                                return;
+                            }
+
+                            setStatus(data.success ? 'Saved.' : ('Error: ' + (data.error || 'Unknown')));
+                            await loadCurrent();
+                        }
+
+                        async function deleteTrigger() {
+                            if (!confirm('Delete the trigger for this template?')) return;
+
+                            const template = getTemplateFilename();
+                            if (!template) {
+                                setStatus('Missing template filename.');
+                                return;
+                            }
+
+                            setStatus('Deleting...');
+
+                            const fd = new FormData();
+                            fd.append('template', template);
+                            fd.append('redcap_csrf_token', <?= json_encode($this->getCSRFToken()) ?>);
+
+                            const res = await fetch(buildDeleteUrl(), {
+                                method: 'POST',
+                                body: fd,
+                                credentials: 'same-origin'
+                            });
+
+                            const text = await res.text();
+                            let data;
+
+                            try {
+                                data = JSON.parse(text);
+                            } catch (e) {
+                                console.error('delete_trigger raw response:', text);
+                                setStatus(`Delete failed (HTTP ${res.status}).`);
+                                return;
+                            }
+
+                            setStatus(data.success ? 'Deleted.' : ('Error: ' + (data.error || 'Unknown')));
+                            await loadCurrent();
+                        }
+
+                        document.getElementById('cte-save-trigger-btn')?.addEventListener('click', () => saveTrigger(null));
+                        document.getElementById('cte-disable-trigger-btn')?.addEventListener('click', () => saveTrigger(false));
+                        document.getElementById('cte-delete-trigger-btn')?.addEventListener('click', deleteTrigger);
+
+                        loadCurrent();
+                    })();
+                    </script>
+                    <?php endif; ?>
                     <div class="collapsible-container">
                         <button type="button" class="collapsible">Add Header **Optional** <span class="fas fa-caret-down"></span><span class="fas fa-caret-up"></span></button>
                         <div class="collapsible-content"> 

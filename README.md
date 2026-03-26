@@ -45,7 +45,29 @@ The module users the PHP template engine, Smarty, to fill in the templates with 
 
 WARNING:  This module is not currently able to support REDCap instances using load balancers due to the requirement to save templates to the file system.
 
+## Custom Template Engine Trigger
+
+Generate and save a template automatically when record data meets defined conditions.
+
+When a record is saved and the configured REDCap logic evaluates to **true**, the selected template is rendered and saved to the specified file upload field.
+
+Behaviour:
+ - Enabled trigger conditions are evaluated on every record save
+ - In classic projects, the file is saved to the base record context
+ - In repeating instruments and longitudinal projects:
+   - Saving on the target field's instrument saves to the **current instance**
+   - Saving from another instrument saves to the **latest instance** of the target field's instrument
+
+WARNING: This will overwrite any existing document stored in the selected field.
+
+If a trigger condition depends on a field that is updated during the workflow, @SETVALUE may be useful to reset that field and prevent the trigger from continuing to evalute as true on later saves.
+
 ##  Changelog
+* v4.2.0
+  * feat: add trigger condition per template to save to a file upload field when REDCap::evaluateLogic() returns true on the redcap_save_record hook
+  * framework-version to v12
+  * php-version-min to 8.1.0
+  * redcap-version-min to 15.5.35
 * v4.1.5
   * bug fixes for missing checkbox values in repeating instruments (classic & longitudinal)
   * improved merge logic to preserve non-empty data and detect semantically empty values
