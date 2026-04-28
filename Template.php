@@ -127,6 +127,45 @@ class Template
     }
 
     /**
+     * Resolves a file upload field value into an embeddable image string.
+     *
+     * Returns the original value if it cannot be resolved safely.
+     *
+     * @param string $field_name
+     * @param mixed $value
+     * @return mixed
+     */
+    private function resolveImageFileFieldValue(string $fieldName, $value)
+    {
+        if (($this->dictionary[$fieldName]["field_type"] ?? null) !== "file") {
+            return $value;
+        }
+
+        $docId = trim((string) $value);
+
+        if ($docId === "" || !ctype_digit($docId)) {
+            return $value;
+        }
+
+        $file = \REDCap::getFile($docId);
+
+        if ($file === false || !is_array($file) || count($file) < 3) {
+            return $value;
+        }
+
+        [$mimeType, $docName, $fileContent] = $file;
+
+        if (!is_string($mimeType) || stripos($mimeType, "image/") !== 0) {
+            return $value;
+        }
+
+        $dataUri = "data:" . $mimeType . ";base64," . base64_encode($fileContent);
+        $alt = htmlspecialchars($docName ?: $fieldName, ENT_QUOTES);
+
+        return '<img src="' . $dataUri . '" alt="' . $alt . '" style="max-width:100%;height:auto;" />';
+    }
+
+    /**
      * Parses event data into an assosiative array that will be used by Smarty to fill templates 
      * with data.
      * 
@@ -144,9 +183,9 @@ class Template
         $rights = REDCap::getUserRights($user);
         $rights_object = new ExportRights();  // create a rights object
         $rights_object->setRights($rights);  // set the rights within this object
-        print "<!-- Rights for $user\n ";
-        print_r($rights);
-        print "-->\n";
+        // print "<!-- Rights for $user\n ";
+        // print_r($rights);
+        // print "-->\n";
         $external_fields = array();
         $this->instruments = REDCap::getInstrumentNames();
         foreach ($this->instruments as $unique_name => $label)
@@ -258,18 +297,21 @@ class Template
 
                     } else {  // treat the data normally
 
-                        if ($this->dictionary[$field_name]["field_type"] === "notes") { // make HTML entities
+                        if ($this->dictionary[$field_name]["field_type"] === "notes") {
 
                             $event_fields_and_vals[$field_name] = str_replace("\r\n", "<br/>", htmlentities($value));
 
-                        } else {  // return without modification
+                        } else if (($this->dictionary[$field_name]["field_type"] ?? null) === "file") {
+                            
+                            $event_fields_and_vals[$field_name] = $this->resolveImageFileFieldValue($field_name, $value);
+
+                        } else {
 
                             $event_fields_and_vals[$field_name] = $value;
-
-                        }  // end else
+                        }
 
                     }  // end else
-
+  
                 }  // end else
 
             } // end else if

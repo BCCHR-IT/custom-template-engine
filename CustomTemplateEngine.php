@@ -11,8 +11,10 @@ require_once "Template.php";
 use REDCap;
 use Project;
 use Dompdf\Dompdf;
+use Dompdf\Options;
 use DOMDocument;
 use HtmlPage;
+use phpDocumentor\Reflection\Types\Array_;
 use ZipArchive;
 
 class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
@@ -39,6 +41,50 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * Initialize class variables.
      */
     // here you are. Remove constructor and implement lazy loading, per ~/public_html/redcap/bin/scan . output
+
+    /**
+     * 
+     * 
+     * @since 4.2.1
+     */
+    private function getProjectImageDir(): string
+    {
+        $dir = rtrim($this->img_dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . "pid_" . $this->pid . DIRECTORY_SEPARATOR;
+
+        if (!file_exists($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        return $dir;
+    }
+
+    /** 
+     * 
+     * 
+     * @since 4.2.1
+    */
+    private function getProjectImageUrl(string $filename): string
+    {
+        $realpath = realpath($this->getProjectImageDir());
+        $publicly_accessible_start_pos = strpos($realpath, "redcap");
+        $path = substr($realpath, $publicly_accessible_start_pos);
+
+        return "https://" . $_SERVER["SERVER_NAME"] . "/" . str_replace(DIRECTORY_SEPARATOR, "/", $path) . "/" . rawurlencode($filename);
+    }
+
+    /**
+     * 
+     * 
+     * @since 4.2.1
+     */
+    private function getLegacyImageUrl(string $filename): string
+    {
+        $realpath = realpath($this->img_dir);
+        $publicly_accessible_start_pos = strpos($realpath, "redcap");
+        $path = substr($realpath, $publicly_accessible_start_pos);
+
+        return "https://" . $_SERVER["SERVER_NAME"] . "/" . str_replace(DIRECTORY_SEPARATOR, "/", $path) . "/" . rawurlencode($filename);
+    }
 
     /**
      * CTE Trigger retrieves the trigger configuration for the project
@@ -1304,14 +1350,21 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             			$escaped_extension = htmlentities($name['extension'], ENT_QUOTES);
 			            $filename = str_replace(" ", "_", $escaped_filename) . "_" . $epid . "." . $escaped_extension;
 
-                        if (move_uploaded_file(realpath($tmp_name), $this->img_dir . $filename))
-                        {
-                            $realpath = realpath($this->img_dir);
-                            $publicly_accessible_start_pos = strpos($realpath, "redcap");
-                            $path = substr($realpath, $publicly_accessible_start_pos);
+                        // adding new directory structure /img_dir/{pid}/ to prevent filename conflicts between projects and to make it easier to find images for a specific project when browsing the server files
+                        $project_img_dir = $this->getProjectImageDir();
+                        $target_path = $project_img_dir . $filename;
 
-                            $url = "https://" . $_SERVER["SERVER_NAME"] . "/$path/" . $filename;
-                            REDCap::logEvent("Custom Template Engine - Photo uploaded", $filename);
+                        // if (move_uploaded_file(realpath($tmp_name), $this->img_dir . $filename))
+                        if (move_uploaded_file(realpath($tmp_name), $target_path))
+                        {
+                            // $realpath = realpath($this->img_dir);
+                            $url = $this->getProjectImageUrl($filename);
+                            REDCap::logEvent("Custom Template Engine - Photo uploaded", "pid={$this->pid}, file={$filename}");
+                            // $publicly_accessible_start_pos = strpos($realpath, "redcap");
+                            // $path = substr($realpath, $publicly_accessible_start_pos);
+
+                            // $url = "https://" . $_SERVER["SERVER_NAME"] . "/$path/" . $filename;
+                            // REDCap::logEvent("Custom Template Engine - Photo uploaded", $filename);
                         }
                         else
                         {
@@ -1410,19 +1463,38 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             <div style="margin:20px">
                 <?php
                     $all_imgs = array();
-                    foreach($proj_imgs as $img)
-                    {
-                        $realpath = realpath($this->img_dir);
-                        $publicly_accessible_start_pos = strpos($realpath, "redcap");
-                        $path = substr($realpath, $publicly_accessible_start_pos);
-
-                        array_push(
-                            $all_imgs,
-                            array(
-                                "url" => "https://" . $_SERVER["SERVER_NAME"] . "/$path/" . $img,
+                    $seen = [];
+                    $project_img_dir = $this->getProjectImageDir(); // project scoped
+                    if (is_dir($project_img_dir)) {
+                        $proj_imgs = array_filter(scandir($project_img_dir), function ($img) use ($project_img_dir) {
+                            return $img !== "." && $img !== ".." && is_file($project_img_dir . $img);
+                        });
+                    
+                        foreach($proj_imgs as $img)
+                        {
+                            if (isset($seen[$img])) {
+                                continue;
+                            }
+                            $all_imgs[] = [
+                                "url" => $this->getProjectImageUrl($img),
                                 "name" => $img
-                            )
-                        );
+                            ];
+                            $seen[$img] = true;
+                        }
+                    }
+                    // legacy images
+                    $legacy_imgs = array_filter(scandir($this->img_dir), function ($img) {
+                        return $img !== "." && $img !== ".." && strpos($img, "_" . $this->pid) !== FALSE && is_file($this->img_dir . $img);
+                    });
+                    foreach ($legacy_imgs as $img) {
+                        if (isset($seen[$img])) {
+                            continue;
+                        }
+                        $all_imgs[] = [
+                            "url" => $this->getLegacyImageUrl($img),
+                            "name" => $img
+                        ];
+                        $seen[$img] = true;
                     }
                     for($i = 0; $i < sizeof($all_imgs); $i++)
                     {
@@ -1679,11 +1751,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $contents = $this->formatPDFContents($main, $header, $footer);
 
         // Add page numbers to the footer of every page
-        $dompdf_obj->set_option("isHtml5ParserEnabled", true);
-        $dompdf_obj->set_option("isPhpEnabled", true);
+        $dompdf_obj->getOptions()->setIsHtml5ParserEnabled(true);
+        $dompdf_obj->getOptions()->setIsPhpEnabled(true);
+        $dompdf_obj->getOptions()->setIsRemoteEnabled(true);
         $dompdf_obj->loadHtml($contents);
-
-        $dompdf_obj->set_option('isRemoteEnabled', TRUE);
 
         // Setup the paper size and orientation
         $dompdf_obj->setPaper("letter", "portrait");
@@ -1797,12 +1868,12 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
                     if (!empty($contents))
                     {
-                        $dompdf = new Dompdf();
-                        $dompdf->set_option("isHtml5ParserEnabled", true);
-                        $dompdf->set_option("isPhpEnabled", true);
+                        $options = new Options();
+                        $options->setIsHtml5ParserEnabled(true);
+                        $options->setIsPhpEnabled(true);
+                        $options->setIsRemoteEnabled(true);
+                        $dompdf = new Dompdf($options);
                         $dompdf->loadHtml($contents);
-
-                        $dompdf->set_option('isRemoteEnabled', TRUE);
 
                         // Setup the paper size and orientation
                         $dompdf->setPaper("letter", "portrait");
@@ -1862,7 +1933,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             ob_clean();
             ob_end_flush(); // more important function - (without - error corrupted zip)
             header("Cache-Control: no-cache, must-revalidate"); // HTTP/1.1
-            header('Content-Type: application/zip;\n');
+            header('Content-Type: application/zip');
             header("Content-Transfer-Encoding: Binary");
             header("Content-Disposition: attachment; filename=\"".basename($zip_name)."\"");
             readfile($zip_name);

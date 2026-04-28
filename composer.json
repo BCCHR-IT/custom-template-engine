@@ -1,8 +1,10 @@
 {
     "require": {
         "ckeditor/ckeditor": "dev-full/4.21.x",
-        "dompdf/dompdf": ">=3",
-        "smarty/smarty": ">=5.3.0"
+        "dompdf/dompdf": "^3.1",
+        "smarty/smarty": "^5.8",
+        "sabberworm/php-css-parser": "^9.3",
+        "dompdf/php-svg-lib": "^1.0.2"
     },
     "config": {
         "platform": {
