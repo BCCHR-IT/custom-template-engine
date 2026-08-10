@@ -3589,7 +3589,10 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 		if (!in_array($to_add, array_keys($participant_options), true))
                 {
                     $arm_num = REDCap::isLongitudinal() ? array_pop(explode("arm_", $record["redcap_event_name"])) : "1";;
-                    $label = $custom_labels[$arm_num][$to_add]; 
+                    $label = strip_tags(
+                        (string) ($custom_labels[$arm_num][$to_add] ?? '')
+                    );
+                    \REDCap::logEvent('Custom Template Engine - Record Label', "Record: $to_add, Label: $label", null, null, null, $this->pid);
                     if (!empty($label))
                     {
                         $participant_options[$to_add] = "$to_add $label";
