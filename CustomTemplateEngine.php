@@ -3592,7 +3592,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $label = strip_tags(
                         (string) ($custom_labels[$arm_num][$to_add] ?? '')
                     );
-                    \REDCap::logEvent('Custom Template Engine - Record Label', "Record: $to_add, Label: $label", null, null, null, $this->pid);
                     if (!empty($label))
                     {
                         $participant_options[$to_add] = "$to_add $label";
