@@ -262,34 +262,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      *
      * @since 4.2.0
      */
-    // private function generatePdfFromTemplateForRecord(string $template_filename, string $record): string
-    // {
-    //     $template_filename = $this->requireValidProjectTemplate($template_filename);
-
-    //     $template = new \BCCHR\CustomTemplateEngine\Template();
-    //     $template->setPaths($this->templates_dir, $this->compiled_dir);
-
-    //     $filled_template = $template->fillTemplate($template_filename, $record);
-
-    //     $doc = new \DOMDocument();
-    //     $doc->loadHTML($filled_template);
-
-    //     $header = $doc->getElementsByTagName("header")->item(0);
-    //     $footer = $doc->getElementsByTagName("footer")->item(0);
-    //     $main = $doc->getElementsByTagName("main")->item(0);
-        
-    //     $filled_main = $doc->saveHTML($main);
-    //     $fm_entities = htmlentities($filled_main);
-    //     $filled_header = empty($header) ? "" : $doc->saveHTML($header);
-    //     $filled_footer = empty($footer)? "" : $doc->saveHTML($footer);
-
-    //     $header = \REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $filled_header));
-    //     $footer = \REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $filled_footer));
-    //     $main   = \REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $filled_main));
-
-    //     $dompdf = new \Dompdf\Dompdf();
-    //     return $this->createPDF($dompdf, $filled_header, $filled_footer, $filled_main);
-    // }
     private function generatePdfFromTemplateForRecord(
         string $template_filename,
         string $record
@@ -1408,68 +1380,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * @since 3.0
      * @return String   PDF contents
      */
-    // private function formatPDFContents($main, $header = "", $footer = "")
-    // {
-
-    //     if (isset($main) && !empty($main))
-    //     {
-    //         $doc = new DOMDocument();
-    //         $doc->loadHtml("
-    //             <!DOCTYPE html>
-    //             <html>
-    //                 <head>
-    //                     <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
-    //                 </head>
-    //                 <body>
-    //                     <header>$header</header>
-    //                     <footer>$footer</footer>
-    //                     <main>$main</main>
-    //                     <script type='text/php'>
-    //                         // Add page number and timestamp to every page
-    //                         if (isset(\$pdf)) {
-    //                             \$pdf->page_script('
-    //                                 \$font = \$fontMetrics->get_font(\"Arial, Helvetica, sans-serif\", \"normal\");
-    //                                 \$size = 12;
-    //                                 \$pageNum = \"Page \" . \$PAGE_NUM . \" of \" . \$PAGE_COUNT;
-    //                                 \$y = 750;
-    //                                 \$pdf->text(520, \$y, \$pageNum, \$font, \$size);
-    //                                 \$pdf->text(36, \$y, date(\"Y-m-d H:i:s\", time()), \$font, \$size);
-    //                             ');
-    //                         }
-    //                     </script>
-    //                 </body>
-    //             </html>
-    //         ");
-
-    //         // DOMPdf renders what's passed in, and if default font-size is used then
-    //         // the editor will use what's in app.css. Set the general CSS to be 12px.
-    //         // Any styling done by the user should appear as inline styling, which should
-    //         // override this.
-    //         if (!empty($header) && !empty($footer))
-    //         {
-    //             // $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 25px; } header { position: fixed; left: 0px; right: 0px; top: -100px;} footer { position: fixed; left: 0px; right: 0px; bottom: 0px; height: 150px;} @page { margin: 130px 50px; }");
-    //             $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 25px; } header { position: fixed; left: 0px; right: 0px; top: -100px;} footer { position: fixed; left: 0px; right: 0px; bottom: 400px; } @page { margin: 130px 50px; }");
-    //         }
-    //         else if (!empty($header))
-    //         {
-    //             $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 15px; } header { position: fixed; left: 0px; top: -100px; } @page { margin: 130px 50px 50px 50px; }");
-    //         }
-    //         else if (!empty($footer))
-    //         {
-    //             $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 15px; } footer { position: fixed; left: 0px; bottom: 0px; } @page { margin: 50px 50px 130px 50px; }");
-    //         }
-    //         else
-    //         {
-    //             $style = $doc->createElement("style", "body, body > table { font-size: 12px;} @page { margin: 50px 50px; }");
-    //         }
-
-    //         $doc->appendChild($style);
-
-    //         return $doc->saveHTML();
-    //     }
-
-    //     return "";
-    // }
     private function formatPDFContents($main, $header = "", $footer = "")
     {
         if (empty($main)) {
@@ -2193,69 +2103,6 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $doc = new DOMDocument();
                     $doc->loadHTML($filled_template);
 
-                    // $header = $doc->getElementsByTagName("header")->item(0);
-                    // $footer = $doc->getElementsByTagName("footer")->item(0);
-                    // $main = $doc->getElementsByTagName("main")->item(0);
-                    // $header = empty($header) ? "" : $doc->saveHTML($header);
-                    // $footer = empty($footer) ? "" : $doc->saveHTML($footer);
-                    // $main = $doc->saveHTML($main);
-
-                    // $headerNode = $doc->getElementsByTagName("header")->item(0);
-                    // $footerNode = $doc->getElementsByTagName("footer")->item(0);
-                    // $mainNode = $doc->getElementsByTagName("main")->item(0);
-
-                    // $header = "";
-                    // $footer = "";
-                    // $main = "";
-
-                    // if ($headerNode !== null) {
-                    //     foreach ($headerNode->childNodes as $child) {
-                    //         $header .= $doc->saveHTML($child);
-                    //     }
-                    // }
-
-                    // if ($footerNode !== null) {
-                    //     foreach ($footerNode->childNodes as $child) {
-                    //         $footer .= $doc->saveHTML($child);
-                    //     }
-                    // }
-
-                    // if ($mainNode !== null) {
-                    //     foreach ($mainNode->childNodes as $child) {
-                    //         $main .= $doc->saveHTML($child);
-                    //     }
-                    // }
-                    // $headerNode = $doc->getElementsByTagName("header")->item(0);
-                    // $footerNode = $doc->getElementsByTagName("footer")->item(0);
-                    // $mainNode = $doc->getElementsByTagName("main")->item(0);
-
-                    // $header = $this->getInnerHtml($doc, $headerNode);
-                    // $footer = $this->getInnerHtml($doc, $footerNode);
-                    // $main = $this->getInnerHtml($doc, $mainNode);
-
-                    // $contents = $this->formatPDFContents($main, $header, $footer);
-
-                    // if (!empty($contents))
-                    // {
-                    //     $options = new Options();
-                    //     $options->setIsHtml5ParserEnabled(true);
-                    //     $options->setIsPhpEnabled(true);
-                    //     $options->setIsRemoteEnabled(true);
-                    //     $dompdf = new Dompdf($options);
-                    //     $dompdf->loadHtml($contents);
-
-                    //     // Setup the paper size and orientation
-                    //     $dompdf->setPaper("letter", "portrait");
-                    //     // Render the HTML as PDF
-                    //     $dompdf->render();
-                    //     // $filled_template_pdf_content = $dompdf->output();
-                    //     $filled_template_pdf_content =
-                    //         $this->createPDF(
-                    //             $dompdf,
-                    //             $header,
-                    //             $footer,
-                    //             $main
-                    //         );
                     $headerNode = $doc->getElementsByTagName("header")->item(0);
                     $footerNode = $doc->getElementsByTagName("footer")->item(0);
                     $mainNode = $doc->getElementsByTagName("main")->item(0);
