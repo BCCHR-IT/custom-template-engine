@@ -1897,17 +1897,30 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                         else
                         {
                             REDCap::logEvent("Custom Template Engine - Template edited", $currTemplateName);
-                            if ((!empty($template_errors) || !empty($header_errors) || !empty($footer_errors)) && strpos($currTemplateName, " - INVALID") === FALSE)
+                            $hasValidationErrors =
+                                !empty($template_errors)
+                                || !empty($header_errors)
+                                || !empty($footer_errors);
+
+                            $isCurrentlyInvalid =
+                                strpos($currTemplateName, " - INVALID") !== false;
+
+                            $filename = $currTemplateName;
+
+                            // Valid template now contains errors: mark INVALID.
+                            if ($hasValidationErrors && !$isCurrentlyInvalid)
                             {
-                                $filename = strpos($currTemplateName, " - INVALID") !== FALSE ? $currTemplateName : str_replace(".html", " - INVALID.html", $currTemplateName);
-                                rename(realpath($this->templates_dir. $currTemplateName), realpath($this->templates_dir . $filename));
+                                $filename = str_replace(".html", " - INVALID.html", $currTemplateName);
+                                rename($this->templates_dir . $currTemplateName, $this->templates_dir . $filename);
                             }
-                            else if (strpos($currTemplateName, " - INVALID") !== FALSE)
+                            // Invalid template has been corrected: remove INVALID marker
+                            else if (!$hasValidationErrors && $isCurrentlyInvalid)
                             {
                                 $filename = str_replace(" - INVALID", "", $currTemplateName);
                                 rename($this->templates_dir. $currTemplateName, $this->templates_dir . $filename);
                             }
-                            $currTemplateName = realpath($filename);
+
+                            $currTemplateName = $filename;
                         }
                     }
                     else if (!file_exists("$this->templates_dir{$name}_$this->pid.html") && !file_exists("$this->templates_dir{$name}_{$this->pid} - INVALID.html") )
