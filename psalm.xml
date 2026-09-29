@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<psalm
+    errorLevel="7"
+    resolveFromConfigFile="true"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="https://getpsalm.org/schema/config"
+    xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
+>
+    <ruleset name="PHP Backwards Compatability">
+        <description>Fixing an issue with the REDCap 'scan' tool where it's lacking a PHP version value</description>
+        <!-- Run against PHPCompatability ruleset -->
+        <config name="testVersion" value="7.4-"/>
+    </ruleset>
+    <projectFiles>
+        <file name="BrowseImages.php" />
+        <file name="CreateTemplate.php" />
+        <file name="CustomTemplateEngine.php" />
+        <file name="DeleteTemplate.php" />
+        <file name="DownloadFilledTemplate.php" />
+        <file name="EditTemplate.php" />
+        <file name="FillTemplate.php" />
+        <file name="index.php" />
+        <file name="SaveFileToField.php" />
+        <file name="SaveTemplate.php" />
+        <file name="Template.php" />
+        <file name="UploadImages.php" />
+        <file name="vendor/autoload.php" />
+        <file name="vendor/composer/autoload_classmap.php" />
+        <file name="vendor/composer/autoload_files.php" />
+        <file name="vendor/composer/autoload_namespaces.php" />
+        <file name="vendor/composer/autoload_psr4.php" />
+        <file name="vendor/composer/autoload_real.php" />
+        <file name="vendor/composer/autoload_static.php" />
+        <file name="vendor/composer/ClassLoader.php" />
+        <ignoreFiles>
+            <directory name="vendor" />
+        </ignoreFiles>
+    </projectFiles>
+</psalm>
