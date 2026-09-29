@@ -42,7 +42,7 @@ Users must have access to data exports and reports in order to edit or create a 
 
 Users may add optional footers and headers that follow the same syntax rules as the body.
 
-Users may upload and browse images. However, no security is placed on what images are uploaded, and all images uploaded to the project are viewable by every user. Consider this before uploading.
+Users may upload and browse images. Images uploaded through CTE are stored in the current project's project-specific image directory and are available to users of that project who can access the module.
 
 The user may copy-paste pre-formatted fields and events into their template. Descriptive text fields are exempt from the list. 
 
@@ -52,7 +52,7 @@ Users must have access to data exports and reports in order to delete a template
 
 ## Filling and Downloading Template
 
-The module users the PHP template engine, Smarty, to fill in the templates with the appropriate record data. Smarty will compile the template and store it in the previously configured compiled templates folder. The user is free to make edits to the template content before downloading. When the template is downloaded, if saving templates to the file repository has been configured, then the module will do so.
+The module users the PHP template engine, Smarty, to fill in the templates with the appropriate record data. Smarty will compile the template and store it in the previously configured compiled templates folder. The user is free to make edits to the template content before downloading. When the template is downloaded, if saving templates to the file repository has been configured, then the module will do so. Submitted template selections are validated server-side against the valid templates for the current REDCap project before rendering.
 
 ##  Web Application Load Balancing
 
@@ -65,17 +65,33 @@ Generate and save a template automatically when record data meets defined condit
 When a record is saved and the configured REDCap logic evaluates to **true**, the selected template is rendered and saved to the specified file upload field.
 
 Behaviour:
- - Enabled trigger conditions are evaluated on every record save
- - In classic projects, the file is saved to the base record context
- - In repeating instruments and longitudinal projects:
-   - Saving on the target field's instrument saves to the **current instance**
-   - Saving from another instrument saves to the **latest instance** of the target field's instrument
+ - Enabled trigger conditions are evaluated on every record save.
+ - In classic projects with a repeating target instrument:
+   - Saving on the target form uses the current instance.
+   - Saving from another form uses the latest existing instance of the target repeating instrument.
+ - In longitudinal projects: the selected target event is used for trigger logic evaluation and as the destination event for the generated report.
+   - Non-repeating events are supported
+   - Repeat Entire Event is supported and uses the current event instance. 
+     - Saving on the target field's instrument uses the current event instance.
+     - Saving from another instrument within the same repeating event instance also uses that same current event instance.
+   - Independently repeating instruments are not currently supported.
 
 WARNING: This will overwrite any existing document stored in the selected field.
 
-If a trigger condition depends on a field that is updated during the workflow, @SETVALUE may be useful to reset that field and prevent the trigger from continuing to evalute as true on later saves.
+If a trigger condition depends on a field that is updated during the workflow, @SETVALUE may be useful to reset that field and prevent the trigger from continuing to evaluate as true on later saves.
 
 ##  Changelog
+* v4.2.2
+  * feat: improve template validation error reporting with surrounding line context
+  * fix: normalize Custom Record Labels containing HTML for record selection dropdowns
+  * fix: validate submitted template filenames against valid templates for the current REDCap project before rendering
+  * fix: apply project template validation consistently to single, batch, and trigger-based template generation
+  * fix: escape filename-derived values when rendered into HTML
+  * fix: preserve header, footer, and body rendering in batch and trigger-generated PDFs
+  * docs: clarify CTE Trigger behaviour for classic repeating and longitudinal projects
+  * security: upgrade vulnerable dependencies
+    * dompdf/dompdf (v3.1.5 => v3.1.6)
+    * smarty/smarty (v5.8.0 => v5.8.4)
 * v4.2.1
   * feat: support rendering of record file upload images (including signatures)
   * feat: add project-scoped image storage

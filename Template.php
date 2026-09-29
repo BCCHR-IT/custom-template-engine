@@ -56,6 +56,73 @@ class Template
         $this->smarty->assign("showLabelAndRow", $this->show_label_and_row);
 
     }  // end setPaths()
+
+    /**
+     * Build line context on error for user debugging purposes
+     */
+    private function buildLineContext(array $lines, int $lineNum, int $contextRadius = 2): string
+    {
+        $startLine = max(1, $lineNum - $contextRadius); // 1 indexed line numbers
+        $endLine = min(count($lines), $lineNum + $contextRadius);
+
+        $context = [];
+        
+        for ($i = $startLine; $i <= $endLine; $i++) {
+            $rawLine = $lines[$i - 1] ?? ''; // Adjust for 0-indexed array
+            $line = html_entity_decode($rawLine, ENT_HTML5 | ENT_QUOTES);
+
+            $line = preg_replace('/^\s*<p>/i', '', $line);
+            $line = preg_replace('/<\/p>\s*$/i', '', $line);
+            $line = preg_replace('/<br\s*\/?>\s*$/i', '', $line);
+
+            $prefix = $i === $lineNum ? '>' : ' ';
+
+            $context[] = sprintf(
+                '%s %' . $width . 'd | %s',
+                $prefix,
+                $i,
+                $line
+            );
+        }
+
+        return htmlspecialchars(
+            implode("\n", $context),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+    }
+
+    /**
+     * Append line context to error message for debugging purposes
+     */
+    private function addLineContextToErrors(array $errors, array $lines): array
+    {
+        $seenLineNumbers = [];
+
+        foreach ($errors as $index => $error) {
+            if (!preg_match('/LINE \[(\d+)\]/', $error, $matches)) {
+                continue;
+            }
+
+            $lineNum = (int) $matches[1];
+            
+            if (isset($seenLineNumbers[$lineNum])) {
+                continue;
+            }
+
+            $seenLineNumbers[$lineNum] = true;
+
+            $errors[$index] .= sprintf(
+                '<br><details style="margin:0.25rem 0 0.5rem;">
+                    <summary style="cursor:pointer;font-weight:600;">Show line context</summary>
+                    <pre style="margin:0.5rem 0 0;padding:0.5rem;white-space:pre-wrap;overflow-x:auto;border:1px solid #ddd;background:#f8f8f8;font-size:0.875rem;">%s</pre>
+                </details>',
+                $this->buildLineContext($lines, $lineNum)
+            );
+        }
+
+        return $errors;
+    }
  
     /**
      * Checks whether all the siblings that come before or after an html element are empty
@@ -756,7 +823,7 @@ class Template
 
                             if ($previous !== "\$redcap" && $previous !== "]")
                             {
-                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Each field and events query must be preceeded by <strong>\$redcap</strong>";
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Each field and events query must be preceded by <strong>\$redcap</strong>";
                             }
 
                             if ($next_part == "]")
@@ -799,7 +866,7 @@ class Template
                                 && !in_array($next_part, $this->formatting_operators))
                             {
                                 // $test = in_array($next_part, $this->logical_operators) ? 'yes' : implode('-', $this->logical_operators);
-                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalidd <strong>'$next_part'</strong> after <strong>$part</strong>.";
+                                $errors[] = "<b>ERROR</b> [EDITOR] LINE [$line_num] Invalid <strong>'$next_part'</strong> after <strong>$part</strong>.";
                             }
                         }
                         break;
@@ -1148,7 +1215,9 @@ class Template
             }
         }
 
-        return array_merge($errors, $this->validateIfStatements($lines));
+        $errors = array_merge($errors, $this->validateIfStatements($lines));
+
+        return $this->addLineContextToErrors($errors, $lines);
     }
 
     private function isSemanticallyEmptyValue($v): bool

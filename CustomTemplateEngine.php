@@ -43,6 +43,96 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     // here you are. Remove constructor and implement lazy loading, per ~/public_html/redcap/bin/scan . output
 
     /**
+     * Returns the filename suffix for fillable template belonging to current REDCap project
+     * 
+     * @since 4.2.2
+     */
+    private function getProjectTemplateSuffix(): string
+    {
+        return "_{$this->pid}.html";
+    }
+
+    /**
+     * Determine whether template path remains inside configured templates directory
+     * 
+     * @since 4.2.2
+     */
+    private function isTemplatePathSafe(string $templatePath): bool
+    {
+        if (is_link($templatePath) || !is_file($templatePath)) {
+            return false;
+        }
+
+        $templateRoot = realpath($this->templates_dir);
+        $resolvedPath = realpath($templatePath);
+
+        if ($templateRoot === false || $resolvedPath === false) {
+            return false;
+        }
+
+        $templateRoot = rtrim($templateRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+
+        return str_starts_with($resolvedPath, $templateRoot);
+    }
+
+    /**
+     * Return existing templates belonging to current REDCap project
+     * @return list<string>
+     * @since 4.2.2
+     */
+    private function getValidProjectTemplates(): array
+    {
+        if (!is_dir($this->templates_dir)) {
+            return [];
+        }
+
+        $files = scandir($this->templates_dir);
+
+        if ($files === false) {
+            return [];
+        }
+
+        $suffix = $this->getProjectTemplateSuffix();
+
+        $templates = [];
+
+        foreach ($files as $file) {
+            if ($file === '.' || $file === '..' || !str_ends_with($file, $suffix)) {
+                continue;
+            }
+
+            $templatePath = $this->templates_dir . $file;
+            
+            if (!$this->isTemplatePathSafe($templatePath)) {
+                continue;
+            }
+
+            $templates[] = $file;
+        }
+
+        sort($templates, SORT_NATURAL | SORT_FLAG_CASE);
+        return $templates;
+    }
+
+    /**
+     * Require a valid template filename for the current REDCap project, throwing an exception if invalid
+     * 
+     * @since 4.2.2
+     */
+    private function requireValidProjectTemplate(mixed $templateFilename): string
+    {
+        if (!is_string($templateFilename) || $templateFilename === '') {
+            throw new \InvalidArgumentException('Invalid template selected.');
+        }
+
+        if (!in_array($templateFilename, $this->getValidProjectTemplates(), true)) {
+            throw new \InvalidArgumentException('Invalid template selected.');
+        }
+
+        return $templateFilename;
+    }
+
+    /**
      * 
      * 
      * @since 4.2.1
@@ -62,11 +152,11 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      * 
      * 
      * @since 4.2.1
-    */
+     */
     private function getProjectImageUrl(string $filename): string
     {
         $realpath = realpath($this->getProjectImageDir());
-        $publicly_accessible_start_pos = strpos($realpath, "redcap");
+        $publicly_accessible_start_pos = strrpos($realpath, "redcap");
         $path = substr($realpath, $publicly_accessible_start_pos);
 
         return "https://" . $_SERVER["SERVER_NAME"] . "/" . str_replace(DIRECTORY_SEPARATOR, "/", $path) . "/" . rawurlencode($filename);
@@ -80,7 +170,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
     private function getLegacyImageUrl(string $filename): string
     {
         $realpath = realpath($this->img_dir);
-        $publicly_accessible_start_pos = strpos($realpath, "redcap");
+        $publicly_accessible_start_pos = strrpos($realpath, "redcap");
         $path = substr($realpath, $publicly_accessible_start_pos);
 
         return "https://" . $_SERVER["SERVER_NAME"] . "/" . str_replace(DIRECTORY_SEPARATOR, "/", $path) . "/" . rawurlencode($filename);
@@ -172,31 +262,63 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      *
      * @since 4.2.0
      */
-    private function generatePdfFromTemplateForRecord(string $template_filename, string $record): string
-    {
-        $template = new \BCCHR\CustomTemplateEngine\Template();
-        $template->setPaths($this->templates_dir, $this->compiled_dir);
+    private function generatePdfFromTemplateForRecord(
+        string $template_filename,
+        string $record
+    ): string {
+        $template_filename =
+            $this->requireValidProjectTemplate($template_filename);
 
-        $filled_template = $template->fillTemplate($template_filename, $record);
+        $template = new Template();
+        $template->setPaths(
+            $this->templates_dir,
+            $this->compiled_dir
+        );
 
-        $doc = new \DOMDocument();
+        $filled_template =
+            $template->fillTemplate(
+                $template_filename,
+                $record
+            );
+
+        $doc = new DOMDocument();
         $doc->loadHTML($filled_template);
 
-        $header = $doc->getElementsByTagName("header")->item(0);
-        $footer = $doc->getElementsByTagName("footer")->item(0);
-        $main = $doc->getElementsByTagName("main")->item(0);
+        $header = $this->getInnerHtml(
+            $doc,
+            $doc->getElementsByTagName("header")->item(0)
+        );
 
-        $filled_main = $doc->saveHTML($main);
-        $fm_entities = htmlentities($filled_main);
-        $filled_header = empty($header) ? "" : $doc->saveHTML($header);
-        $filled_footer = empty($footer)? "" : $doc->saveHTML($footer);
+        $footer = $this->getInnerHtml(
+            $doc,
+            $doc->getElementsByTagName("footer")->item(0)
+        );
 
-        $header = \REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $filled_header));
-        $footer = \REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $filled_footer));
-        $main   = \REDCap::filterHtml(preg_replace("/&nbsp;/", " ", $filled_main));
+        $main = $this->getInnerHtml(
+            $doc,
+            $doc->getElementsByTagName("main")->item(0)
+        );
 
-        $dompdf = new \Dompdf\Dompdf();
-        return $this->createPDF($dompdf, $filled_header, $filled_footer, $filled_main);
+        $header = \REDCap::filterHtml(
+            preg_replace("/&nbsp;/", " ", $header)
+        );
+
+        $footer = \REDCap::filterHtml(
+            preg_replace("/&nbsp;/", " ", $footer)
+        );
+
+        $main = \REDCap::filterHtml(
+            preg_replace("/&nbsp;/", " ", $main)
+        );
+
+        $dompdf = new Dompdf();
+
+        return $this->createPDF(
+            $dompdf,
+            $header,
+            $footer,
+            $main
+        );
     }
 
     /**
@@ -1233,6 +1355,21 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         return true;
     }
 
+    private function getInnerHtml(DOMDocument $doc, ?\DOMNode $node): string
+    {
+        if ($node === null) {
+            return "";
+        }
+
+        $html = "";
+
+        foreach ($node->childNodes as $child) {
+            $html .= $doc->saveHTML($child);
+        }
+
+        return $html;
+    }
+
     /**
      * Formats a report to give to DOMPdf, with appropriate CSS
      * and scripts to add page numbers/timestamps, at the bottom of the page.
@@ -1245,66 +1382,156 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
      */
     private function formatPDFContents($main, $header = "", $footer = "")
     {
-
-        if (isset($main) && !empty($main))
-        {
-            $doc = new DOMDocument();
-            $doc->loadHtml("
-                <!DOCTYPE html>
-                <html>
-                    <head>
-                        <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
-                    </head>
-                    <body>
-                        <header>$header</header>
-                        <footer>$footer</footer>
-                        <main>$main</main>
-                        <script type='text/php'>
-                            // Add page number and timestamp to every page
-                            if (isset(\$pdf)) {
-                                \$pdf->page_script('
-                                    \$font = \$fontMetrics->get_font(\"Arial, Helvetica, sans-serif\", \"normal\");
-                                    \$size = 12;
-                                    \$pageNum = \"Page \" . \$PAGE_NUM . \" of \" . \$PAGE_COUNT;
-                                    \$y = 750;
-                                    \$pdf->text(520, \$y, \$pageNum, \$font, \$size);
-                                    \$pdf->text(36, \$y, date(\"Y-m-d H:i:s\", time()), \$font, \$size);
-                                ');
-                            }
-                        </script>
-                    </body>
-                </html>
-            ");
-
-            // DOMPdf renders what's passed in, and if default font-size is used then
-            // the editor will use what's in app.css. Set the general CSS to be 12px.
-            // Any styling done by the user should appear as inline styling, which should
-            // override this.
-            if (!empty($header) && !empty($footer))
-            {
-                // $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 25px; } header { position: fixed; left: 0px; right: 0px; top: -100px;} footer { position: fixed; left: 0px; right: 0px; bottom: 0px; height: 150px;} @page { margin: 130px 50px; }");
-                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 25px; } header { position: fixed; left: 0px; right: 0px; top: -100px;} footer { position: fixed; left: 0px; right: 0px; bottom: 400px; } @page { margin: 130px 50px; }");
-            }
-            else if (!empty($header))
-            {
-                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 15px; } header { position: fixed; left: 0px; top: -100px; } @page { margin: 130px 50px 50px 50px; }");
-            }
-            else if (!empty($footer))
-            {
-                $style = $doc->createElement("style", "body, body > table { font-size: 12px; margin-top: 15px; } footer { position: fixed; left: 0px; bottom: 0px; } @page { margin: 50px 50px 130px 50px; }");
-            }
-            else
-            {
-                $style = $doc->createElement("style", "body, body > table { font-size: 12px;} @page { margin: 50px 50px; }");
-            }
-
-            $doc->appendChild($style);
-
-            return $doc->saveHTML();
+        if (empty($main)) {
+            return "";
         }
 
-        return "";
+        /*
+        * Fixed elements in Dompdf are positioned relative to the page's
+        * content area. Reserve space with @page margins, then position the
+        * header/footer into those margins using negative offsets.
+        */
+
+        if (!empty($header) && !empty($footer)) {
+            $css = "
+                @page {
+                    margin: 130px 50px 150px 50px;
+                }
+
+                body {
+                    margin: 0;
+                    padding: 0;
+                    font-size: 12px;
+                }
+
+                header {
+                    position: fixed;
+                    top: -105px;
+                    left: 0;
+                    right: 0;
+                }
+
+                footer {
+                    position: fixed;
+                    bottom: -105px;
+                    left: 0;
+                    right: 0;
+                }
+            ";
+        } elseif (!empty($header)) {
+            $css = "
+                @page {
+                    margin: 130px 50px 50px 50px;
+                }
+
+                body {
+                    margin: 0;
+                    padding: 0;
+                    font-size: 12px;
+                }
+
+                header {
+                    position: fixed;
+                    top: -105px;
+                    left: 0;
+                    right: 0;
+                }
+            ";
+        } elseif (!empty($footer)) {
+            $css = "
+                @page {
+                    margin: 50px 50px 150px 50px;
+                }
+
+                body {
+                    margin: 0;
+                    padding: 0;
+                    font-size: 12px;
+                }
+
+                footer {
+                    position: fixed;
+                    bottom: -105px;
+                    left: 0;
+                    right: 0;
+                }
+            ";
+        } else {
+            $css = "
+                @page {
+                    margin: 50px;
+                }
+
+                body {
+                    margin: 0;
+                    padding: 0;
+                    font-size: 12px;
+                }
+            ";
+        }
+
+        return "
+            <!DOCTYPE html>
+            <html>
+                <head>
+                    <meta http-equiv='Content-Type'
+                        content='text/html; charset=utf-8'/>
+
+                    <style>
+                        $css
+                    </style>
+                </head>
+
+                <body>
+                    <header>$header</header>
+
+                    <footer>$footer</footer>
+
+                    <main>
+                        $main
+                    </main>
+
+                    <script type='text/php'>
+                        if (isset(\$pdf)) {
+                            \$pdf->page_script('
+                                \$font = \$fontMetrics->get_font(
+                                    \"Arial, Helvetica, sans-serif\",
+                                    \"normal\"
+                                );
+
+                                \$size = 12;
+
+                                \$pageNum =
+                                    \"Page \" .
+                                    \$PAGE_NUM .
+                                    \" of \" .
+                                    \$PAGE_COUNT;
+
+                                \$y = 765;
+
+                                \$pdf->text(
+                                    520,
+                                    \$y,
+                                    \$pageNum,
+                                    \$font,
+                                    \$size
+                                );
+
+                                \$pdf->text(
+                                    36,
+                                    \$y,
+                                    date(\"Y-m-d H:i:s\", time()),
+                                    \$font,
+                                    \$size
+                                );
+                            ');
+                        }
+                    </script>
+                </body>
+            </html>
+        ";
     }
+    
 
     /**
      * Uploads images from file browser object to server.
@@ -1827,7 +2054,26 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 
         // $records = htmlspecialchars($_POST["participantID"], ENT_QUOTES);
         $records = array_map('htmlspecialchars', $_POST["participantID"], array(ENT_QUOTES));
-        $template_filename = htmlspecialchars($_POST['template'], ENT_QUOTES);
+        try {
+            $template_filename =
+                $this->requireValidProjectTemplate(
+                    $_POST['template'] ?? null
+                );
+        } catch (\InvalidArgumentException $e) {
+            \REDCap::logEvent(
+                'Custom Template Engine - Invalid template selection',
+                'The selected template is not available for this project.'
+            );
+
+            exit(
+                "<div class='red'>"
+                . "Custom Template Engine - Invalid template selection"
+                . "</div>"
+                . "<a href='"
+                . $this->getUrl('index.php')
+                . "'>Back to Front</a>"
+            );
+        }
         // $template = new Template($this->templates_dir, $this->compiled_dir);
         $template = new Template();
         $template->setPaths($this->templates_dir, $this->compiled_dir);
@@ -1857,29 +2103,24 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     $doc = new DOMDocument();
                     $doc->loadHTML($filled_template);
 
-                    $header = $doc->getElementsByTagName("header")->item(0);
-                    $footer = $doc->getElementsByTagName("footer")->item(0);
-                    $main = $doc->getElementsByTagName("main")->item(0);
-                    $header = empty($header) ? "" : $doc->saveHTML($header);
-                    $footer = empty($footer) ? "" : $doc->saveHTML($footer);
-                    $main = $doc->saveHTML($main);
+                    $headerNode = $doc->getElementsByTagName("header")->item(0);
+                    $footerNode = $doc->getElementsByTagName("footer")->item(0);
+                    $mainNode = $doc->getElementsByTagName("main")->item(0);
 
-                    $contents = $this->formatPDFContents($main, $header, $footer);
+                    $header = $this->getInnerHtml($doc, $headerNode);
+                    $footer = $this->getInnerHtml($doc, $footerNode);
+                    $main = $this->getInnerHtml($doc, $mainNode);
 
-                    if (!empty($contents))
-                    {
-                        $options = new Options();
-                        $options->setIsHtml5ParserEnabled(true);
-                        $options->setIsPhpEnabled(true);
-                        $options->setIsRemoteEnabled(true);
-                        $dompdf = new Dompdf($options);
-                        $dompdf->loadHtml($contents);
+                    if (!empty($main)) {
+                        $dompdf = new Dompdf();
 
-                        // Setup the paper size and orientation
-                        $dompdf->setPaper("letter", "portrait");
-                        // Render the HTML as PDF
-                        $dompdf->render();
-                        $filled_template_pdf_content = $dompdf->output();
+                        $filled_template_pdf_content =
+                            $this->createPDF(
+                                $dompdf,
+                                $header,
+                                $footer,
+                                $main
+                            );
 
                         // Add PDF to ZIP
                         if ($z->addFromString("reports/$filename.pdf", $filled_template_pdf_content) !== true)
@@ -1903,7 +2144,7 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                     }
                 }
             }
-            catch (Exception $e)
+            catch (\Throwable $e)
             {
                 $errors[] = "<b>ERROR</b> [" . $e->getCode() . "] LINE [" . $e->getLine() . "] FILE [" . $e->getFile() . "] " . str_replace("Undefined index", "Field name does not exist", $e->getMessage());
             }
@@ -1992,7 +2233,26 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
             exit("<div class='red'>No record has been selected. Please go back and select a record to fill the template.</div><a href='" . $this->getUrl("index.php") . "'>Back to Front</a>");
         }
 
-        $template_filename = $_POST['template'];
+        try {
+            $template_filename =
+                $this->requireValidProjectTemplate(
+                    $_POST['template'] ?? null
+                );
+        } catch (\InvalidArgumentException $e) {
+            \REDCap::logEvent(
+                'Custom Template Engine - Invalid template selection',
+                'The selected template is not available for this project.'
+            );
+
+            exit(
+                "<div class='red'>"
+                . "Custom Template Engine - Invalid template selection"
+                . "</div>"
+                . "<a href='"
+                . $this->getUrl('index.php')
+                . "'>Back to Front</a>"
+            );
+        }
         //$template = new Template($this->templates_dir, $this->compiled_dir);
         $template = new Template();
         $template->setPaths($this->templates_dir, $this->compiled_dir);
@@ -2078,7 +2338,28 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                 <td class="data">
                                     <div class="row">
                                         <div class="col-md-5">
-                                            <input id="filename" name="filename" type="text" class="form-control" value="<?php print basename($template_filename, "_$this->pid.html") . " - $record";?>" required>
+                                            <?php
+                                            $downloadFilename =
+                                                basename(
+                                                    $template_filename,
+                                                    "_{$this->pid}.html"
+                                                )
+                                                . " - "
+                                                . $record;
+                                            ?>
+
+                                            <input
+                                                id="filename"
+                                                name="filename"
+                                                type="text"
+                                                class="form-control"
+                                                value="<?= htmlspecialchars(
+                                                    $downloadFilename,
+                                                    ENT_QUOTES,
+                                                    'UTF-8'
+                                                ) ?>"
+                                                required
+                                            >
                                             <input name="record" type="hidden" value="<?php print $record;?>">
                                         </div>
                                     </div>
@@ -2873,10 +3154,21 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
                                     </small>
                                     <br>
                                     <div class="small text-muted">
-                                    <strong>Repeating & longitudinal behavior</strong>
-                                        <ul>
-                                            <li>Saving on the target form → uses the <strong>current instance</strong></li>
-                                            <li>Saving from another form → uses the <strong>latest instance</strong></li>
+                                        <strong>Repeating & longitudinal behavior</strong>
+                                        <ul class="mb-2">
+                                            <li>
+                                                <strong>Classic repeating:</strong>
+                                                target form → <strong>current instance</strong>;
+                                                other form → <strong>latest instance</strong>.
+                                            </li>
+                                            <li>
+                                                <strong>Longitudinal:</strong>
+                                                Target Event is used for trigger evaluation and report storage.
+                                                <strong>Repeat Entire Event</strong> uses the <strong>current event instance</strong>.
+                                            </li>
+                                            <li>
+                                                Independently repeating instruments are not currently supported in longitudinal projects.
+                                            </li>
                                         </ul>
                                     </div>
                                     <div class="alert alert-warning py-2 px-3 small mb-0" role="alert">
@@ -3589,7 +3881,9 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
 		if (!in_array($to_add, array_keys($participant_options), true))
                 {
                     $arm_num = REDCap::isLongitudinal() ? array_pop(explode("arm_", $record["redcap_event_name"])) : "1";;
-                    $label = $custom_labels[$arm_num][$to_add]; 
+                    $label = strip_tags(
+                        (string) ($custom_labels[$arm_num][$to_add] ?? '')
+                    );
                     if (!empty($label))
                     {
                         $participant_options[$to_add] = "$to_add $label";
@@ -3625,20 +3919,13 @@ class CustomTemplateEngine extends \ExternalModules\AbstractExternalModule
         $total = count($participant_options);
 
         $all_templates = array_diff(scandir($this->templates_dir), array("..", "."));
-        $edit_templates = array();
-        $valid_templates = array();
+        $valid_templates = $this->getValidProjectTemplates();
+        $edit_templates = [];
 
-        // Grab all templates for current project
-        foreach($all_templates as $template)
-        {
-            if (strpos($template, "_$this->pid.html") !== FALSE)
+        foreach ($all_templates as $template) {
+            if (str_ends_with($template, "_{$this->pid}.html") || str_ends_with($template, "_{$this->pid} - INVALID.html")) 
             {
-                array_push($valid_templates, $template);
-                array_push($edit_templates, $template);
-            }
-            else if (strpos($template, "_{$this->pid} - INVALID.html") !== FALSE)
-            {
-                array_push($edit_templates, $template);
+                $edit_templates[] = $template;
             }
         }
         ?>
